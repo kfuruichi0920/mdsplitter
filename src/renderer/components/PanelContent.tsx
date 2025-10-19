@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Panel } from '@shared/types';
 import { useAppStore } from '../store/useAppStore';
+import { useCardStore } from '../store/useCardStore';
 import TabBar from './TabBar';
+import CardPanel from './CardPanel';
 
 interface PanelContentProps {
   panel: Panel;
@@ -9,6 +11,7 @@ interface PanelContentProps {
 
 const PanelContent: React.FC<PanelContentProps> = ({ panel }) => {
   const { splitPanel, activePanel, setActivePanel } = useAppStore();
+  const { cardFiles } = useCardStore();
   const [tabs, setTabs] = useState<Panel[]>([panel]);
   const [activeTabId, setActiveTabId] = useState(panel.id);
 
@@ -57,12 +60,12 @@ const PanelContent: React.FC<PanelContentProps> = ({ panel }) => {
       <div className="flex-1 overflow-auto">
         {activeTab.type === 'welcome' && <WelcomeContent />}
         {activeTab.type === 'card' && (
-          <div className="p-4 text-secondary-700 dark:text-secondary-300">
-            Card Panel: {activeTab.title}
-            {activeTab.filePath && (
-              <div className="text-xs text-secondary-500 mt-1">{activeTab.filePath}</div>
-            )}
-          </div>
+          <CardPanel
+            cardFile={
+              activeTab.filePath ? cardFiles.get(activeTab.filePath) || null : null
+            }
+            filePath={activeTab.filePath}
+          />
         )}
         {activeTab.type === 'editor' && (
           <div className="p-4 text-secondary-700 dark:text-secondary-300">
