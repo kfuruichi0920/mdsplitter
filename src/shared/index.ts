@@ -30,3 +30,6 @@ export interface CardFile {
   };
   body: CardNode[];
 }
+
+export type { AppSettings } from "./settings/schema";
+export { parseSettings, defaultSettings, settingsSchema } from "./settings/schema";
