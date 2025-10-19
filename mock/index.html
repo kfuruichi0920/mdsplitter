@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>カード編集アプリケーション モック</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+      --bg: #ffffff;
+      --sub-bg: #f9fafb;
+      --border: #d1d5db;
+      --text: #111827;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.1);
+      --sidebar-width: 256px;
+    }
+
+    body.dark {
+      --bg: #111827;
+      --sub-bg: #1f2937;
+      --border: #374151;
+      --text: #f9fafb;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.15);
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .menu-bar,
+    .status-bar {
+      background: var(--sub-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 14px;
+      height: 32px;
+      gap: 24px;
+    }
+
+    .status-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: none;
+      justify-content: space-between;
+      font-size: 11px;
+      height: 24px;
+    }
+
+    .menu-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .menu-item span:first-child {
+      font-weight: 600;
+      text-decoration: underline;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      height: 40px;
+      border-bottom: 1px solid var(--border);
+      background: var(--sub-bg);
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    .toolbar-group + .toolbar-group::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: var(--border);
+    }
+
+    button.icon {
+      height: 28px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.icon.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button.icon:hover,
+    .tab:hover,
+    .sidebar-item:hover,
+    .log-header button:hover {
+      background: var(--accent-soft);
+    }
+
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: var(--sidebar-width) 1fr;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--sub-bg);
+    }
+
+    .sidebar-section {
+      padding: 12px 12px 0;
+    }
+
+    .sidebar-section h2 {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .sidebar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .sidebar-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .search-box {
+      position: relative;
+      margin: 0 12px 16px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 8px 12px 8px 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: inherit;
+      font-size: 13px;
+    }
+
+    .search-box span {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.6;
+    }
+
+    .content-area {
+      display: grid;
+      grid-template-rows: 1fr 160px;
+      height: 100%;
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--bg);
+      position: relative;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+
+    .panel:last-child {
+      border-right: none;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 1px;
+      background: var(--sub-bg);
+      border-bottom: 1px solid var(--border);
+      height: 36px;
+      align-items: flex-end;
+      padding: 0 8px;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--border);
+      color: inherit;
+      border-radius: 6px 6px 0 0;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .tab.active {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      font-weight: 600;
+    }
+
+    .tab .status-dot {
+      font-size: 10px;
+      color: #f97316;
+    }
+
+    .card-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--sub-bg);
+      font-size: 12px;
+    }
+
+    .card-toolbar-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    .card-toolbar-group + .card-toolbar-group::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--border);
+    }
+
+    .card-list {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      background: var(--bg);
+      position: relative;
+    }
+
+    .card-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      position: relative;
+      transition: background 0.2s ease, border 0.2s ease;
+    }
+
+    .card-item.compact {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+
+    .card-item[data-selected="true"] {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 4px solid var(--accent);
+    }
+
+    .card-item:hover {
+      background: rgba(59, 130, 246, 0.06);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+
+    .card-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .trace-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--accent);
+    }
+
+    .trace-dot.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .card-body textarea,
+    .card-body .card-text {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: 14px;
+      line-height: 1.5;
+      resize: none;
+    }
+
+    .card-body textarea:focus {
+      outline: none;
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .badge[data-status="approved"] {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge[data-status="review"] {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge[data-status="draft"] {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .badge[data-status="deprecated"] {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .card-footer {
+      font-size: 12px;
+      color: rgba(107, 114, 128, 0.9);
+      margin-top: 8px;
+    }
+
+    .indent-level-1 { margin-left: 24px; }
+    .indent-level-2 { margin-left: 48px; }
+    .indent-level-3 { margin-left: 72px; }
+
+    .log-panel {
+      border-top: 1px solid var(--border);
+      background: var(--sub-bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: var(--sub-bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .log-body {
+      flex: 1;
+      padding: 16px;
+      font-family: "Fira Code", "Consolas", monospace;
+      font-size: 12px;
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    .log-line {
+      margin-bottom: 6px;
+    }
+
+    .log-line[data-level="INFO"] { color: #16a34a; }
+    .log-line[data-level="WARN"] { color: #d97706; }
+    .log-line[data-level="ERROR"] { color: #dc2626; }
+    .log-line[data-level="DEBUG"] { color: #2563eb; }
+
+    .trace-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .trace-overlay svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .trace-line {
+      stroke: var(--accent);
+      stroke-width: 2;
+      fill: none;
+      opacity: 0.6;
+      marker-end: url(#arrowhead);
+    }
+
+    .theme-toggle {
+      margin-left: auto;
+    }
+
+    .filter-input {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: inherit;
+      width: 160px;
+    }
+
+    .card-item.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="menu-bar">
+    <div class="menu-item"><span>F</span><span>ファイル</span></div>
+    <div class="menu-item"><span>E</span><span>編集</span></div>
+    <div class="menu-item"><span>V</span><span>表示</span></div>
+    <div class="menu-item"><span>H</span><span>ヘルプ</span></div>
+  </div>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="icon" title="ファイルを開く"><span>📂</span><span>開く</span></button>
+      <button class="icon" title="保存"><span>💾</span><span>保存</span></button>
+    </div>
+    <div class="toolbar-group">
+      <button class="icon" id="trace-toggle" title="トレース表示切替"><span>⛓️</span><span>トレース</span></button>
+      <button class="icon" title="トレースタイプフィルタ"><span>⛏️</span><span>タイプ</span></button>
+    </div>
+    <div class="toolbar-group">
+      <button class="icon" title="水平分割"><span>⬌</span></button>
+      <button class="icon" title="垂直分割"><span>⬍</span></button>
+    </div>
+    <button class="icon theme-toggle" id="themeToggle" title="テーマ切替">🌗 テーマ</button>
+  </div>
+  <div class="main">
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h2>エクスプローラ</h2>
+        <div class="sidebar-list" id="fileList"></div>
+      </div>
+      <div class="sidebar-section">
+        <h2>検索</h2>
+      </div>
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="カードを検索" />
+      </div>
+    </aside>
+    <div class="content-area">
+      <div class="panels" id="panels">
+        <div class="trace-overlay" id="traceOverlay"></div>
+      </div>
+      <div class="log-panel">
+        <div class="log-header">
+          <strong>動作ログ</strong>
+          <button class="icon" id="clearLog">クリア</button>
+        </div>
+        <div class="log-body" id="logBody"></div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div>
+      <span id="statusTotal">総カード数: 0</span>
+      <span>｜</span>
+      <span id="statusSelected">選択カード: -</span>
+      <span>｜</span>
+      <span id="statusSave">● 未保存</span>
+    </div>
+    <div>
+      <span>UTF-8</span>
+      <span>｜</span>
+      <span id="statusTheme">ライトモード</span>
+    </div>
+  </div>
+  <script>
+    const mockFiles = [
+      { name: "システム要求.md", unsaved: true },
+      { name: "UI設計.md", unsaved: false },
+      { name: "試験仕様.md", unsaved: false }
+    ];
+
+    const mockPanels = [
+      {
+        id: "leftPanel",
+        title: "要件分割カード.json",
+        cards: [
+          {
+            id: "C-001",
+            level: 0,
+            icon: "📑",
+            status: "approved",
+            text: "1. アプリケーション概要",
+            updated: "2025-10-19 14:30",
+            hasTrace: true
+          },
+          {
+            id: "C-002",
+            level: 1,
+            icon: "📝",
+            status: "review",
+            text: "非構造化文書をカード単位で管理し、トレーサビリティを確保する。",
+            updated: "2025-10-19 12:10",
+            hasTrace: true
+          },
+          {
+            id: "C-003",
+            level: 1,
+            icon: "📝",
+            status: "draft",
+            text: "カード変換は固定ルールとLLM変換を切り替え可能にする。",
+            updated: "2025-10-18 21:02",
+            hasTrace: false
+          },
+          {
+            id: "C-004",
+            level: 0,
+            icon: "📑",
+            status: "approved",
+            text: "2. 共通機能",
+            updated: "2025-10-17 08:32",
+            hasTrace: true
+          },
+          {
+            id: "C-005",
+            level: 1,
+            icon: "📊",
+            status: "review",
+            text: "ファイル入出力はTXT/MDに対応し、5,000カードで1秒未満を目標とする。",
+            updated: "2025-10-16 18:11",
+            hasTrace: true
+          }
+        ]
+      },
+      {
+        id: "rightPanel",
+        title: "UI設計カード.json",
+        cards: [
+          {
+            id: "U-101",
+            level: 0,
+            icon: "📑",
+            status: "review",
+            text: "1. 設計コンセプト",
+            updated: "2025-10-20 09:44",
+            hasTrace: true
+          },
+          {
+            id: "U-102",
+            level: 1,
+            icon: "📝",
+            status: "review",
+            text: "視認性の高さと操作効率を重視したレイアウトを採用する。",
+            updated: "2025-10-20 09:50",
+            hasTrace: true
+          },
+          {
+            id: "U-103",
+            level: 0,
+            icon: "📑",
+            status: "approved",
+            text: "2. レイアウト構成",
+            updated: "2025-10-19 16:20",
+            hasTrace: true
+          },
+          {
+            id: "U-104",
+            level: 1,
+            icon: "📝",
+            status: "draft",
+            text: "メニューバー32px、ツールバー40px、サイドバー256pxを基準とする。",
+            updated: "2025-10-19 16:30",
+            hasTrace: true
+          }
+        ]
+      }
+    ];
+
+    const mockLog = [
+      { time: "2025-10-20 10:02:15", level: "INFO", message: "カードファイルを読み込みました" },
+      { time: "2025-10-20 10:02:16", level: "DEBUG", message: "LLM変換モード: 固定ルール" },
+      { time: "2025-10-20 10:02:20", level: "WARN", message: "カード C-003 にレビュー未完了のステータスが残っています" },
+      { time: "2025-10-20 10:02:24", level: "INFO", message: "トレーサビリティ表示を有効化しました" }
+    ];
+
+    const traces = [
+      { fromPanel: "leftPanel", fromId: "C-002", toPanel: "rightPanel", toId: "U-102" },
+      { fromPanel: "leftPanel", fromId: "C-005", toPanel: "rightPanel", toId: "U-104" }
+    ];
+
+    const fileList = document.getElementById("fileList");
+    mockFiles.forEach((file, idx) => {
+      const item = document.createElement("div");
+      item.className = "sidebar-item" + (idx === 0 ? " active" : "");
+      item.innerHTML = `<span>${file.unsaved ? "📄" : "📁"}</span><span>${file.name}</span>${file.unsaved ? '<span class="status-dot">●</span>' : ""}`;
+      fileList.appendChild(item);
+    });
+
+    const panelsContainer = document.getElementById("panels");
+
+    function renderPanels(compact = false, filter = "") {
+      panelsContainer.querySelectorAll(".panel").forEach((p) => p.remove());
+      const matchedCards = [];
+      mockPanels.forEach((panel) => {
+        const panelEl = document.createElement("section");
+        panelEl.className = "panel";
+        panelEl.dataset.panelId = panel.id;
+        panelEl.innerHTML = `
+          <div class="tab-bar">
+            <div class="tab active"><span>📄</span><span>${panel.title}</span><span class="status-dot">●</span></div>
+            <div class="tab">➕ 新規</div>
+          </div>
+          <div class="card-toolbar">
+            <div class="card-toolbar-group">
+              <button class="icon" data-action="expand">▼ 展開</button>
+              <button class="icon" data-action="collapse">▶ 折畳</button>
+            </div>
+            <div class="card-toolbar-group">
+              <input class="filter-input" type="text" placeholder="文字列フィルタ" value="${filter}" />
+              <button class="icon" title="カード情報種別"><span>🗂️</span></button>
+              <button class="icon" title="トレース関係のみ"><span>🔽</span></button>
+            </div>
+            <div class="card-toolbar-group">
+              <button class="icon compact-toggle ${compact ? "active" : ""}"><span>☰</span> コンパクト</button>
+            </div>
+          </div>
+          <div class="card-list"></div>
+        `;
+
+        const list = panelEl.querySelector(".card-list");
+        panel.cards.forEach((card) => {
+          const matchesFilter = card.text.toLowerCase().includes(filter.toLowerCase());
+          if (matchesFilter) {
+            matchedCards.push(card.id);
+          }
+          const cardEl = document.createElement("article");
+          cardEl.className = `card-item indent-level-${card.level}`;
+          cardEl.dataset.cardId = card.id;
+          cardEl.innerHTML = compact
+            ? `
+              <div class="trace-dot ${card.hasTrace ? "active" : ""}"></div>
+              <span>${card.icon}</span>
+              <span class="badge" data-status="${card.status}">${card.status}</span>
+              <div class="card-text">${card.text}</div>
+            `
+            : `
+              <div class="card-header">
+                <div class="card-main">
+                  <div class="trace-dot ${card.hasTrace ? "active" : ""}"></div>
+                  <button class="icon" style="padding:2px 6px" title="展開/折畳">${card.level > 0 ? "▼" : ""}</button>
+                  <span>${card.icon}</span>
+                  <span class="badge" data-status="${card.status}">${card.status}</span>
+                  <strong>${card.id}</strong>
+                </div>
+                <span>●</span>
+              </div>
+              <div class="card-body">
+                <textarea rows="3">${card.text}</textarea>
+              </div>
+              <div class="card-footer">最終更新: ${card.updated}</div>
+            `;
+          if (compact && !matchesFilter && filter) {
+            cardEl.classList.add("hidden");
+          }
+          list.appendChild(cardEl);
+        });
+
+        list.dataset.panelId = panel.id;
+        panelsContainer.appendChild(panelEl);
+      });
+
+      document.getElementById("statusTotal").textContent = `総カード数: ${mockPanels.reduce((sum, p) => sum + p.cards.length, 0)}`;
+      document.getElementById("statusSelected").textContent = matchedCards.length ? `検索一致: ${matchedCards.length}` : "選択カード: -";
+      updateTraces();
+    }
+
+    function updateTraces() {
+      const overlay = document.getElementById("traceOverlay");
+      overlay.innerHTML = "";
+      if (!document.getElementById("trace-toggle").classList.contains("active")) {
+        return;
+      }
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      const defs = document.createElementNS(svgNS, "defs");
+      const marker = document.createElementNS(svgNS, "marker");
+      marker.setAttribute("id", "arrowhead");
+      marker.setAttribute("markerWidth", "6");
+      marker.setAttribute("markerHeight", "6");
+      marker.setAttribute("refX", "5");
+      marker.setAttribute("refY", "3");
+      marker.setAttribute("orient", "auto");
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", "M0,0 L6,3 L0,6 z");
+      path.setAttribute("fill", "var(--accent)");
+      marker.appendChild(path);
+      defs.appendChild(marker);
+      svg.appendChild(defs);
+
+      traces.forEach((trace) => {
+        const fromEl = panelsContainer.querySelector(`.panel[data-panel-id="${trace.fromPanel}"] [data-card-id="${trace.fromId}"]`);
+        const toEl = panelsContainer.querySelector(`.panel[data-panel-id="${trace.toPanel}"] [data-card-id="${trace.toId}"]`);
+        if (!fromEl || !toEl) return;
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const containerRect = panelsContainer.getBoundingClientRect();
+
+        const startX = fromRect.right - containerRect.left;
+        const startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+        const endX = toRect.left - containerRect.left;
+        const endY = toRect.top + toRect.height / 2 - containerRect.top;
+        const ctrlOffset = (endX - startX) / 2;
+
+        const bezier = document.createElementNS(svgNS, "path");
+        bezier.setAttribute(
+          "d",
+          `M ${startX} ${startY} C ${startX + ctrlOffset} ${startY}, ${endX - ctrlOffset} ${endY}, ${endX} ${endY}`
+        );
+        bezier.setAttribute("class", "trace-line");
+        svg.appendChild(bezier);
+      });
+
+      overlay.appendChild(svg);
+    }
+
+    renderPanels();
+
+    window.addEventListener("resize", updateTraces);
+
+    panelsContainer.addEventListener("click", (event) => {
+      const button = event.target.closest("button.icon");
+      if (!button) return;
+      const panelEl = event.target.closest(".panel");
+      const action = button.dataset.action;
+      if (action === "expand" || action === "collapse") {
+        const expanded = action === "expand";
+        panelEl.querySelectorAll("textarea").forEach((area) => {
+          area.parentElement.parentElement.style.display = expanded ? "" : "none";
+        });
+      }
+      if (button.classList.contains("compact-toggle")) {
+        button.classList.toggle("active");
+        const isCompact = button.classList.contains("active");
+        renderPanels(isCompact, document.getElementById("searchInput").value);
+      }
+    });
+
+    document.getElementById("searchInput").addEventListener("input", (event) => {
+      const query = event.target.value;
+      const compact = panelsContainer.querySelector(".compact-toggle")?.classList.contains("active");
+      renderPanels(compact, query);
+    });
+
+    const logBody = document.getElementById("logBody");
+    function renderLog() {
+      logBody.innerHTML = "";
+      mockLog.forEach((entry) => {
+        const line = document.createElement("div");
+        line.className = "log-line";
+        line.dataset.level = entry.level;
+        line.textContent = `[${entry.time}] ${entry.level}: ${entry.message}`;
+        logBody.appendChild(line);
+      });
+    }
+    renderLog();
+
+    document.getElementById("clearLog").addEventListener("click", () => {
+      logBody.innerHTML = "";
+    });
+
+    document.getElementById("trace-toggle").addEventListener("click", (event) => {
+      event.currentTarget.classList.toggle("active");
+      updateTraces();
+    });
+
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+      const darkMode = document.body.classList.contains("dark");
+      document.getElementById("statusTheme").textContent = darkMode ? "ダークモード" : "ライトモード";
+      document.getElementById("statusSave").textContent = darkMode ? "✓ 保存済み" : "● 未保存";
+      updateTraces();
+    });
+  </script>
+</body>
+</html>
