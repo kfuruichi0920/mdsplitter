@@ -103,3 +103,25 @@ export interface FileInfo {
   size?: number;
   modifiedAt?: string;
 }
+
+// File I/O types
+export interface FileOpenResult {
+  success: boolean;
+  filePath?: string;
+  content?: string;
+  encoding?: string;
+  error?: string;
+}
+
+export interface FileSaveResult {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+}
+
+export interface FileDialogOptions {
+  title?: string;
+  defaultPath?: string;
+  filters?: Array<{ name: string; extensions: string[] }>;
+  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>;
+}

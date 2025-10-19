@@ -1,5 +1,9 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import * as path from 'path';
+import { openFile, saveFile, saveFileAs, readFile } from './services/fileService';
+import { initLogger, logInfo } from './services/logService';
+import { initSettings, getSettings, updateSettings } from './services/settingsService';
+import { initWorkDir } from './services/folderService';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -37,6 +41,9 @@ function createWindow() {
 
   // Create application menu
   createMenu();
+
+  // Setup IPC handlers
+  setupIpcHandlers();
 }
 
 function createMenu() {
@@ -108,8 +115,83 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+/**
+ * Setup IPC handlers for file operations
+ */
+function setupIpcHandlers() {
+  // File operations
+  ipcMain.handle('file:open', async () => {
+    return await openFile(mainWindow);
+  });
+
+  ipcMain.handle('file:save', async (_event, { filePath, content }) => {
+    return await saveFile(filePath, content);
+  });
+
+  ipcMain.handle('file:saveAs', async (_event, { content, defaultPath }) => {
+    return await saveFileAs(mainWindow, content, { defaultPath });
+  });
+
+  ipcMain.handle('file:read', async (_event, filePath: string) => {
+    return await readFile(filePath);
+  });
+
+  // Settings operations
+  ipcMain.handle('settings:get', async () => {
+    return getSettings();
+  });
+
+  ipcMain.handle('settings:update', async (_event, updates) => {
+    return await updateSettings(updates);
+  });
+
+  // Log operations
+  ipcMain.handle('log:info', async (_event, message: string, meta?: Record<string, unknown>) => {
+    logInfo(message, meta);
+  });
+
+  ipcMain.handle('log:warn', async (_event, message: string, meta?: Record<string, unknown>) => {
+    const { logWarn } = await import('./services/logService');
+    logWarn(message, meta);
+  });
+
+  ipcMain.handle('log:error', async (_event, message: string, error?: unknown) => {
+    const { logError } = await import('./services/logService');
+    logError(message, error);
+  });
+
+  ipcMain.handle('log:debug', async (_event, message: string, meta?: Record<string, unknown>) => {
+    const { logDebug } = await import('./services/logService');
+    logDebug(message, meta);
+  });
+}
+
+/**
+ * Initialize application services
+ */
+async function initializeApp() {
+  // Initialize logger
+  initLogger();
+  logInfo('Application starting...');
+
+  // Initialize settings
+  const settings = await initSettings();
+  logInfo('Settings loaded', { settings });
+
+  // Initialize work directory if set
+  if (settings.workDir) {
+    try {
+      await initWorkDir(settings.workDir);
+      logInfo('Work directory initialized', { workDir: settings.workDir });
+    } catch (error) {
+      logInfo('Failed to initialize work directory, will use default', { error });
+    }
+  }
+}
+
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initializeApp();
   createWindow();
 
   app.on('activate', () => {

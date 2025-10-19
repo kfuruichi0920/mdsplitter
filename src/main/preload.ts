@@ -1,22 +1,48 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { FileOpenResult, FileSaveResult, AppSettings } from '../shared/types';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
-  // File operations (to be implemented in Phase 2)
+  // File operations
   openFile: () => ipcRenderer.invoke('file:open'),
-  saveFile: (data: unknown) => ipcRenderer.invoke('file:save', data),
-  saveFileAs: (data: unknown) => ipcRenderer.invoke('file:saveAs', data),
+  saveFile: (filePath: string, content: string) =>
+    ipcRenderer.invoke('file:save', { filePath, content }),
+  saveFileAs: (content: string, defaultPath?: string) =>
+    ipcRenderer.invoke('file:saveAs', { content, defaultPath }),
+  readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
+
+  // Settings operations
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  updateSettings: (updates: Partial<AppSettings>) =>
+    ipcRenderer.invoke('settings:update', updates),
+
+  // Log operations
+  logInfo: (message: string, meta?: Record<string, unknown>) =>
+    ipcRenderer.invoke('log:info', message, meta),
+  logWarn: (message: string, meta?: Record<string, unknown>) =>
+    ipcRenderer.invoke('log:warn', message, meta),
+  logError: (message: string, error?: unknown) =>
+    ipcRenderer.invoke('log:error', message, error),
+  logDebug: (message: string, meta?: Record<string, unknown>) =>
+    ipcRenderer.invoke('log:debug', message, meta),
 
   // Platform info
   platform: process.platform,
 });
 
-// Type declaration for TypeScript (will be in shared/types.ts later)
+// Type declaration for TypeScript
 export interface ElectronAPI {
-  openFile: () => Promise<unknown>;
-  saveFile: (data: unknown) => Promise<void>;
-  saveFileAs: (data: unknown) => Promise<void>;
+  openFile: () => Promise<FileOpenResult>;
+  saveFile: (filePath: string, content: string) => Promise<FileSaveResult>;
+  saveFileAs: (content: string, defaultPath?: string) => Promise<FileSaveResult>;
+  readFile: (filePath: string) => Promise<FileOpenResult>;
+  getSettings: () => Promise<AppSettings>;
+  updateSettings: (updates: Partial<AppSettings>) => Promise<AppSettings>;
+  logInfo: (message: string, meta?: Record<string, unknown>) => Promise<void>;
+  logWarn: (message: string, meta?: Record<string, unknown>) => Promise<void>;
+  logError: (message: string, error?: unknown) => Promise<void>;
+  logDebug: (message: string, meta?: Record<string, unknown>) => Promise<void>;
   platform: NodeJS.Platform;
 }
 

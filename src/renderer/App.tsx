@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import StatusBar from './components/StatusBar';
 import LogPanel from './components/LogPanel';
+import { ErrorDialog } from './components/ErrorDialog';
 
 const App: React.FC = () => {
   // Initialize theme
@@ -34,6 +35,9 @@ const App: React.FC = () => {
 
       {/* Status bar */}
       <StatusBar />
+
+      {/* Error dialog */}
+      <ErrorDialog />
     </div>
   );
 };
