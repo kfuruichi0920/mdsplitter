@@ -33,3 +33,4 @@ export interface CardFile {
 
 export type { AppSettings } from "./settings/schema";
 export { parseSettings, defaultSettings, settingsSchema } from "./settings/schema";
+export { IPC_CHANNELS } from "./ipc";

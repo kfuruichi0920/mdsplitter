@@ -25,6 +25,10 @@ export class SettingsService {
     this.filePath = path.join(configDir, options.fileName ?? DEFAULT_FILE_NAME);
   }
 
+  get path(): string {
+    return this.filePath;
+  }
+
   async init(): Promise<AppSettings> {
     await this.ensureConfigDir();
     this.settings = await this.loadFromDisk();
@@ -110,4 +114,3 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
 
   return result as T;
 }
-

@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "chardet": "^2.1.0",
+    "chokidar": "^4.0.3",
     "electron": "^31.2.0",
     "encoding-japanese": "^2.2.0",
     "iconv-lite": "^0.7.0",

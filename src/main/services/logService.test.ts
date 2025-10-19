@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile, utimes } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 
@@ -88,5 +88,35 @@ describe("LogService", () => {
     expect(content).toContain("visible");
 
     service.dispose();
+  });
+
+  it("removes logs older than retention days", async () => {
+    settings.current = {
+      ...settings.current,
+      log: {
+        ...settings.current.log,
+        logRotation: {
+          ...settings.current.log.logRotation,
+          retentionDays: 1,
+          maxFiles: 2
+        }
+      }
+    };
+
+    const logsDir = path.join(tempDir, "_logs");
+    await mkdir(logsDir, { recursive: true });
+    const oldFile = path.join(logsDir, "app-20200101.log");
+    await writeFile(oldFile, "old log", "utf-8");
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    await utimes(oldFile, threeDaysAgo / 1000, threeDaysAgo / 1000);
+
+    const service = new LogService(settings, { baseDir: tempDir });
+    await service.init();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const files = await readdir(logsDir);
+    expect(files).not.toContain("app-20200101.log");
+
+    await service.dispose();
   });
 });
