@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>カード編集アプリケーション - モック</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+        --accent: #3b82f6;
+        --bg: #ffffff;
+        --bg-sub: #f9fafb;
+        --border: #d1d5db;
+        --text: #111827;
+        --text-muted: #6b7280;
+        --menu-height: 32px;
+        --toolbar-height: 40px;
+        --sidebar-width: 256px;
+        --tabbar-height: 36px;
+        --log-height: 180px;
+        --status-height: 24px;
+      }
+
+      [data-theme="dark"] {
+        --accent: #60a5fa;
+        --bg: #111827;
+        --bg-sub: #1f2937;
+        --border: #374151;
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-family);
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      button {
+        font: inherit;
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: var(--menu-height) var(--toolbar-height) 1fr var(--status-height);
+        min-height: 100vh;
+      }
+
+      .menu-bar,
+      .tool-bar,
+      .status-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-sub);
+      }
+
+      .menu-bar {
+        font-size: 13px;
+        justify-content: flex-start;
+      }
+
+      .menu-item {
+        padding: 4px 12px;
+        border-radius: 4px;
+      }
+
+      .menu-item:hover,
+      .tool-button:hover,
+      .panel-tool-button:hover,
+      .tab.active {
+        background: rgba(59, 130, 246, 0.12);
+      }
+
+      .menu-item span {
+        color: var(--text-muted);
+        margin-left: 4px;
+      }
+
+      .tool-bar {
+        justify-content: space-between;
+      }
+
+      .tool-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tool-group + .tool-group {
+        border-left: 1px solid var(--border);
+        padding-left: 16px;
+        margin-left: 16px;
+      }
+
+      .tool-button,
+      .panel-tool-button,
+      .tab {
+        padding: 6px 10px;
+        border-radius: 6px;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+
+      .main-layout {
+        display: grid;
+        grid-template-columns: var(--sidebar-width) 1fr;
+        grid-template-rows: 1fr var(--log-height);
+        min-height: calc(100vh - var(--menu-height) - var(--toolbar-height) - var(--status-height));
+        border-top: 1px solid var(--border);
+      }
+
+      .sidebar {
+        grid-row: 1 / span 2;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border);
+        background: var(--bg-sub);
+        padding: 16px;
+        gap: 24px;
+      }
+
+      .sidebar h2 {
+        font-size: 14px;
+        margin: 0 0 8px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .sidebar-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .sidebar .filter-chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        font-size: 13px;
+        background: var(--bg);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-rows: 1fr var(--log-height);
+      }
+
+      .split-node {
+        display: grid;
+        grid-template-rows: var(--tabbar-height) auto 1fr;
+      }
+
+      .tab-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-sub);
+      }
+
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .tab .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      .panel-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+        min-height: 42px;
+      }
+
+      .panel-toolbar-left,
+      .panel-toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel-tool-button {
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .card-list {
+        overflow: auto;
+        padding: 16px;
+        background: var(--bg);
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 12px;
+        padding: 12px;
+        background: var(--bg-sub);
+        position: relative;
+        transition: background 0.2s ease, border 0.2s ease;
+      }
+
+      .card.compact {
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .card:hover {
+        border-color: var(--accent);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .card-title {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .card-content {
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-line;
+      }
+
+      .card-children {
+        margin-left: 20px;
+        border-left: 2px dashed var(--border);
+        padding-left: 16px;
+      }
+
+      .card-toggle {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+
+      .badge {
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .badge[data-status="draft"] {
+        background: #f3f4f6;
+        color: #4b5563;
+      }
+
+      .badge[data-status="review"] {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .badge[data-status="approved"] {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .badge[data-status="deprecated"] {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      [data-theme="dark"] .badge[data-status="draft"] {
+        background: rgba(243, 244, 246, 0.12);
+        color: #f3f4f6;
+      }
+
+      .connector-anchor {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--accent);
+      }
+
+      .connector-anchor.left {
+        left: -18px;
+      }
+
+      .connector-anchor.right {
+        right: -18px;
+      }
+
+      .connector-anchor.active {
+        background: var(--accent);
+      }
+
+      .log-area {
+        border-top: 1px solid var(--border);
+        background: var(--bg-sub);
+        padding: 12px;
+        overflow: auto;
+        font-size: 12px;
+      }
+
+      .log-entry {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 4px 0;
+      }
+
+      .log-entry time {
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .status-bar {
+        justify-content: space-between;
+        font-size: 12px;
+        border-top: 1px solid var(--border);
+      }
+
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .keyboard-hint {
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 11px;
+        background: var(--bg);
+      }
+
+      .pill-toggle {
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        padding: 4px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        background: var(--bg);
+      }
+
+      .tree-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+
+      .tree-item > span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .tree-item small {
+        color: var(--text-muted);
+      }
+
+      .sidebar .section-content {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      @media (max-width: 1200px) {
+        :root {
+          --sidebar-width: 220px;
+        }
+      }
+
+      @media (max-width: 960px) {
+        .main-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          grid-row: auto;
+          flex-direction: row;
+          overflow-x: auto;
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar h2 {
+          min-width: 160px;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="light">
+    <div class="app">
+      <nav class="menu-bar" aria-label="アプリメニュー">
+        <div class="menu-item" role="button" tabindex="0">ファイル<span>(F)</span></div>
+        <div class="menu-item" role="button" tabindex="0">編集<span>(E)</span></div>
+        <div class="menu-item" role="button" tabindex="0">表示<span>(V)</span></div>
+        <div class="menu-item" role="button" tabindex="0">カード<span>(C)</span></div>
+        <div class="menu-item" role="button" tabindex="0">ヘルプ<span>(H)</span></div>
+      </nav>
+
+      <header class="tool-bar" aria-label="グローバルツールバー">
+        <div class="tool-group" aria-label="ファイル操作">
+          <button class="tool-button" data-action="open" aria-label="ファイルを開く (Ctrl+O)">📂 開く</button>
+          <button class="tool-button" data-action="save" aria-label="上書き保存 (Ctrl+S)">💾 保存</button>
+          <button class="tool-button" data-action="save-as" aria-label="名前を付けて保存 (Ctrl+Shift+S)">📝 別名保存</button>
+        </div>
+        <div class="tool-group" aria-label="ビュー操作">
+          <button class="tool-button" data-action="split-h" aria-label="水平分割">↔️ 水平分割</button>
+          <button class="tool-button" data-action="split-v" aria-label="垂直分割">↕️ 垂直分割</button>
+          <button class="tool-button" id="toggleTrace" aria-pressed="true" aria-label="トレース表示 (Ctrl+T)">🔗 トレース</button>
+        </div>
+        <div class="tool-group" aria-label="テーマ操作">
+          <button class="tool-button" id="themeToggle" aria-pressed="false">🌗 テーマ切替</button>
+          <button class="tool-button" data-action="settings" aria-label="設定を開く (Ctrl+,)">⚙️ 設定</button>
+        </div>
+      </header>
+
+      <div class="main-layout">
+        <aside class="sidebar">
+          <section class="sidebar-section">
+            <h2>エクスプローラ</h2>
+            <div class="section-content" role="tree">
+              <div class="tree-item" role="treeitem" aria-expanded="true">
+                <span>📁 要求仕様 <small>12 カード</small></span>
+                <div class="tree-item" role="treeitem" aria-expanded="true">
+                  <span>📄 1. 概要.md <small>6 カード</small></span>
+                </div>
+                <div class="tree-item" role="treeitem" aria-expanded="false">
+                  <span>📄 2. 詳細設計.md <small>24 カード</small></span>
+                </div>
+              </div>
+              <div class="tree-item" role="treeitem" aria-expanded="true">
+                <span>📁 設計書 <small>8 カード</small></span>
+              </div>
+            </div>
+          </section>
+          <section class="sidebar-section">
+            <h2>フィルタ</h2>
+            <div class="section-content">
+              <label class="pill-toggle"><input type="checkbox" checked /> 詳細表示</label>
+              <label class="pill-toggle"><input type="checkbox" checked /> トレースあり</label>
+              <label class="pill-toggle"><input type="checkbox" /> レビュー中</label>
+            </div>
+          </section>
+          <section class="sidebar-section">
+            <h2>トレースビュー</h2>
+            <div class="section-content">
+              <div class="filter-chip">テスト仕様 ⇄ 要求仕様</div>
+              <div class="filter-chip">設計 ⇄ 試験</div>
+            </div>
+          </section>
+        </aside>
+
+        <div class="workspace">
+          <section class="split-node" aria-label="カードパネル">
+            <div class="tab-bar" role="tablist">
+              <div class="tab active" role="tab" aria-selected="true">要件カード.json<div class="status-dot" aria-hidden="true"></div></div>
+              <div class="tab" role="tab" aria-selected="false">設計カード.json<div class="status-dot" aria-hidden="true"></div></div>
+              <div class="tab" role="tab" aria-selected="false">テストカード.json<div class="status-dot" aria-hidden="true"></div></div>
+            </div>
+            <div class="panel-toolbar">
+              <div class="panel-toolbar-left">
+                <button class="panel-tool-button" id="collapseAll" aria-label="すべて折りたたみ">▶ 折りたたみ</button>
+                <button class="panel-tool-button" id="expandAll" aria-label="すべて展開">▼ 展開</button>
+                <button class="panel-tool-button" id="toggleView" aria-label="表示モード切替">☰ コンパクト</button>
+                <button class="panel-tool-button" id="addCard" aria-label="カードを追加">➕ カード</button>
+                <button class="panel-tool-button" id="undoAction" aria-label="元に戻す (Ctrl+Z)">↩ Undo</button>
+                <button class="panel-tool-button" id="redoAction" aria-label="やり直し (Ctrl+Y)">↪ Redo</button>
+              </div>
+              <div class="panel-toolbar-right">
+                <span class="keyboard-hint">Ctrl+F 検索</span>
+                <span class="keyboard-hint">Ctrl+Shift+F 置換</span>
+              </div>
+            </div>
+            <div class="card-list" id="cardList" role="tree"></div>
+          </section>
+          <section class="log-area" aria-live="polite" aria-label="操作ログ">
+            <div class="log-entry"><time>12:24:03</time><span>info</span><div>アプリケーションを起動しました。</div></div>
+            <div class="log-entry"><time>12:24:08</time><span>info</span><div>`要求仕様.md` を読み込みました。</div></div>
+            <div class="log-entry"><time>12:24:10</time><span>debug</span><div>カード 1.2.1 の編集を開始。</div></div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="status-bar" aria-label="ステータスバー">
+        <div class="status-item">
+          <span>ファイル: 要件カード.json</span>
+          <span>|</span>
+          <span>カード数: <strong id="cardCount">0</strong></span>
+        </div>
+        <div class="status-item">
+          <span>テーマ: <strong id="themeLabel">ライト</strong></span>
+          <span>|</span>
+          <span>トレース: <strong id="traceLabel">表示中</strong></span>
+          <span>|</span>
+          <span>Undo 残り: <strong id="undoDepth">5</strong></span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const cardData = [
+        {
+          id: "card-1",
+          type: "heading",
+          status: "approved",
+          title: "1. システム概要",
+          updatedAt: "2025-10-18T11:23:00Z",
+          content: "本システムは仕様書からカードを生成し、編集・トレーサビリティ管理を支援します。",
+          number: "",
+          connectors: 2,
+          children: [
+            {
+              id: "card-1-1",
+              type: "paragraph",
+              status: "review",
+              title: "1.1 目的",
+              updatedAt: "2025-10-18T11:45:00Z",
+              content: "非構造化ドキュメントを構造化カードに変換し、上流工程のAI活用を推進します。",
+              number: "",
+              connectors: 1,
+              children: [],
+            },
+            {
+              id: "card-1-2",
+              type: "bullet",
+              status: "draft",
+              title: "1.2 主要機能",
+              updatedAt: "2025-10-18T11:50:00Z",
+              content: "- カード変換\n- カード編集\n- トレーサビリティ管理",
+              number: "",
+              connectors: 0,
+              children: [],
+            },
+          ],
+        },
+        {
+          id: "card-2",
+          type: "heading",
+          status: "review",
+          title: "2. 共通機能",
+          updatedAt: "2025-10-18T12:05:00Z",
+          content: "ファイル入出力、ログ管理、設定管理を提供します。",
+          number: "",
+          connectors: 3,
+          children: [
+            {
+              id: "card-2-1",
+              type: "paragraph",
+              status: "approved",
+              title: "2.1 ファイル入出力",
+              updatedAt: "2025-10-18T12:10:00Z",
+              content: "テキスト/Markdownの読込とカードJSONの保存をサポートし、ドラッグ&ドロップにも対応します。",
+              number: "",
+              connectors: 1,
+              children: [],
+            },
+            {
+              id: "card-2-2",
+              type: "paragraph",
+              status: "draft",
+              title: "2.2 ログ管理",
+              updatedAt: "2025-10-18T12:18:00Z",
+              content: "ログレベル設定とローテーションを提供し、操作ログをリアルタイム表示します。",
+              number: "",
+              connectors: 0,
+              children: [],
+            },
+          ],
+        },
+        {
+          id: "card-3",
+          type: "heading",
+          status: "draft",
+          title: "3. カード変換",
+          updatedAt: "2025-10-18T12:30:00Z",
+          content: "固定ルールまたはLLMによるカード生成を選択できます。",
+          number: "",
+          connectors: 4,
+          children: [
+            {
+              id: "card-3-1",
+              type: "paragraph",
+              status: "review",
+              title: "3.1 入力仕様",
+              updatedAt: "2025-10-18T12:32:00Z",
+              content: "UTF-8を既定とし、SJIS/CP932は自動変換されます。10MB超の場合は警告が表示されます。",
+              number: "",
+              connectors: 1,
+              children: [],
+            },
+            {
+              id: "card-3-2",
+              type: "paragraph",
+              status: "draft",
+              title: "3.2 変換方式",
+              updatedAt: "2025-10-18T12:40:00Z",
+              content: "共通ルールで文書順序と階層を保持し、図表やQAはまとまりとしてカード化します。",
+              number: "",
+              connectors: 2,
+              children: [],
+            },
+            {
+              id: "card-3-3",
+              type: "paragraph",
+              status: "approved",
+              title: "3.3 出力仕様",
+              updatedAt: "2025-10-18T12:48:00Z",
+              content: "カードファイルとトレーサビリティ情報をJSON形式で保存します。",
+              number: "",
+              connectors: 1,
+              children: [],
+            },
+          ],
+        },
+      ];
+
+      const cardIcons = {
+        heading: "📑",
+        paragraph: "📝",
+        bullet: "•",
+        figure: "🖼️",
+        table: "📊",
+        test: "🧪",
+        qa: "💬",
+        other: "📄",
+      };
+
+      const collapseState = new Map();
+      let compactMode = false;
+      let traceVisible = true;
+
+      const cardList = document.getElementById("cardList");
+      const cardCountLabel = document.getElementById("cardCount");
+      const themeLabel = document.getElementById("themeLabel");
+      const traceLabel = document.getElementById("traceLabel");
+      const undoDepth = document.getElementById("undoDepth");
+
+      function formatDate(iso) {
+        const date = new Date(iso);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+      }
+
+      function createCard(card, level = 1) {
+        const container = document.createElement("div");
+        container.className = "card";
+        container.dataset.cardId = card.id;
+        container.setAttribute("role", "treeitem");
+        container.setAttribute("aria-level", String(level));
+        container.setAttribute("aria-expanded", !collapseState.get(card.id));
+
+        if (compactMode) {
+          container.classList.add("compact");
+        }
+
+        const icon = cardIcons[card.type] ?? cardIcons.other;
+        const header = document.createElement("div");
+        header.className = "card-header";
+
+        const toggle = document.createElement("button");
+        toggle.className = "card-toggle";
+        toggle.setAttribute("aria-label", "階層の展開/折りたたみ");
+        toggle.textContent = collapseState.get(card.id) ? "▶" : "▼";
+        toggle.addEventListener("click", () => {
+          const current = collapseState.get(card.id);
+          collapseState.set(card.id, !current);
+          renderCards();
+        });
+
+        if (!card.children.length) {
+          toggle.style.visibility = "hidden";
+        }
+
+        const title = document.createElement("div");
+        title.className = "card-title";
+        title.innerHTML = `${icon} ${card.title}`;
+
+        const badge = document.createElement("div");
+        badge.className = "badge";
+        badge.dataset.status = card.status;
+        badge.textContent = card.status;
+
+        const meta = document.createElement("div");
+        meta.className = "card-meta";
+        meta.innerHTML = `<span>更新: ${formatDate(card.updatedAt)}</span>${card.number ? `<span>No. ${card.number}</span>` : ""}`;
+
+        header.append(toggle, title, badge);
+
+        if (!compactMode) {
+          header.appendChild(meta);
+        }
+
+        const connectorLeft = document.createElement("div");
+        connectorLeft.className = "connector-anchor left";
+        if (traceVisible && card.connectors > 0) {
+          connectorLeft.classList.add("active");
+        }
+
+        const connectorRight = document.createElement("div");
+        connectorRight.className = "connector-anchor right";
+        if (traceVisible && card.connectors > 1) {
+          connectorRight.classList.add("active");
+        }
+
+        container.append(connectorLeft, connectorRight, header);
+
+        if (!compactMode) {
+          const content = document.createElement("div");
+          content.className = "card-content";
+          content.textContent = card.content;
+          container.appendChild(content);
+        }
+
+        if (!collapseState.get(card.id) && card.children.length) {
+          const children = document.createElement("div");
+          children.className = "card-children";
+          card.children.forEach((child) => {
+            children.appendChild(createCard(child, level + 1));
+          });
+          container.appendChild(children);
+        }
+
+        return container;
+      }
+
+      function countCards(card) {
+        return 1 + (card.children?.reduce((total, child) => total + countCards(child), 0) ?? 0);
+      }
+
+      function walkCards(cards, callback) {
+        cards.forEach((card) => {
+          callback(card);
+          if (card.children?.length) {
+            walkCards(card.children, callback);
+          }
+        });
+      }
+
+      function renderCards() {
+        cardList.innerHTML = "";
+        let count = 0;
+        cardData.forEach((card) => {
+          cardList.appendChild(createCard(card));
+          count += countCards(card);
+        });
+        cardCountLabel.textContent = String(count);
+      }
+
+      renderCards();
+
+      document.getElementById("toggleView").addEventListener("click", () => {
+        compactMode = !compactMode;
+        document.getElementById("toggleView").textContent = compactMode ? "☰ 詳細" : "☰ コンパクト";
+        renderCards();
+      });
+
+      document.getElementById("collapseAll").addEventListener("click", () => {
+        walkCards(cardData, (card) => collapseState.set(card.id, true));
+        renderCards();
+      });
+
+      document.getElementById("expandAll").addEventListener("click", () => {
+        collapseState.clear();
+        renderCards();
+      });
+
+      document.getElementById("toggleTrace").addEventListener("click", (event) => {
+        traceVisible = !traceVisible;
+        event.currentTarget.setAttribute("aria-pressed", String(traceVisible));
+        event.currentTarget.textContent = traceVisible ? "🔗 トレース" : "⛓️ 非表示";
+        traceLabel.textContent = traceVisible ? "表示中" : "非表示";
+        renderCards();
+      });
+
+      document.getElementById("themeToggle").addEventListener("click", (event) => {
+        const body = document.body;
+        const isDark = body.dataset.theme === "dark";
+        body.dataset.theme = isDark ? "light" : "dark";
+        event.currentTarget.setAttribute("aria-pressed", String(!isDark));
+        themeLabel.textContent = isDark ? "ライト" : "ダーク";
+      });
+
+      document.getElementById("addCard").addEventListener("click", () => {
+        const log = document.createElement("div");
+        log.className = "log-entry";
+        const now = new Date();
+        log.innerHTML = `<time>${now.toLocaleTimeString("ja-JP", { hour12: false })}</time><span>info</span><div>新しいカードを作成しました (モック)。</div>`;
+        document.querySelector(".log-area").appendChild(log);
+        undoDepth.textContent = String(Number(undoDepth.textContent) + 1);
+      });
+
+      document.getElementById("undoAction").addEventListener("click", () => {
+        const remaining = Math.max(Number(undoDepth.textContent) - 1, 0);
+        undoDepth.textContent = String(remaining);
+      });
+
+      document.getElementById("redoAction").addEventListener("click", () => {
+        undoDepth.textContent = String(Number(undoDepth.textContent) + 1);
+      });
+    </script>
+  </body>
+</html>
