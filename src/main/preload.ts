@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { FileOpenResult, FileSaveResult, AppSettings, CardFile } from '../shared/types';
+import {
+  FileOpenResult,
+  FileSaveResult,
+  AppSettings,
+  CardFile,
+  LLMResponse,
+  LLMConfigValidation,
+} from '../shared/types';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -34,7 +41,25 @@ contextBridge.exposeInMainWorld('electron', {
     copiedInputFilePath: string;
     fileName: string;
     fileExtension: string;
+    strategy?: 'rule' | 'llm';
   }) => ipcRenderer.invoke('converter:convert', params),
+
+  // LLM operations
+  generateLLMCompletion: (request: {
+    prompt: string;
+    systemPrompt?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeout?: number;
+  }) => ipcRenderer.invoke('llm:generateCompletion', request),
+  validateLLMConfig: () => ipcRenderer.invoke('llm:validateConfig'),
+
+  // Card file operations
+  copyInputFile: (params: { originalPath: string; content: string }) =>
+    ipcRenderer.invoke('cardFile:copy', params),
+  saveCardFile: (params: { cardFile: CardFile; label?: string }) =>
+    ipcRenderer.invoke('cardFile:save', params),
+  loadCardFile: (filePath: string) => ipcRenderer.invoke('cardFile:load', filePath),
 
   // Platform info
   platform: process.platform,
@@ -58,7 +83,31 @@ export interface ElectronAPI {
     copiedInputFilePath: string;
     fileName: string;
     fileExtension: string;
+    strategy?: 'rule' | 'llm';
   }) => Promise<CardFile>;
+  generateLLMCompletion: (request: {
+    prompt: string;
+    systemPrompt?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeout?: number;
+  }) => Promise<LLMResponse>;
+  validateLLMConfig: () => Promise<LLMConfigValidation>;
+  copyInputFile: (params: { originalPath: string; content: string }) => Promise<{
+    success: boolean;
+    copiedPath?: string;
+    error?: string;
+  }>;
+  saveCardFile: (params: { cardFile: CardFile; label?: string }) => Promise<{
+    success: boolean;
+    savedPath?: string;
+    error?: string;
+  }>;
+  loadCardFile: (filePath: string) => Promise<{
+    success: boolean;
+    cardFile?: CardFile;
+    error?: string;
+  }>;
   platform: NodeJS.Platform;
 }
 

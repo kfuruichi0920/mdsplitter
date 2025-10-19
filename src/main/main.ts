@@ -1,10 +1,19 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import * as path from 'path';
-import { openFile, saveFile, saveFileAs, readFile } from './services/fileService';
+import {
+  openFile,
+  saveFile,
+  saveFileAs,
+  readFile,
+  copyInputFile,
+  saveCardFile,
+  loadCardFile,
+} from './services/fileService';
 import { initLogger, logInfo } from './services/logService';
 import { initSettings, getSettings, updateSettings } from './services/settingsService';
 import { initWorkDir } from './services/folderService';
 import { convertToCards } from './services/converterService';
+import { generateLLMCompletion, validateLLMConfig } from './services/llmService';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -177,21 +186,24 @@ function setupIpcHandlers() {
         copiedInputFilePath,
         fileName,
         fileExtension,
+        strategy,
       }: {
         content: string;
         inputFilePath: string;
         copiedInputFilePath: string;
         fileName: string;
         fileExtension: string;
+        strategy?: 'rule' | 'llm';
       }
     ) => {
       try {
-        return convertToCards(
+        return await convertToCards(
           content,
           inputFilePath,
           copiedInputFilePath,
           fileName,
-          fileExtension
+          fileExtension,
+          strategy
         );
       } catch (error) {
         const { logError } = await import('./services/logService');
@@ -200,6 +212,52 @@ function setupIpcHandlers() {
       }
     }
   );
+
+  // LLM operations
+  ipcMain.handle(
+    'llm:generateCompletion',
+    async (
+      _event,
+      request: {
+        prompt: string;
+        systemPrompt?: string;
+        temperature?: number;
+        maxTokens?: number;
+        timeout?: number;
+      }
+    ) => {
+      try {
+        return await generateLLMCompletion(request);
+      } catch (error) {
+        const { logError } = await import('./services/logService');
+        logError('LLM completion failed', error);
+        throw error;
+      }
+    }
+  );
+
+  ipcMain.handle('llm:validateConfig', async () => {
+    return validateLLMConfig();
+  });
+
+  // Card file operations
+  ipcMain.handle(
+    'cardFile:copy',
+    async (_event, { originalPath, content }: { originalPath: string; content: string }) => {
+      return await copyInputFile(originalPath, content);
+    }
+  );
+
+  ipcMain.handle(
+    'cardFile:save',
+    async (_event, { cardFile, label }: { cardFile: any; label?: string }) => {
+      return await saveCardFile(cardFile, label);
+    }
+  );
+
+  ipcMain.handle('cardFile:load', async (_event, filePath: string) => {
+    return await loadCardFile(filePath);
+  });
 }
 
 /**

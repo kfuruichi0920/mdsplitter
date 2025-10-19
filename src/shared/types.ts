@@ -229,6 +229,30 @@ export interface FileInfo {
   modifiedAt?: string;
 }
 
+// LLM types
+export interface LLMResponse {
+  content: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  model?: string;
+}
+
+export interface LLMRequest {
+  prompt: string;
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  timeout?: number;
+}
+
+export interface LLMConfigValidation {
+  valid: boolean;
+  message: string;
+}
+
 // File I/O types
 export interface FileOpenResult {
   success: boolean;
