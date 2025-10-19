@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { ThemeMode, AppSettings, Panel, LogEntry } from '@shared/types';
+import { ThemeMode, AppSettings, Panel, PanelLayout, LogEntry } from '@shared/types';
 
 interface AppState {
   // Theme
@@ -18,6 +18,11 @@ interface AppState {
   removePanel: (panelId: string) => void;
   setActivePanel: (panelId: string) => void;
   updatePanel: (panelId: string, updates: Partial<Panel>) => void;
+
+  // Panel Layout
+  panelLayout: PanelLayout | Panel | null;
+  setPanelLayout: (layout: PanelLayout | Panel | null) => void;
+  splitPanel: (panelId: string, direction: 'horizontal' | 'vertical') => void;
 
   // Logs
   logs: LogEntry[];
@@ -78,6 +83,48 @@ export const useAppStore = create<AppState>()(
             p.id === panelId ? { ...p, ...updates } : p
           ),
         })),
+
+      // Panel Layout
+      panelLayout: null,
+      setPanelLayout: (layout) => set({ panelLayout: layout }),
+      splitPanel: (panelId, direction) =>
+        set((state) => {
+          const splitRecursive = (
+            node: PanelLayout | Panel | null
+          ): PanelLayout | Panel | null => {
+            if (!node) return null;
+
+            // If this is the panel to split
+            if ('type' in node && node.id === panelId) {
+              const newPanel: Panel = {
+                id: `panel-${Date.now()}`,
+                type: 'welcome',
+                title: 'New Panel',
+              };
+
+              return {
+                id: `layout-${Date.now()}`,
+                direction,
+                children: [node, newPanel],
+                sizes: [50, 50],
+              };
+            }
+
+            // If this is a layout, recursively split children
+            if ('direction' in node) {
+              return {
+                ...node,
+                children: node.children.map(child => splitRecursive(child) || child),
+              };
+            }
+
+            return node;
+          };
+
+          return {
+            panelLayout: splitRecursive(state.panelLayout),
+          };
+        }),
 
       // Logs
       logs: [],

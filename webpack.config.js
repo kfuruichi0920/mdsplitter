@@ -88,6 +88,11 @@ module.exports = [
         '@main': path.resolve(__dirname, 'src/main'),
       },
     },
+    externalsPresets: { node: true },
+    externals: {
+      electron: 'commonjs electron',
+      path: 'commonjs path',
+    },
     node: {
       __dirname: false,
       __filename: false,
@@ -119,6 +124,10 @@ module.exports = [
     },
     resolve: {
       extensions: ['.ts', '.js'],
+    },
+    externalsPresets: { node: true },
+    externals: {
+      electron: 'commonjs electron',
     },
   },
 ];
