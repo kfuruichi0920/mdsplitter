@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>カード編集アプリケーション モック</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg-subtle: #f9fafb;
+        --border: #d1d5db;
+        --text: #111827;
+        --accent: #3b82f6;
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+        --status-approved-bg: #d1fae5;
+        --status-approved-text: #065f46;
+        --status-review-bg: #fef3c7;
+        --status-review-text: #92400e;
+        --status-draft-bg: #f3f4f6;
+        --status-draft-text: #4b5563;
+        --status-deprecated-bg: #fee2e2;
+        --status-deprecated-text: #991b1b;
+      }
+
+      body[data-theme="dark"] {
+        --bg: #111827;
+        --bg-subtle: #1f2937;
+        --border: #374151;
+        --text: #f9fafb;
+        --accent: #60a5fa;
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.4);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Noto Sans JP", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 32px 40px minmax(0, 1fr) 24px;
+        height: 100vh;
+      }
+
+      .menu-bar,
+      .tool-bar,
+      .status-bar {
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-subtle);
+      }
+
+      .status-bar {
+        border-top: 1px solid var(--border);
+        border-bottom: none;
+        font-size: 12px;
+        gap: 16px;
+      }
+
+      .menu-items,
+      .tool-actions,
+      .tool-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .menu-item,
+      .tool-button {
+        position: relative;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: inherit;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+      }
+
+      .menu-item:focus,
+      .tool-button:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .menu-item:hover,
+      .tool-button:hover {
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+
+      .menu-item::after {
+        content: attr(data-key);
+        font-size: 11px;
+        margin-left: 4px;
+        color: var(--accent);
+      }
+
+      .tool-bar {
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .tool-actions {
+        flex-wrap: wrap;
+      }
+
+      .tool-meta {
+        margin-left: auto;
+        gap: 8px;
+      }
+
+      .tool-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+      }
+
+      .workspace-frame {
+        display: grid;
+        grid-template-columns: 256px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) 128px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .sidebar-section h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .sidebar-section ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+      }
+
+      .sidebar-item {
+        padding: 8px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+
+      .sidebar-item[aria-selected="true"],
+      .sidebar-item:hover {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, var(--bg-subtle));
+      }
+
+      .card-panel-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 16px;
+        overflow: auto;
+      }
+
+      .split-node {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-subtle);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .tab-bar {
+        display: flex;
+        align-items: center;
+        height: 36px;
+        padding: 0 8px;
+        gap: 6px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .tab {
+        padding: 6px 12px;
+        font-size: 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+
+      .tab[data-active="true"],
+      .tab:hover {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 14%, var(--bg-subtle));
+      }
+
+      .panel-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .panel-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+      }
+
+      .panel-toolbar span {
+        font-size: 12px;
+        opacity: 0.7;
+      }
+
+      .card-list {
+        flex: 1;
+        overflow: auto;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        background: var(--bg-subtle);
+      }
+
+      .card {
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      body.compact-mode .card-list {
+        gap: 6px;
+      }
+
+      body.compact-mode .card {
+        padding: 8px;
+        gap: 6px;
+        font-size: 12px;
+      }
+
+      .card:focus-within,
+      .card:hover {
+        border-color: var(--accent);
+        box-shadow: var(--shadow);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .card-meta {
+        display: flex;
+        gap: 8px;
+        font-size: 12px;
+        color: rgba(17, 24, 39, 0.65);
+      }
+
+      body[data-theme="dark"] .card-meta {
+        color: rgba(249, 250, 251, 0.65);
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .status-approved {
+        background: var(--status-approved-bg);
+        color: var(--status-approved-text);
+      }
+
+      .status-review {
+        background: var(--status-review-bg);
+        color: var(--status-review-text);
+      }
+
+      .status-draft {
+        background: var(--status-draft-bg);
+        color: var(--status-draft-text);
+      }
+
+      .status-deprecated {
+        background: var(--status-deprecated-bg);
+        color: var(--status-deprecated-text);
+      }
+
+      .card-description {
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .log-area {
+        grid-column: 1 / span 2;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+      }
+
+      .log-header {
+        padding: 8px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .log-stream {
+        flex: 1;
+        padding: 12px 16px;
+        font-size: 12px;
+        line-height: 1.5;
+        overflow: auto;
+      }
+
+      .log-entry {
+        margin-bottom: 8px;
+        opacity: 0.85;
+      }
+
+      .log-entry strong {
+        color: var(--accent);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .flex-spacer {
+        flex: 1;
+      }
+
+      .pill-toggle {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+      }
+
+      .pill-toggle button {
+        border: none;
+        background: none;
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        color: inherit;
+      }
+
+      .pill-toggle button[data-active="true"] {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      .empty-state {
+        padding: 24px;
+        text-align: center;
+        font-size: 13px;
+        opacity: 0.6;
+      }
+
+      @media (max-width: 1200px) {
+        .card-panel-grid {
+          grid-template-columns: repeat(1, minmax(0, 1fr));
+          grid-template-rows: repeat(3, minmax(0, 240px));
+        }
+      }
+
+      @media (max-width: 960px) {
+        .workspace-frame {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .sidebar {
+          display: none;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .app {
+          grid-template-rows: 32px 56px minmax(0, 1fr) 24px;
+        }
+
+        .tool-bar {
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          gap: 12px 8px;
+        }
+
+        .tool-meta {
+          width: 100%;
+          justify-content: space-between;
+          order: 2;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="light">
+    <div class="app" role="application">
+      <nav class="menu-bar" aria-label="メニューバー">
+        <div class="menu-items">
+          <button class="menu-item" data-key="F" aria-haspopup="true">ファイル</button>
+          <button class="menu-item" data-key="E" aria-haspopup="true">編集</button>
+          <button class="menu-item" data-key="V" aria-haspopup="true">表示</button>
+          <button class="menu-item" data-key="H" aria-haspopup="true">ヘルプ</button>
+        </div>
+      </nav>
+
+      <div class="tool-bar" role="toolbar" aria-label="グローバルツールバー">
+        <div class="tool-actions">
+          <button class="tool-button" data-action="new-card">新規カード</button>
+          <button class="tool-button" data-action="split-horizontal">水平分割</button>
+          <button class="tool-button" data-action="split-vertical">垂直分割</button>
+          <div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+          <button class="tool-button" data-action="toggle-compact">表示切替</button>
+          <button class="tool-button" data-action="trace-connector">トレース接続</button>
+          <div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+          <button class="tool-button" data-action="undo">Undo</button>
+          <button class="tool-button" data-action="redo">Redo</button>
+        </div>
+        <div class="tool-meta">
+          <div class="pill-toggle" role="group" aria-label="テーマ切替">
+            <button type="button" data-theme="light" data-active="true">ライト</button>
+            <button type="button" data-theme="dark">ダーク</button>
+          </div>
+          <span class="badge" aria-label="保存状態">AutoSave</span>
+        </div>
+      </div>
+
+      <main class="workspace-frame">
+        <aside class="sidebar" aria-label="サイドバー">
+          <section class="sidebar-section" aria-labelledby="nav-collections">
+            <h2 id="nav-collections">コレクション</h2>
+            <ul>
+              <li class="sidebar-item" tabindex="0" aria-selected="true">プロジェクト概要</li>
+              <li class="sidebar-item" tabindex="0">スプリント計画</li>
+              <li class="sidebar-item" tabindex="0">アーキテクチャ</li>
+              <li class="sidebar-item" tabindex="0">ユーザーストーリー</li>
+            </ul>
+          </section>
+          <section class="sidebar-section" aria-labelledby="nav-filters">
+            <h2 id="nav-filters">フィルター</h2>
+            <ul>
+              <li class="sidebar-item" tabindex="0">ステータス: 全て</li>
+              <li class="sidebar-item" tabindex="0">担当: 自分</li>
+              <li class="sidebar-item" tabindex="0">タグ: 優先</li>
+            </ul>
+          </section>
+          <section class="sidebar-section" aria-labelledby="nav-search">
+            <h2 id="nav-search">検索履歴</h2>
+            <ul>
+              <li class="sidebar-item" tabindex="0">"データモデル"</li>
+              <li class="sidebar-item" tabindex="0">"API"</li>
+              <li class="sidebar-item" tabindex="0">"要件"</li>
+            </ul>
+          </section>
+        </aside>
+
+        <section class="card-panel-grid" aria-label="カードパネルエリア">
+          <article class="split-node" aria-label="カードパネル 1">
+            <header class="tab-bar">
+              <span class="tab" data-active="true" role="tab">カード一覧</span>
+              <span class="tab" role="tab">カード編集</span>
+              <span class="flex-spacer" aria-hidden="true"></span>
+              <button class="tool-button" data-action="pin-panel" aria-label="パネルを固定">📌</button>
+            </header>
+            <div class="panel-content">
+              <div class="panel-toolbar" role="toolbar" aria-label="カードパネルツールバー">
+                <span>表示: 詳細</span>
+                <span class="flex-spacer" aria-hidden="true"></span>
+                <button class="tool-button" data-action="sort">並び替え</button>
+                <button class="tool-button" data-action="filter">フィルター</button>
+              </div>
+              <div class="card-list" role="list">
+                <div class="card" tabindex="0" role="listitem">
+                  <div class="card-header">
+                    <span>カード #1024 - 認証フロー</span>
+                    <span class="status-pill status-review">Review</span>
+                  </div>
+                  <div class="card-meta">
+                    <span>担当: 佐藤</span>
+                    <span>更新: 3分前</span>
+                  </div>
+                  <p class="card-description">
+                    OAuth2.0 ベースの認証フロー設計。PKCE 対応とデバイスコードフローを含む。
+                  </p>
+                </div>
+                <div class="card" tabindex="0" role="listitem">
+                  <div class="card-header">
+                    <span>カード #1025 - カード分割アルゴリズム</span>
+                    <span class="status-pill status-approved">Approved</span>
+                  </div>
+                  <div class="card-meta">
+                    <span>担当: 鈴木</span>
+                    <span>更新: 10分前</span>
+                  </div>
+                  <p class="card-description">
+                    連続的なドラッグ&ドロップに対応したスプリットパネル生成ロジックの改善案。
+                  </p>
+                </div>
+                <div class="card" tabindex="0" role="listitem">
+                  <div class="card-header">
+                    <span>カード #1026 - 履歴トラッキング</span>
+                    <span class="status-pill status-draft">Draft</span>
+                  </div>
+                  <div class="card-meta">
+                    <span>担当: 高橋</span>
+                    <span>更新: 25分前</span>
+                  </div>
+                  <p class="card-description">
+                    操作履歴を時系列で可視化するログタイムラインUIの設計メモ。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="split-node" aria-label="カードパネル 2">
+            <header class="tab-bar">
+              <span class="tab" data-active="true" role="tab">カード編集</span>
+              <span class="tab" role="tab">履歴</span>
+            </header>
+            <div class="panel-content">
+              <div class="panel-toolbar" role="toolbar" aria-label="編集ツールバー">
+                <button class="tool-button" data-action="lock">ロック</button>
+                <button class="tool-button" data-action="comment">コメント</button>
+                <span class="flex-spacer" aria-hidden="true"></span>
+                <span>入力補助: ON</span>
+              </div>
+              <div class="card-list" role="region" aria-label="カード詳細">
+                <div class="card" tabindex="0">
+                  <div class="card-header">
+                    <span>カード #1024 - 認証フロー</span>
+                    <span class="status-pill status-review">Review</span>
+                  </div>
+                  <div class="card-description">
+                    <strong>目的:</strong> 外部IDプロバイダ連携のための共通フローを定義する。
+                  </div>
+                  <div class="card-description">
+                    <strong>受入条件:</strong>
+                    <ul>
+                      <li>OAuth2.0 Authorization Code + PKCE 対応</li>
+                      <li>多要素認証のフックポイント提供</li>
+                      <li>失敗時のロールバック戦略が定義済み</li>
+                    </ul>
+                  </div>
+                  <div class="card-description">
+                    <strong>関連カード:</strong> #1030, #1041
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="split-node" aria-label="カードパネル 3">
+            <header class="tab-bar">
+              <span class="tab" data-active="true" role="tab">コネクタ</span>
+              <span class="tab" role="tab">差分</span>
+              <span class="flex-spacer" aria-hidden="true"></span>
+              <span class="badge">リアルタイム</span>
+            </header>
+            <div class="panel-content">
+              <div class="panel-toolbar" role="toolbar" aria-label="コネクタツールバー">
+                <span>フォーカス: 認証フロー</span>
+                <span class="flex-spacer" aria-hidden="true"></span>
+                <button class="tool-button" data-action="zoom-in">ズームイン</button>
+                <button class="tool-button" data-action="zoom-out">ズームアウト</button>
+              </div>
+              <div class="card-list" role="presentation">
+                <div class="empty-state">コネクタプレビューはキャンバス領域でレンダリングされます。</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="split-node" aria-label="カードパネル 4">
+            <header class="tab-bar">
+              <span class="tab" data-active="true" role="tab">プレビュー</span>
+              <span class="tab" role="tab">コメント</span>
+            </header>
+            <div class="panel-content">
+              <div class="panel-toolbar" role="toolbar" aria-label="プレビューツールバー">
+                <span>モード: カンバン</span>
+                <span class="flex-spacer" aria-hidden="true"></span>
+                <button class="tool-button" data-action="share">共有</button>
+                <button class="tool-button" data-action="export">エクスポート</button>
+              </div>
+              <div class="card-list" role="region" aria-label="プレビュー">
+                <div class="card" tabindex="0">
+                  <div class="card-header">
+                    <span>カード #1024 の進捗</span>
+                    <span class="status-pill status-review">Review</span>
+                  </div>
+                  <div class="card-description">
+                    現在、セキュリティレビュー中。レビューアー: 田中。想定完了: 10/21。
+                  </div>
+                  <div class="card-meta">
+                    <span>コメント: 8</span>
+                    <span>添付: 3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="log-area" aria-live="polite" aria-label="ログエリア">
+          <header class="log-header">
+            <span>操作ログ</span>
+            <button class="tool-button" data-action="clear-log">ログをクリア</button>
+          </header>
+          <div class="log-stream" id="logStream"></div>
+        </section>
+      </main>
+
+      <footer class="status-bar" role="contentinfo">
+        <span>プロジェクト: Phoenix</span>
+        <span>カード: 128</span>
+        <span>選択: 認証フロー</span>
+        <span class="flex-spacer" aria-hidden="true"></span>
+        <span>接続: オンライン</span>
+      </footer>
+    </div>
+
+    <script>
+      const logStream = document.getElementById("logStream");
+      const toolbarButtons = document.querySelectorAll(".tool-button[data-action]");
+      const themeButtons = document.querySelectorAll(".pill-toggle button");
+      const sidebarItems = document.querySelectorAll(".sidebar-item");
+
+      const log = (message) => {
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        const timestamp = new Date().toLocaleTimeString("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+        logStream.prepend(entry);
+      };
+
+      toolbarButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.action;
+          switch (action) {
+            case "new-card":
+              log("新しいカードの作成ダイアログを開きました。");
+              break;
+            case "split-horizontal":
+              log("カードパネルを水平方向に分割しました (モック動作)。");
+              break;
+            case "split-vertical":
+              log("カードパネルを垂直方向に分割しました (モック動作)。");
+              break;
+            case "toggle-compact":
+              document.body.classList.toggle("compact-mode");
+              log("カードの表示密度を切り替えました。");
+              break;
+            case "trace-connector":
+              log("選択カード間のトレース接続を生成しました。");
+              break;
+            case "undo":
+              log("Undo 操作を実行しました。");
+              break;
+            case "redo":
+              log("Redo 操作を実行しました。");
+              break;
+            case "pin-panel":
+              log("パネルを固定しました。");
+              break;
+            case "sort":
+              log("カードを更新日時で並び替えました。");
+              break;
+            case "filter":
+              log("フィルター設定モーダルを開きました。");
+              break;
+            case "lock":
+              log("カードをロックしました。");
+              break;
+            case "comment":
+              log("コメントパネルを開きました。");
+              break;
+            case "zoom-in":
+              log("コネクタビューをズームインしました。");
+              break;
+            case "zoom-out":
+              log("コネクタビューをズームアウトしました。");
+              break;
+            case "share":
+              log("プレビューを共有リンクとして生成しました。");
+              break;
+            case "export":
+              log("プレビューをエクスポートしました。");
+              break;
+            case "clear-log":
+              logStream.innerHTML = "";
+              log("ログをクリアしました。");
+              break;
+            default:
+              log(`${action} を実行しました。`);
+          }
+        });
+      });
+
+      themeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          themeButtons.forEach((btn) => btn.removeAttribute("data-active"));
+          button.setAttribute("data-active", "true");
+          const nextTheme = button.dataset.theme;
+          document.body.setAttribute("data-theme", nextTheme);
+          log(`テーマを ${nextTheme === "light" ? "ライト" : "ダーク"} モードに切り替えました。`);
+        });
+      });
+
+      sidebarItems.forEach((item) => {
+        item.addEventListener("click", () => {
+          sidebarItems.forEach((node) => node.setAttribute("aria-selected", "false"));
+          item.setAttribute("aria-selected", "true");
+          log(`サイドバーで「${item.textContent.trim()}」を選択しました。`);
+        });
+      });
+
+      log("アプリケーションを初期化しました。");
+      log("AutoSave 状態: 正常");
+    </script>
+  </body>
+</html>
