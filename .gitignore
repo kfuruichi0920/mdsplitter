@@ -42,11 +42,6 @@ desktop.ini
 .env.local
 .env.*.local
 
-# Package managers
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
 # Test coverage
 coverage/
 .nyc_output/
