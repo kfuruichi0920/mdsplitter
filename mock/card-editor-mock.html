@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>カード編集アプリケーション モック</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --bg-sub: #f9fafb;
+      --border: #d1d5db;
+      --text: #111827;
+      --accent: #3b82f6;
+      --status-approved-bg: #d1fae5;
+      --status-approved-text: #065f46;
+      --status-review-bg: #fef3c7;
+      --status-review-text: #92400e;
+      --status-draft-bg: #f3f4f6;
+      --status-draft-text: #4b5563;
+      --status-deprecated-bg: #fee2e2;
+      --status-deprecated-text: #991b1b;
+    }
+
+    .theme-dark {
+      --bg: #111827;
+      --bg-sub: #1f2937;
+      --border: #374151;
+      --text: #f9fafb;
+      --accent: #60a5fa;
+    }
+
+    body {
+      font-family: "Inter", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header, .toolbar, .status-bar {
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-sub);
+    }
+
+    header {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    header nav {
+      display: flex;
+      gap: 20px;
+    }
+
+    header button {
+      background: none;
+      border: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      padding: 4px 0;
+      position: relative;
+    }
+
+    header button::after {
+      content: attr(data-access-key);
+      font-size: 11px;
+      color: var(--accent);
+      margin-left: 4px;
+    }
+
+    header button:hover, .toolbar button:hover {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
+    .toolbar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      font-size: 13px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 12px;
+      border-right: 1px solid var(--border);
+    }
+
+    .toolbar-group:last-child {
+      border-right: none;
+    }
+
+    .toolbar button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .app-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 256px;
+      min-width: 180px;
+      max-width: 360px;
+      background: var(--bg-sub);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar header {
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 24px;
+    }
+
+    .sidebar nav h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 16px 0 8px;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+    }
+
+    .sidebar nav ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .sidebar nav a {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: inherit;
+      font-size: 13px;
+    }
+
+    .sidebar nav a.active {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .split-area {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 12px;
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    .split-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-sub);
+      min-height: 200px;
+    }
+
+    .tab-bar {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      background: var(--bg);
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+    }
+
+    .tab {
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: var(--bg-sub);
+      border: 1px solid var(--border);
+      border-bottom-color: transparent;
+    }
+
+    .panel-toolbar {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-sub);
+    }
+
+    .panel-toolbar input {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: inherit;
+    }
+
+    .card-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+      background: var(--bg);
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: var(--bg-sub);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: none;
+      padding: 0;
+      background: none;
+      height: auto;
+    }
+
+    .status {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status[data-status="approved"] {
+      background: var(--status-approved-bg);
+      color: var(--status-approved-text);
+    }
+
+    .status[data-status="review"] {
+      background: var(--status-review-bg);
+      color: var(--status-review-text);
+    }
+
+    .status[data-status="draft"] {
+      background: var(--status-draft-bg);
+      color: var(--status-draft-text);
+    }
+
+    .status[data-status="deprecated"] {
+      background: var(--status-deprecated-bg);
+      color: var(--status-deprecated-text);
+    }
+
+    .metadata {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+    }
+
+    .log-area {
+      height: 128px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-sub);
+      padding: 12px 16px;
+      display: grid;
+      gap: 6px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 12px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .log-timestamp {
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+      width: 130px;
+    }
+
+    .status-bar {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-sub);
+    }
+
+    .status-bar span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+    }
+
+    .theme-toggle {
+      margin-left: auto;
+      padding: 6px 12px;
+    }
+
+    [aria-live="polite"] {
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+    }
+
+    .kbd {
+      font-family: "JetBrains Mono", monospace;
+      background: var(--bg-sub);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 4px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 1024px) {
+      .split-area {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header role="menubar" aria-label="アプリケーションメニュー">
+    <nav>
+      <button type="button" data-access-key="F" aria-haspopup="true">ファイル</button>
+      <button type="button" data-access-key="E" aria-haspopup="true">編集</button>
+      <button type="button" data-access-key="V" aria-haspopup="true">表示</button>
+      <button type="button" data-access-key="H" aria-haspopup="true">ヘルプ</button>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="テーマを切り替える"><span aria-hidden="true">🌗</span> テーマ切替</button>
+  </header>
+
+  <div class="toolbar" role="toolbar" aria-label="クイックアクション">
+    <div class="toolbar-group" aria-label="ファイル操作">
+      <button type="button"><span aria-hidden="true">💾</span> 保存</button>
+      <button type="button"><span aria-hidden="true">📝</span> 新規カード</button>
+    </div>
+    <div class="toolbar-group" aria-label="編集操作">
+      <button type="button"><span aria-hidden="true">↩︎</span> Undo <span class="kbd">Ctrl+Z</span></button>
+      <button type="button"><span aria-hidden="true">↪︎</span> Redo <span class="kbd">Ctrl+Shift+Z</span></button>
+    </div>
+    <div class="toolbar-group" aria-label="表示設定">
+      <button type="button"><span aria-hidden="true">🗂️</span> 分割追加</button>
+      <button type="button"><span aria-hidden="true">🌓</span> コンパクト表示</button>
+    </div>
+  </div>
+
+  <main class="app-container">
+    <aside class="sidebar" aria-label="ナビゲーション" tabindex="0">
+      <header>
+        <span>エクスプローラ</span>
+        <button type="button" aria-label="検索を開く">🔍</button>
+      </header>
+      <nav>
+        <h3>プロジェクト</h3>
+        <ul>
+          <li><a href="#" class="active">カード定義 <span class="badge">26</span></a></li>
+          <li><a href="#">トレーサビリティ</a></li>
+          <li><a href="#">テストケース</a></li>
+        </ul>
+        <h3>フィルター</h3>
+        <ul>
+          <li><a href="#">承認済み <span class="badge">14</span></a></li>
+          <li><a href="#">レビュー中 <span class="badge">7</span></a></li>
+          <li><a href="#">ドラフト <span class="badge">5</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <section class="content" aria-label="カードパネル領域">
+      <div class="split-area" role="group" aria-label="分割カードビュー">
+        <article class="split-panel" aria-label="カードパネル A">
+          <div class="tab-bar" role="tablist">
+            <div class="tab active" role="tab" aria-selected="true">カード一覧</div>
+            <div class="tab" role="tab" aria-selected="false">差分</div>
+          </div>
+          <div class="panel-toolbar">
+            <input type="search" placeholder="カードを検索" aria-label="カードを検索" />
+            <button type="button">フィルター</button>
+            <button type="button">表示設定</button>
+          </div>
+          <div class="card-list" role="tree" aria-label="カード一覧">
+            <div class="card" role="treeitem" aria-level="1">
+              <header>
+                <strong>REQ-001 カード構造設計</strong>
+                <span class="status" data-status="approved">Approved</span>
+              </header>
+              <p>カードデータモデルの階層構造とトレーサビリティ要件を定義。</p>
+              <div class="metadata">
+                <span>更新者: 山田</span>
+                <span>更新日: 2025-02-14</span>
+              </div>
+            </div>
+            <div class="card" role="treeitem" aria-level="1">
+              <header>
+                <strong>REQ-014 仮想スクロール実装</strong>
+                <span class="status" data-status="review">Review</span>
+              </header>
+              <p>大量カードに対応する仮想スクロールと差分描画の実装方針。</p>
+              <div class="metadata">
+                <span>担当: 佐藤</span>
+                <span>更新日: 2025-02-10</span>
+              </div>
+            </div>
+            <div class="card" role="treeitem" aria-level="1">
+              <header>
+                <strong>REQ-020 ダークモードテーマ</strong>
+                <span class="status" data-status="draft">Draft</span>
+              </header>
+              <p>ライト/ダークモード切替とカラーパレット最適化の要件整理。</p>
+              <div class="metadata">
+                <span>担当: 鈴木</span>
+                <span>更新日: 2025-02-01</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="split-panel" aria-label="カードパネル B">
+          <div class="tab-bar" role="tablist">
+            <div class="tab active" role="tab" aria-selected="true">詳細</div>
+            <div class="tab" role="tab" aria-selected="false">履歴</div>
+            <div class="tab" role="tab" aria-selected="false">コメント</div>
+          </div>
+          <div class="panel-toolbar">
+            <input type="search" value="REQ-014" aria-label="詳細検索" />
+            <button type="button">編集</button>
+            <button type="button">リンク追加</button>
+          </div>
+          <div class="card-list" aria-label="カード詳細">
+            <div class="card">
+              <header>
+                <strong>REQ-014 仮想スクロール実装</strong>
+                <span class="status" data-status="review">Review</span>
+              </header>
+              <p>スクロール位置に応じてカードDOMを遅延生成し、上下各10件のバッファを持つ。</p>
+              <div class="metadata">
+                <span>優先度: 高</span>
+                <span>依存: REQ-005</span>
+              </div>
+              <p>メモ: `react-window` を利用し、差分更新によるレンダリング最適化を行う。</p>
+            </div>
+            <div class="card">
+              <header>
+                <strong>関連コネクタ</strong>
+                <span class="status" data-status="draft">Draft</span>
+              </header>
+              <p>テストケース `TC-310` とトレーサビリティリンクを保持。Canvas API による描画最適化を検討。</p>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <section class="log-area" aria-live="polite" aria-label="アクティビティログ">
+        <div class="log-entry">
+          <span class="log-timestamp">12:41:22</span>
+          <span>山田がカード <strong>REQ-014</strong> をレビュー状態に更新しました。</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-timestamp">12:37:09</span>
+          <span>鈴木がカード <strong>REQ-020</strong> にコメントを追加しました。</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-timestamp">12:15:54</span>
+          <span>自動保存: 作業コピーは最新です。</span>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="status-bar" role="status">
+    <span><strong>プロジェクト:</strong> NextGen Traceability</span>
+    <span><strong>シンク:</strong> クラウド (自動保存)</span>
+    <span><strong>状態:</strong> Idle</span>
+  </footer>
+
+  <script>
+    const toggleButton = document.querySelector('.theme-toggle');
+    const body = document.body;
+
+    function setTheme(mode) {
+      if (mode === 'dark') {
+        body.classList.add('theme-dark');
+        localStorage.setItem('mock-theme', 'dark');
+      } else {
+        body.classList.remove('theme-dark');
+        localStorage.setItem('mock-theme', 'light');
+      }
+    }
+
+    const savedTheme = localStorage.getItem('mock-theme');
+    if (savedTheme) {
+      setTheme(savedTheme);
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark');
+    }
+
+    toggleButton.addEventListener('click', () => {
+      const isDark = body.classList.toggle('theme-dark');
+      localStorage.setItem('mock-theme', isDark ? 'dark' : 'light');
+    });
+
+    document.querySelectorAll('.tab-bar').forEach((bar) => {
+      const tabs = Array.from(bar.querySelectorAll('.tab'));
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tabs.forEach((t) => t.classList.remove('active'));
+          tab.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
