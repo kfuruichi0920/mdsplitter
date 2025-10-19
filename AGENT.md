@@ -5,6 +5,7 @@
 以下を参照。
 - `spec/SW要求仕様書.md`
 - `spec/UI設計書.md`
+- `doc/操作ガイドmd`
 
 ## 2. 技術スタック
 UIの操作性・拡張性とデータ保護の観点から、Electron/React/TypeScript によるデスクトップアプリとして実装する。
@@ -12,7 +13,7 @@ UIの操作性・拡張性とデータ保護の観点から、Electron/React/Typ
 - **技術スタック**: Electron / React / TypeScript
 
 ## 3. 開発情報
-### 9.1. 開発コマンド
+### 3.1. 開発コマンド
 - `npm install`: 依存関係のインストール
 - `npm start`: 開発サーバー起動
 - `npm run build`: プロダクションビルド
