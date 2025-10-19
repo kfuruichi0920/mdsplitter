@@ -37,13 +37,54 @@ interface AppState {
 }
 
 const defaultSettings: AppSettings = {
-  theme: 'system',
+  input: {
+    maxWarnSizeMB: 10,
+    maxAbortSizeMB: 200,
+  },
+  file: {
+    encodingFallback: 'reject',
+    normalizeNewline: true,
+  },
+  converter: {
+    strategy: 'rule',
+    timeoutMs: 60000,
+  },
+  llm: {
+    provider: 'none',
+    temperature: 0,
+    allowCloud: false,
+  },
+  log: {
+    logLevel: 'info',
+    logRotation: {
+      maxFileSizeMB: 10,
+      maxFiles: 5,
+      retentionDays: 30,
+    },
+  },
+  history: {
+    maxDepth: 1000,
+    perFile: false,
+    persistOnExit: false,
+  },
+  ui: {
+    theme: 'system',
+    font: {
+      size: 14,
+    },
+    window: {
+      startMaximized: false,
+    },
+    autoSave: {
+      enabled: true,
+      intervalMs: 30000,
+    },
+  },
+  concurrency: {
+    fileLocking: 'optimistic',
+    maxOpenFiles: 32,
+  },
   workDir: './workdir',
-  fontSize: 14,
-  autoSave: true,
-  autoSaveInterval: 30,
-  maxUndoSteps: 1000,
-  logLevel: 'info',
 };
 
 export const useAppStore = create<AppState>()(

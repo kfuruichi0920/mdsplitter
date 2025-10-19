@@ -63,12 +63,19 @@ export const useCardStore = create<CardState>()(
           const cardFile = state.cardFiles.get(filePath);
           if (!cardFile) return state;
 
-          const updatedCards = cardFile.cards.map((card) =>
-            card.id === cardId ? { ...card, ...updates, updated_at: new Date().toISOString() } : card
+          const updatedCards = cardFile.body.map((card) =>
+            card.id === cardId ? { ...card, ...updates, updatedAt: new Date().toISOString() } : card
           );
 
           const newCardFiles = new Map(state.cardFiles);
-          newCardFiles.set(filePath, { ...cardFile, cards: updatedCards });
+          newCardFiles.set(filePath, {
+            ...cardFile,
+            body: updatedCards,
+            header: {
+              ...cardFile.header,
+              updatedAt: new Date().toISOString(),
+            },
+          });
 
           return { cardFiles: newCardFiles };
         }),
@@ -82,10 +89,10 @@ export const useCardStore = create<CardState>()(
           const newCardFiles = new Map(state.cardFiles);
           newCardFiles.set(filePath, {
             ...cardFile,
-            cards: [...cardFile.cards, card],
-            metadata: {
-              ...cardFile.metadata,
-              total_cards: cardFile.cards.length + 1,
+            body: [...cardFile.body, card],
+            header: {
+              ...cardFile.header,
+              updatedAt: new Date().toISOString(),
             },
           });
 
@@ -97,14 +104,14 @@ export const useCardStore = create<CardState>()(
           const cardFile = state.cardFiles.get(filePath);
           if (!cardFile) return state;
 
-          const updatedCards = cardFile.cards.filter((card) => card.id !== cardId);
+          const updatedCards = cardFile.body.filter((card) => card.id !== cardId);
           const newCardFiles = new Map(state.cardFiles);
           newCardFiles.set(filePath, {
             ...cardFile,
-            cards: updatedCards,
-            metadata: {
-              ...cardFile.metadata,
-              total_cards: updatedCards.length,
+            body: updatedCards,
+            header: {
+              ...cardFile.header,
+              updatedAt: new Date().toISOString(),
             },
           });
 

@@ -4,6 +4,7 @@ import { openFile, saveFile, saveFileAs, readFile } from './services/fileService
 import { initLogger, logInfo } from './services/logService';
 import { initSettings, getSettings, updateSettings } from './services/settingsService';
 import { initWorkDir } from './services/folderService';
+import { convertToCards } from './services/converterService';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -164,6 +165,41 @@ function setupIpcHandlers() {
     const { logDebug } = await import('./services/logService');
     logDebug(message, meta);
   });
+
+  // Converter operations
+  ipcMain.handle(
+    'converter:convert',
+    async (
+      _event,
+      {
+        content,
+        inputFilePath,
+        copiedInputFilePath,
+        fileName,
+        fileExtension,
+      }: {
+        content: string;
+        inputFilePath: string;
+        copiedInputFilePath: string;
+        fileName: string;
+        fileExtension: string;
+      }
+    ) => {
+      try {
+        return convertToCards(
+          content,
+          inputFilePath,
+          copiedInputFilePath,
+          fileName,
+          fileExtension
+        );
+      } catch (error) {
+        const { logError } = await import('./services/logService');
+        logError('Conversion failed', error);
+        throw error;
+      }
+    }
+  );
 }
 
 /**

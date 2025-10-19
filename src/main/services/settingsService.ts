@@ -12,51 +12,117 @@ let settingsFilePath: string = '';
  * Default settings
  */
 const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'system',
+  input: {
+    maxWarnSizeMB: 10,
+    maxAbortSizeMB: 200,
+  },
+  file: {
+    encodingFallback: 'reject',
+    normalizeNewline: true,
+  },
+  converter: {
+    strategy: 'rule',
+    timeoutMs: 60000,
+  },
+  llm: {
+    provider: 'none',
+    temperature: 0,
+    allowCloud: false,
+  },
+  log: {
+    logLevel: 'info',
+    logRotation: {
+      maxFileSizeMB: 10,
+      maxFiles: 5,
+      retentionDays: 30,
+    },
+  },
+  history: {
+    maxDepth: 1000,
+    perFile: false,
+    persistOnExit: false,
+  },
+  ui: {
+    theme: 'system',
+    font: {
+      size: 14,
+    },
+    window: {
+      startMaximized: false,
+    },
+    autoSave: {
+      enabled: true,
+      intervalMs: 60000,
+    },
+  },
+  concurrency: {
+    fileLocking: 'optimistic',
+    maxOpenFiles: 32,
+  },
   workDir: '',
-  fontSize: 14,
-  autoSave: true,
-  autoSaveInterval: 60, // 60 seconds
-  maxUndoSteps: 1000,
-  logLevel: 'info',
-  llmProvider: undefined,
-  llmApiKey: undefined,
-  llmModel: undefined,
 };
 
 /**
  * Validate settings object
+ * Note: This is a simplified validation. Complete validation will be added later.
  */
 function validateSettings(data: unknown): AppSettings {
   const s = data as Partial<AppSettings>;
 
-  return {
-    theme: ['light', 'dark', 'system'].includes(s.theme || '')
-      ? (s.theme as AppSettings['theme'])
-      : DEFAULT_SETTINGS.theme,
+  // Deep merge with defaults
+  const validated: AppSettings = {
+    input: {
+      maxWarnSizeMB: s.input?.maxWarnSizeMB ?? DEFAULT_SETTINGS.input.maxWarnSizeMB,
+      maxAbortSizeMB: s.input?.maxAbortSizeMB ?? DEFAULT_SETTINGS.input.maxAbortSizeMB,
+    },
+    file: {
+      encodingFallback: s.file?.encodingFallback ?? DEFAULT_SETTINGS.file.encodingFallback,
+      normalizeNewline: s.file?.normalizeNewline ?? DEFAULT_SETTINGS.file.normalizeNewline,
+    },
+    converter: {
+      strategy: s.converter?.strategy ?? DEFAULT_SETTINGS.converter.strategy,
+      timeoutMs: s.converter?.timeoutMs ?? DEFAULT_SETTINGS.converter.timeoutMs,
+    },
+    llm: {
+      provider: s.llm?.provider ?? DEFAULT_SETTINGS.llm.provider,
+      endpoint: s.llm?.endpoint,
+      model: s.llm?.model,
+      temperature: s.llm?.temperature ?? DEFAULT_SETTINGS.llm.temperature,
+      maxTokens: s.llm?.maxTokens,
+      allowCloud: s.llm?.allowCloud ?? DEFAULT_SETTINGS.llm.allowCloud,
+      redaction: s.llm?.redaction,
+      apiKey: s.llm?.apiKey,
+      timeoutMs: s.llm?.timeoutMs,
+      maxConcurrency: s.llm?.maxConcurrency,
+    },
+    log: {
+      logLevel: s.log?.logLevel ?? DEFAULT_SETTINGS.log.logLevel,
+      logRotation: s.log?.logRotation ?? DEFAULT_SETTINGS.log.logRotation,
+    },
+    history: {
+      maxDepth: s.history?.maxDepth ?? DEFAULT_SETTINGS.history.maxDepth,
+      perFile: s.history?.perFile ?? DEFAULT_SETTINGS.history.perFile,
+      persistOnExit: s.history?.persistOnExit ?? DEFAULT_SETTINGS.history.persistOnExit,
+    },
+    ui: {
+      theme: s.ui?.theme ?? DEFAULT_SETTINGS.ui.theme,
+      locale: s.ui?.locale,
+      font: s.ui?.font ?? DEFAULT_SETTINGS.ui.font,
+      window: s.ui?.window ?? DEFAULT_SETTINGS.ui.window,
+      tab: s.ui?.tab,
+      highlightColors: s.ui?.highlightColors,
+      autoSave: s.ui?.autoSave ?? DEFAULT_SETTINGS.ui.autoSave,
+    },
+    trace: s.trace,
+    fileWatcher: s.fileWatcher,
+    search: s.search,
+    concurrency: s.concurrency ?? DEFAULT_SETTINGS.concurrency,
+    recentFiles: s.recentFiles,
+    shortcuts: s.shortcuts,
     workDir: typeof s.workDir === 'string' ? s.workDir : DEFAULT_SETTINGS.workDir,
-    fontSize:
-      typeof s.fontSize === 'number' && s.fontSize >= 10 && s.fontSize <= 32
-        ? s.fontSize
-        : DEFAULT_SETTINGS.fontSize,
-    autoSave: typeof s.autoSave === 'boolean' ? s.autoSave : DEFAULT_SETTINGS.autoSave,
-    autoSaveInterval:
-      typeof s.autoSaveInterval === 'number' && s.autoSaveInterval >= 10
-        ? s.autoSaveInterval
-        : DEFAULT_SETTINGS.autoSaveInterval,
-    maxUndoSteps:
-      typeof s.maxUndoSteps === 'number' && s.maxUndoSteps >= 0
-        ? s.maxUndoSteps
-        : DEFAULT_SETTINGS.maxUndoSteps,
-    logLevel: ['debug', 'info', 'warn', 'error'].includes(s.logLevel || '')
-      ? (s.logLevel as AppSettings['logLevel'])
-      : DEFAULT_SETTINGS.logLevel,
-    llmProvider: ['openai', 'gemini', 'ollama'].includes(s.llmProvider || '')
-      ? (s.llmProvider as AppSettings['llmProvider'])
-      : undefined,
-    llmApiKey: typeof s.llmApiKey === 'string' ? s.llmApiKey : undefined,
-    llmModel: typeof s.llmModel === 'string' ? s.llmModel : undefined,
   };
+
+  return validated;
 }
 
 /**

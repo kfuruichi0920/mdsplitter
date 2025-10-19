@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { FileOpenResult, FileSaveResult, AppSettings } from '../shared/types';
+import { FileOpenResult, FileSaveResult, AppSettings, CardFile } from '../shared/types';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -27,6 +27,15 @@ contextBridge.exposeInMainWorld('electron', {
   logDebug: (message: string, meta?: Record<string, unknown>) =>
     ipcRenderer.invoke('log:debug', message, meta),
 
+  // Converter operations
+  convertToCards: (params: {
+    content: string;
+    inputFilePath: string;
+    copiedInputFilePath: string;
+    fileName: string;
+    fileExtension: string;
+  }) => ipcRenderer.invoke('converter:convert', params),
+
   // Platform info
   platform: process.platform,
 });
@@ -43,6 +52,13 @@ export interface ElectronAPI {
   logWarn: (message: string, meta?: Record<string, unknown>) => Promise<void>;
   logError: (message: string, error?: unknown) => Promise<void>;
   logDebug: (message: string, meta?: Record<string, unknown>) => Promise<void>;
+  convertToCards: (params: {
+    content: string;
+    inputFilePath: string;
+    copiedInputFilePath: string;
+    fileName: string;
+    fileExtension: string;
+  }) => Promise<CardFile>;
   platform: NodeJS.Platform;
 }
 

@@ -17,74 +17,199 @@ export interface PanelLayout {
   sizes?: number[];
 }
 
-// Card types (to be extended in Phase 3)
-export type CardInfoType = 'section' | 'paragraph' | 'bullet' | 'diagram' | 'table' | 'test' | 'qa';
+// Card types (Phase 3: Data Model Definition)
+export type CardInfoType = 'heading' | 'paragraph' | 'bullet' | 'figure' | 'table' | 'test' | 'qa' | 'other';
 export type CardStatus = 'draft' | 'review' | 'approved' | 'deprecated';
 
+export interface CardContent {
+  text: string;
+  number?: string; // 図番号、表番号、試験番号など
+}
+
 export interface Card {
-  id: string;
-  content: string;
-  info_type: CardInfoType;
+  id: string; // UUID v4
+  type: CardInfoType;
   status: CardStatus;
+  content: CardContent;
+  updatedAt: string; // ISO 8601
   parent_id: string | null;
   child_ids: string[];
   prev_id: string | null;
   next_id: string | null;
-  attributes: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+}
+
+export interface CardFileHeader {
+  id: string; // UUID v4
+  fileName: string;
+  orgInputFilePath: string; // オリジナルの入力ファイルの絶対パス
+  inputFilePath: string; // inputフォルダにコピーされた入力ファイルの絶対パス
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  memo?: string;
 }
 
 export interface CardFile {
-  version: string;
-  label: string;
-  source_file: string;
-  converted_at: string;
-  conversion_method: 'rule' | 'llm';
-  cards: Card[];
-  metadata: {
-    total_cards: number;
-    llm_tokens?: number;
-    [key: string]: unknown;
-  };
+  schemaVersion: number;
+  header: CardFileHeader;
+  body: Card[];
 }
 
-// Traceability types (to be extended in Phase 5)
-export type TraceRelationType = 'trace' | 'refines' | 'satisfies' | 'tests' | 'verifies' | 'depends';
+// Traceability types (Phase 3: Data Model Definition)
+export type TraceRelationType = 'trace' | 'refines' | 'tests' | 'duplicates' | 'satisfy' | 'relate' | 'specialize';
 export type TraceDirection = 'left_to_right' | 'right_to_left' | 'bidirectional';
 
 export interface TraceRelation {
-  id: string;
-  left_card_id: string;
-  right_card_id: string;
-  relation_type: TraceRelationType;
-  direction: TraceDirection;
+  id: string; // UUID v4
+  left_ids: string[]; // left_fileのカードID配列
+  right_ids: string[]; // right_fileのカードID配列
+  type: TraceRelationType;
+  directed: TraceDirection;
   memo?: string;
-  created_at: string;
-  updated_at: string;
+}
+
+export interface TraceFileHeader {
+  id: string; // UUID v4
+  fileName: string;
+  leftFilePath: string; // 左側カードファイルの絶対パス
+  rightFilePath: string; // 右側カードファイルの絶対パス
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  memo?: string;
 }
 
 export interface TraceFile {
-  version: string;
-  left_file: string;
-  right_file: string;
-  relations: TraceRelation[];
-  created_at: string;
-  updated_at: string;
+  schemaVersion: number;
+  header: TraceFileHeader;
+  body: TraceRelation[];
 }
 
-// Application settings
+// Application settings (Phase 3: Extended Settings)
+export type LLMProvider = 'openai' | 'gemini' | 'ollama' | 'none';
+export type ConverterStrategy = 'rule' | 'llm';
+export type EncodingFallback = 'reject' | 'assume-sjis' | 'assume-utf8';
+export type FileLockingMode = 'optimistic' | 'pessimistic' | 'none';
+export type AutoReloadPolicy = 'prompt' | 'auto' | 'ignore';
+
 export interface AppSettings {
-  theme: ThemeMode;
+  // ファイル入力
+  input: {
+    maxWarnSizeMB: number;
+    maxAbortSizeMB: number;
+  };
+  file: {
+    encodingFallback: EncodingFallback;
+    normalizeNewline: boolean;
+  };
+
+  // 変換方式
+  converter: {
+    strategy: ConverterStrategy;
+    timeoutMs: number | 'none';
+  };
+
+  // LLM設定
+  llm: {
+    provider: LLMProvider;
+    endpoint?: string;
+    model?: string;
+    temperature: number;
+    maxTokens?: number;
+    allowCloud: boolean;
+    redaction?: {
+      enabled: boolean;
+    };
+    apiKey?: string;
+    timeoutMs?: number;
+    maxConcurrency?: number;
+  };
+
+  // ログ
+  log: {
+    logLevel: 'info' | 'warn' | 'error' | 'debug';
+    logRotation?: {
+      maxFileSizeMB: number;
+      maxFiles: number;
+      retentionDays: number;
+    };
+  };
+
+  // 履歴／Undo/Redo
+  history: {
+    maxDepth: number;
+    perFile: boolean;
+    persistOnExit: boolean;
+  };
+
+  // UI／表示設定
+  ui: {
+    theme: ThemeMode;
+    locale?: string;
+    font?: {
+      family?: string;
+      size?: number;
+    };
+    window?: {
+      startMaximized: boolean;
+      bounds?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+    };
+    tab?: {
+      maxWidth?: number;
+      height?: number;
+    };
+    highlightColors?: {
+      selected?: string;
+      edited?: string;
+      traceHighlight?: string;
+    };
+    autoSave?: {
+      enabled: boolean;
+      intervalMs: number;
+    };
+  };
+
+  // トレーサビリティ
+  trace?: {
+    defaultDirection: TraceDirection;
+    highlightColors?: {
+      selected?: string;
+      traceHighlight?: string;
+    };
+  };
+
+  // ファイル監視
+  fileWatcher?: {
+    enabled: boolean;
+    debounceMs: number;
+    autoReloadPolicy: AutoReloadPolicy;
+    ignorePatterns?: string[];
+  };
+
+  // 検索／置換
+  search?: {
+    defaultRegex: boolean;
+    maxResults: number;
+    caseSensitiveDefault: boolean;
+  };
+
+  // 同時編集／ロック
+  concurrency?: {
+    fileLocking: FileLockingMode;
+    maxOpenFiles: number;
+  };
+
+  // その他運用
+  recentFiles?: {
+    limit: number;
+  };
+  shortcuts?: Record<string, string>;
+
+  // 作業ディレクトリ（後方互換性のため残す）
   workDir: string;
-  fontSize: number;
-  autoSave: boolean;
-  autoSaveInterval: number; // in seconds
-  maxUndoSteps: number;
-  logLevel: 'debug' | 'info' | 'warn' | 'error';
-  llmProvider?: 'openai' | 'gemini' | 'ollama';
-  llmApiKey?: string;
-  llmModel?: string;
 }
 
 // Log types
