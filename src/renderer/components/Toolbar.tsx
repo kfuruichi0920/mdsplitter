@@ -1,8 +1,52 @@
 import React from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useCardStore } from '../store/useCardStore';
 
 const Toolbar: React.FC = () => {
-  const { sidebarVisible, toggleSidebar } = useAppStore();
+  const { sidebarVisible, toggleSidebar, addPanel } = useAppStore();
+  const { loadCardFile } = useCardStore();
+
+  const handleOpenFile = async () => {
+    try {
+      const result = await window.electron.openFile();
+      if (result.success && result.filePath && result.content) {
+        // Check if it's a card file (.json)
+        if (result.filePath.endsWith('.json')) {
+          try {
+            const cardFile = JSON.parse(result.content);
+            // Load card file into store
+            loadCardFile(result.filePath, cardFile);
+            // Add a new panel to display the card file
+            const fileName = result.filePath.split('/').pop() || 'Untitled';
+            const newPanel = {
+              id: `panel-${Date.now()}`,
+              type: 'card' as const,
+              title: fileName,
+              filePath: result.filePath,
+            };
+            addPanel(newPanel);
+            await window.electron.logInfo('Card file loaded', {
+              filePath: result.filePath,
+            });
+          } catch (error) {
+            await window.electron.logError('Failed to parse card file', error);
+          }
+        } else {
+          // For now, just log that a non-card file was opened
+          await window.electron.logInfo('File opened (not a card file)', {
+            filePath: result.filePath,
+          });
+        }
+      } else if (!result.success && result.error) {
+        // Error occurred or user canceled
+        if (result.error !== 'User cancelled') {
+          await window.electron.logError('Failed to open file', result.error);
+        }
+      }
+    } catch (error) {
+      await window.electron.logError('Error opening file', error);
+    }
+  };
 
   return (
     <div className="h-10 bg-secondary-100 dark:bg-secondary-800 border-b border-secondary-300 dark:border-secondary-700 flex items-center px-3 gap-2">
@@ -30,6 +74,7 @@ const Toolbar: React.FC = () => {
 
       {/* File operations */}
       <button
+        onClick={handleOpenFile}
         className="p-1.5 hover:bg-secondary-200 dark:hover:bg-secondary-700 rounded text-secondary-700 dark:text-secondary-300"
         title="Open File (Ctrl+O)"
       >
