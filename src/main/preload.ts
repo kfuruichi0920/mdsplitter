@@ -4,6 +4,7 @@ import {
   FileSaveResult,
   AppSettings,
   CardFile,
+  TraceFile,
   LLMResponse,
   LLMConfigValidation,
 } from '../shared/types';
@@ -61,6 +62,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('cardFile:save', params),
   loadCardFile: (filePath: string) => ipcRenderer.invoke('cardFile:load', filePath),
 
+  // Trace file operations
+  saveTraceFile: (params: { traceFile: TraceFile }) =>
+    ipcRenderer.invoke('traceFile:save', params),
+  loadTraceFile: (filePath: string) => ipcRenderer.invoke('traceFile:load', filePath),
+
   // Platform info
   platform: process.platform,
 });
@@ -106,6 +112,16 @@ export interface ElectronAPI {
   loadCardFile: (filePath: string) => Promise<{
     success: boolean;
     cardFile?: CardFile;
+    error?: string;
+  }>;
+  saveTraceFile: (params: { traceFile: TraceFile }) => Promise<{
+    success: boolean;
+    savedPath?: string;
+    error?: string;
+  }>;
+  loadTraceFile: (filePath: string) => Promise<{
+    success: boolean;
+    traceFile?: TraceFile;
     error?: string;
   }>;
   platform: NodeJS.Platform;

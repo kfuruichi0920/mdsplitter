@@ -8,6 +8,8 @@ import {
   copyInputFile,
   saveCardFile,
   loadCardFile,
+  saveTraceFile,
+  loadTraceFile,
 } from './services/fileService';
 import { initLogger, logInfo } from './services/logService';
 import { initSettings, getSettings, updateSettings } from './services/settingsService';
@@ -257,6 +259,18 @@ function setupIpcHandlers() {
 
   ipcMain.handle('cardFile:load', async (_event, filePath: string) => {
     return await loadCardFile(filePath);
+  });
+
+  // Trace file handlers
+  ipcMain.handle(
+    'traceFile:save',
+    async (_event, { traceFile }: { traceFile: any }) => {
+      return await saveTraceFile(traceFile);
+    }
+  );
+
+  ipcMain.handle('traceFile:load', async (_event, filePath: string) => {
+    return await loadTraceFile(filePath);
   });
 }
 

@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import * as Encoding from 'encoding-japanese';
-import { FileOpenResult, FileSaveResult, FileDialogOptions, CardFile } from '../../shared/types';
+import { FileOpenResult, FileSaveResult, FileDialogOptions, CardFile, TraceFile } from '../../shared/types';
 import { getSettings } from './settingsService';
 import { logInfo, logError } from './logService';
 
@@ -351,6 +351,86 @@ export async function loadCardFile(
     return { success: true, cardFile };
   } catch (error) {
     logError('Failed to load card file', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * トレーサビリティファイルを保存
+ */
+export async function saveTraceFile(
+  traceFile: TraceFile
+): Promise<{ success: boolean; savedPath?: string; error?: string }> {
+  try {
+    const settings = getSettings();
+    const workDir = settings.workDir;
+
+    if (!workDir) {
+      return { success: false, error: 'Work directory not configured' };
+    }
+
+    // _trace フォルダを作成
+    const traceDir = path.join(workDir, '_trace');
+    await fs.mkdir(traceDir, { recursive: true });
+
+    // ファイル名を生成: trace_<left>_<right>.json
+    const leftBaseName = path.basename(
+      traceFile.header.leftFilePath,
+      path.extname(traceFile.header.leftFilePath)
+    );
+    const rightBaseName = path.basename(
+      traceFile.header.rightFilePath,
+      path.extname(traceFile.header.rightFilePath)
+    );
+
+    const fileName = `trace_${leftBaseName}_${rightBaseName}.json`;
+    const savedPath = path.join(traceDir, fileName);
+
+    // トレーサビリティファイルをJSON形式で保存
+    const jsonContent = JSON.stringify(traceFile, null, 2);
+    await fs.writeFile(savedPath, jsonContent, { encoding: 'utf-8' });
+
+    logInfo('Trace file saved', {
+      savedPath,
+      totalTraces: traceFile.body.length,
+    });
+
+    return { success: true, savedPath };
+  } catch (error) {
+    logError('Failed to save trace file', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * トレーサビリティファイルを読み込み
+ */
+export async function loadTraceFile(
+  filePath: string
+): Promise<{ success: boolean; traceFile?: TraceFile; error?: string }> {
+  try {
+    const content = await fs.readFile(filePath, { encoding: 'utf-8' });
+    const traceFile: TraceFile = JSON.parse(content);
+
+    // 基本的なバリデーション
+    if (!traceFile.schemaVersion || !traceFile.header || !traceFile.body) {
+      return { success: false, error: 'Invalid trace file format' };
+    }
+
+    logInfo('Trace file loaded', {
+      filePath,
+      totalTraces: traceFile.body.length,
+    });
+
+    return { success: true, traceFile };
+  } catch (error) {
+    logError('Failed to load trace file', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
