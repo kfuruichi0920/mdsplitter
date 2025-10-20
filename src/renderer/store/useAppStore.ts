@@ -153,17 +153,25 @@ export const useAppStore = create<AppState>()(
 
             // If this is a layout, recursively split children
             if ('direction' in node) {
+              const newChildren = node.children.map(child => {
+                const result = splitRecursive(child);
+                return result !== null ? result : child;
+              });
+
               return {
                 ...node,
-                children: node.children.map(child => splitRecursive(child) || child),
+                children: newChildren,
               };
             }
 
             return node;
           };
 
+          const newLayout = splitRecursive(state.panelLayout);
+          console.log('Split panel:', { panelId, direction, oldLayout: state.panelLayout, newLayout });
+
           return {
-            panelLayout: splitRecursive(state.panelLayout),
+            panelLayout: newLayout,
           };
         }),
 

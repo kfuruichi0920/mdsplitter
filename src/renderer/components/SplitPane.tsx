@@ -14,6 +14,11 @@ const SplitPane: React.FC<SplitPaneProps> = ({ layout }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState<number>(-1);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('SplitPane render:', { layout, hasType: 'type' in layout, hasDirection: 'direction' in layout });
+  }, [layout]);
+
   // If this is a simple Panel (leaf node)
   if ('type' in layout) {
     return <PanelContent panel={layout} />;
@@ -21,6 +26,16 @@ const SplitPane: React.FC<SplitPaneProps> = ({ layout }) => {
 
   // This is a PanelLayout (split node)
   const { direction, children } = layout;
+
+  // Safety check
+  if (!children || children.length === 0) {
+    console.error('SplitPane: Invalid layout - no children', layout);
+    return (
+      <div className="flex items-center justify-center h-full bg-white dark:bg-secondary-800">
+        <div className="text-red-500">Error: Invalid panel layout</div>
+      </div>
+    );
+  }
 
   // Initialize sizes from layout or use equal distribution
   useEffect(() => {
