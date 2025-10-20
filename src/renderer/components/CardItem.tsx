@@ -177,6 +177,7 @@ const CardItem: React.FC<CardItemProps> = ({
 
   return (
     <div
+      data-card-id={card.id}
       className={`mb-1 rounded border ${
         isSelected
           ? 'border-primary-500 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'

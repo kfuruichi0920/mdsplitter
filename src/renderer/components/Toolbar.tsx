@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useCardStore } from '../store/useCardStore';
+import { useTraceStore } from '../store/useTraceStore';
 
 const Toolbar: React.FC = () => {
   const { sidebarVisible, toggleSidebar, addPanel } = useAppStore();
   const { loadCardFile } = useCardStore();
+  const { traceVisible, setTraceVisible } = useTraceStore();
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+T / Cmd+T: Toggle trace visibility
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+        e.preventDefault();
+        setTraceVisible(!traceVisible);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [traceVisible, setTraceVisible]);
 
   const handleOpenFile = async () => {
     try {
@@ -129,6 +145,28 @@ const Toolbar: React.FC = () => {
             strokeLinejoin="round"
             strokeWidth={2}
             d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
+          />
+        </svg>
+      </button>
+
+      <div className="w-px h-6 bg-secondary-300 dark:bg-secondary-600" />
+
+      {/* Trace visibility toggle */}
+      <button
+        onClick={() => setTraceVisible(!traceVisible)}
+        className={`p-1.5 rounded ${
+          traceVisible
+            ? 'bg-primary-600 text-white hover:bg-primary-700'
+            : 'hover:bg-secondary-200 dark:hover:bg-secondary-700 text-secondary-700 dark:text-secondary-300'
+        }`}
+        title={`${traceVisible ? 'Hide' : 'Show'} Trace Connectors (Ctrl+T)`}
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
           />
         </svg>
       </button>
