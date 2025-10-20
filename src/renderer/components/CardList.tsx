@@ -10,6 +10,9 @@ interface CardListProps {
   compactMode: boolean;
   selectedCards?: Set<string>;
   onSelectCard?: (cardId: string, multi: boolean) => void;
+  onSelectRange?: (startCardId: string, endCardId: string, allCards: string[]) => void;
+  lastSelectedCard?: string | null;
+  onUpdateCard?: (cardId: string, updates: Partial<Card>) => void;
 }
 
 const CardList: React.FC<CardListProps> = ({
@@ -20,6 +23,9 @@ const CardList: React.FC<CardListProps> = ({
   compactMode,
   selectedCards = new Set(),
   onSelectCard,
+  onSelectRange,
+  lastSelectedCard = null,
+  onUpdateCard,
 }) => {
   // Filter cards based on type and text
   const filteredCards = useMemo(() => {
@@ -71,6 +77,13 @@ const CardList: React.FC<CardListProps> = ({
     );
   }
 
+  const handleSelectRange = (cardId: string, shift: boolean) => {
+    if (shift && lastSelectedCard && onSelectRange) {
+      const allCardIds = filteredCards.map((c) => c.id);
+      onSelectRange(lastSelectedCard, cardId, allCardIds);
+    }
+  };
+
   return (
     <div className="p-2">
       {filteredCards.map((card) => (
@@ -82,6 +95,8 @@ const CardList: React.FC<CardListProps> = ({
           compactMode={compactMode}
           isSelected={selectedCards.has(card.id)}
           onSelect={onSelectCard}
+          onSelectRange={handleSelectRange}
+          onUpdate={onUpdateCard}
         />
       ))}
     </div>

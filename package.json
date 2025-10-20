@@ -26,6 +26,8 @@
   "dependencies": {
     "encoding-japanese": "^2.2.0",
     "react": "^18.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
     "winston": "^3.18.3",
     "zustand": "^4.5.0"
@@ -34,6 +36,8 @@
     "@types/encoding-japanese": "^2.2.1",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
+    "@types/react-dnd": "^2.0.36",
+    "@types/react-dnd-html5-backend": "^3.0.2",
     "@types/react-dom": "^18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
