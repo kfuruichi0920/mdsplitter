@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カード編集アプリケーション - モックUI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #FFFFFF;
+            color: #111827;
+        }
+
+        /* ダークモード */
+        body.dark-mode {
+            background: #111827;
+            color: #F9FAFB;
+        }
+
+        body.dark-mode .menu-bar,
+        body.dark-mode .tool-bar,
+        body.dark-mode .sidebar,
+        body.dark-mode .status-bar {
+            background: #1F2937;
+            border-color: #374151;
+            color: #F9FAFB;
+        }
+
+        body.dark-mode .card {
+            background: #1F2937;
+            border-color: #374151;
+        }
+
+        body.dark-mode .tab.active {
+            background: #111827;
+        }
+
+        body.dark-mode .log-area {
+            background: #1F2937;
+            border-color: #374151;
+        }
+
+        /* メニューバー */
+        .menu-bar {
+            height: 32px;
+            background: #FFFFFF;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 13px;
+        }
+
+        .menu-item {
+            padding: 4px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.15s ease-out;
+        }
+
+        .menu-item:hover {
+            background: #F3F4F6;
+        }
+
+        /* ツールバー */
+        .tool-bar {
+            height: 40px;
+            background: #F9FAFB;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            gap: 8px;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 4px;
+            padding-right: 8px;
+            border-right: 1px solid #D1D5DB;
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+        }
+
+        .tool-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 18px;
+            transition: background 0.15s ease-out;
+        }
+
+        .tool-btn:hover {
+            background: #E5E7EB;
+        }
+
+        .tool-btn.active {
+            background: #3B82F6;
+            color: white;
+        }
+
+        .filter-dropdown {
+            padding: 4px 8px;
+            border: 1px solid #D1D5DB;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* メインコンテナ */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* サイドバー */
+        .sidebar {
+            width: 256px;
+            background: #F9FAFB;
+            border-right: 1px solid #D1D5DB;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-section {
+            padding: 12px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .file-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: background 0.15s ease-out;
+        }
+
+        .file-item:hover {
+            background: #E5E7EB;
+        }
+
+        .file-item.selected {
+            background: #DBEAFE;
+        }
+
+        .file-icon {
+            font-size: 14px;
+        }
+
+        .unsaved-marker {
+            color: #F97316;
+            margin-left: auto;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            background: white;
+            margin-top: 12px;
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            flex: 1;
+            font-size: 13px;
+        }
+
+        /* コンテンツエリア */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* カードパネルエリア */
+        .card-panel-area {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .split-node {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #D1D5DB;
+            overflow: hidden;
+        }
+
+        .split-node:last-child {
+            border-right: none;
+        }
+
+        /* タブバー */
+        .tab-bar {
+            height: 36px;
+            background: #F3F4F6;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+        }
+
+        .tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-right: 1px solid #D1D5DB;
+            cursor: pointer;
+            font-size: 13px;
+            background: #E5E7EB;
+            transition: background 0.15s ease-out;
+        }
+
+        .tab:hover {
+            background: #D1D5DB;
+        }
+
+        .tab.active {
+            background: #FFFFFF;
+            border-bottom: 2px solid #3B82F6;
+        }
+
+        .tab-close {
+            margin-left: 8px;
+            cursor: pointer;
+            opacity: 0.5;
+        }
+
+        .tab-close:hover {
+            opacity: 1;
+        }
+
+        /* カードパネル */
+        .card-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .card-panel-toolbar {
+            height: 40px;
+            background: #F9FAFB;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            gap: 8px;
+        }
+
+        .panel-header {
+            padding: 8px 12px;
+            background: #F9FAFB;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .card-count {
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: normal;
+        }
+
+        .card-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* カード */
+        .card {
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease-out;
+            position: relative;
+        }
+
+        .card:hover {
+            background: #EFF6FF;
+        }
+
+        .card.selected {
+            background: #DBEAFE;
+            border-left: 4px solid #3B82F6;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .trace-point {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid #9CA3AF;
+            background: white;
+            cursor: pointer;
+        }
+
+        .trace-point.has-trace {
+            background: #3B82F6;
+            border-color: #3B82F6;
+        }
+
+        .expand-btn {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .card-type-icon {
+            font-size: 16px;
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .status-badge.approved {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .status-badge.review {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .status-badge.draft {
+            background: #F3F4F6;
+            color: #4B5563;
+        }
+
+        .card-content {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #111827;
+            margin-left: 32px;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: #6B7280;
+            margin-top: 4px;
+            margin-left: 32px;
+        }
+
+        .card.level-1 {
+            margin-left: 24px;
+        }
+
+        .card.level-2 {
+            margin-left: 48px;
+        }
+
+        /* ログエリア */
+        .log-area {
+            height: 128px;
+            border-top: 1px solid #D1D5DB;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-header {
+            height: 32px;
+            background: #F3F4F6;
+            border-bottom: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .log-content {
+            flex: 1;
+            background: #F9FAFB;
+            overflow-y: auto;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+
+        .log-entry.info {
+            color: #059669;
+        }
+
+        .log-entry.warn {
+            color: #D97706;
+        }
+
+        .log-entry.error {
+            color: #DC2626;
+        }
+
+        .clear-btn {
+            padding: 2px 8px;
+            border: 1px solid #D1D5DB;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .clear-btn:hover {
+            background: #F3F4F6;
+        }
+
+        /* ステータスバー */
+        .status-bar {
+            height: 24px;
+            background: #F3F4F6;
+            border-top: 1px solid #D1D5DB;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-size: 11px;
+        }
+
+        .status-left,
+        .status-right {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-icon.saved {
+            color: #059669;
+        }
+
+        .status-icon.unsaved {
+            color: #F97316;
+        }
+
+        /* コンパクト表示 */
+        .card-list.compact .card {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+        }
+
+        .card-list.compact .card-header {
+            margin-bottom: 0;
+        }
+
+        .card-list.compact .card-content {
+            display: inline;
+            margin-left: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-list.compact .card-meta {
+            display: none;
+        }
+
+        /* SVGコネクタ */
+        .connector-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .connector-line {
+            stroke: #3B82F6;
+            stroke-width: 2;
+            fill: none;
+            opacity: 0.6;
+            transition: all 0.2s ease-out;
+        }
+
+        .connector-line:hover {
+            stroke-width: 3;
+            opacity: 1;
+        }
+
+        /* スクロールバー */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F3F4F6;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #9CA3AF;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6B7280;
+        }
+    </style>
+</head>
+<body>
+    <!-- メニューバー -->
+    <div class="menu-bar">
+        <div class="menu-item">ファイル(<u>F</u>)</div>
+        <div class="menu-item">編集(<u>E</u>)</div>
+        <div class="menu-item">表示(<u>V</u>)</div>
+        <div class="menu-item">ヘルプ(<u>H</u>)</div>
+    </div>
+
+    <!-- ツールバー -->
+    <div class="tool-bar">
+        <div class="tool-group">
+            <button class="tool-btn" title="ファイルを開く">📂</button>
+            <button class="tool-btn" title="保存">💾</button>
+        </div>
+        <div class="tool-group">
+            <button class="tool-btn" id="traceToggle" title="トレース表示切替">⛓️</button>
+            <select class="filter-dropdown">
+                <option>トレースタイプ</option>
+                <option>trace</option>
+                <option>refines</option>
+                <option>tests</option>
+            </select>
+        </div>
+        <div class="tool-group">
+            <button class="tool-btn" title="水平分割">⬌</button>
+            <button class="tool-btn" title="垂直分割">⬍</button>
+        </div>
+    </div>
+
+    <!-- メインコンテナ -->
+    <div class="main-container">
+        <!-- サイドバー -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">エクスプローラ</div>
+                <div class="file-tree">
+                    <div class="file-item">
+                        <span class="file-icon">📁</span>
+                        <span>プロジェクト</span>
+                    </div>
+                    <div class="file-item selected" style="margin-left: 16px;">
+                        <span class="file-icon">📄</span>
+                        <span>要求仕様.md</span>
+                        <span class="unsaved-marker">●</span>
+                    </div>
+                    <div class="file-item" style="margin-left: 16px;">
+                        <span class="file-icon">📄</span>
+                        <span>設計書.md</span>
+                    </div>
+                    <div class="file-item" style="margin-left: 16px;">
+                        <span class="file-icon">📄</span>
+                        <span>テスト計画.md</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">検索/置換</div>
+                <div class="search-box">
+                    <span>🔍</span>
+                    <input type="text" placeholder="検索...">
+                </div>
+            </div>
+        </div>
+
+        <!-- コンテンツエリア -->
+        <div class="content-area">
+            <!-- カードパネルエリア -->
+            <div class="card-panel-area">
+                <!-- 左パネル -->
+                <div class="split-node">
+                    <div class="tab-bar">
+                        <div class="tab active">
+                            <span class="file-icon">📄</span>
+                            <span>要求仕様.md</span>
+                            <span class="unsaved-marker">●</span>
+                            <span class="tab-close">×</span>
+                        </div>
+                        <div class="tab">
+                            <span class="file-icon">📄</span>
+                            <span>設計書.md</span>
+                            <span class="tab-close">×</span>
+                        </div>
+                    </div>
+                    <div class="card-panel">
+                        <div class="card-panel-toolbar">
+                            <div class="tool-group">
+                                <button class="tool-btn" title="すべて展開">▼</button>
+                                <button class="tool-btn" title="すべて折りたたみ">▶</button>
+                            </div>
+                            <div class="tool-group">
+                                <input type="text" class="filter-dropdown" placeholder="フィルタ..." style="width: 150px;">
+                                <select class="filter-dropdown">
+                                    <option>カード種別</option>
+                                    <option>見出し</option>
+                                    <option>段落</option>
+                                    <option>箇条書き</option>
+                                </select>
+                            </div>
+                            <div class="tool-group">
+                                <button class="tool-btn" id="compactToggle" title="コンパクト表示">☰</button>
+                            </div>
+                        </div>
+                        <div class="panel-header">
+                            <span>要求仕様.md</span>
+                            <span class="card-count">15カード</span>
+                        </div>
+                        <div class="card-list" id="cardList1">
+                            <div class="card selected">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="expand-btn">▼</span>
+                                    <span class="card-type-icon">📑</span>
+                                    <span class="status-badge approved">approved</span>
+                                    <div class="trace-point has-trace" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    システム要求定義
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 14:30</div>
+                            </div>
+
+                            <div class="card level-1">
+                                <div class="card-header">
+                                    <div class="trace-point"></div>
+                                    <span class="expand-btn">▶</span>
+                                    <span class="card-type-icon">📝</span>
+                                    <span class="status-badge review">review</span>
+                                    <div class="trace-point has-trace" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    本システムは、大規模プロジェクトにおける非構造化データを構造化し、トレーサビリティ管理を実現する。
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 15:45</div>
+                            </div>
+
+                            <div class="card level-1">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">📝</span>
+                                    <span class="status-badge draft">draft</span>
+                                    <div class="trace-point has-trace" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    カード単位での編集・管理機能を提供し、効率的なドキュメント作成を支援する。
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 16:20</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point"></div>
+                                    <span class="expand-btn">▶</span>
+                                    <span class="card-type-icon">📑</span>
+                                    <span class="status-badge approved">approved</span>
+                                    <div class="trace-point has-trace" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    機能要求
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 10:15</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">🖼️</span>
+                                    <span class="status-badge review">review</span>
+                                    <div class="trace-point" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    システムアーキテクチャ図
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 11:30</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point"></div>
+                                    <span class="card-type-icon">📊</span>
+                                    <span class="status-badge draft">draft</span>
+                                    <div class="trace-point has-trace" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    パフォーマンス要求一覧
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 12:00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右パネル -->
+                <div class="split-node">
+                    <div class="tab-bar">
+                        <div class="tab active">
+                            <span class="file-icon">📄</span>
+                            <span>設計書.md</span>
+                            <span class="tab-close">×</span>
+                        </div>
+                    </div>
+                    <div class="card-panel">
+                        <div class="card-panel-toolbar">
+                            <div class="tool-group">
+                                <button class="tool-btn" title="すべて展開">▼</button>
+                                <button class="tool-btn" title="すべて折りたたみ">▶</button>
+                            </div>
+                            <div class="tool-group">
+                                <input type="text" class="filter-dropdown" placeholder="フィルタ..." style="width: 150px;">
+                            </div>
+                        </div>
+                        <div class="panel-header">
+                            <span>設計書.md</span>
+                            <span class="card-count">8カード</span>
+                        </div>
+                        <div class="card-list" id="cardList2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">📑</span>
+                                    <span class="status-badge approved">approved</span>
+                                    <div class="trace-point" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    UI設計
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 13:00</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">📝</span>
+                                    <span class="status-badge review">review</span>
+                                    <div class="trace-point" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    カード編集機能の実装では、React/TypeScriptを採用し、コンポーネントベースの設計とする。
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 14:15</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">🧪</span>
+                                    <span class="status-badge draft">draft</span>
+                                    <div class="trace-point" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    カード編集機能のユニットテスト
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 15:00</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="trace-point has-trace"></div>
+                                    <span class="card-type-icon">💬</span>
+                                    <span class="status-badge review">review</span>
+                                    <div class="trace-point" style="margin-left: auto;"></div>
+                                </div>
+                                <div class="card-content">
+                                    Q: トレーサビリティの表示方法は？<br>A: SVGコネクタで視覚的に表現します。
+                                </div>
+                                <div class="card-meta">最終更新: 2025-10-19 16:00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ログエリア -->
+            <div class="log-area">
+                <div class="log-header">
+                    <span>動作ログ</span>
+                    <button class="clear-btn" id="clearLogBtn">クリア</button>
+                </div>
+                <div class="log-content" id="logContent">
+                    <div class="log-entry info">[2025-10-19 14:30:45] INFO: ファイル「要求仕様.md」を読み込みました</div>
+                    <div class="log-entry info">[2025-10-19 14:30:46] INFO: カード数: 15</div>
+                    <div class="log-entry info">[2025-10-19 14:31:00] INFO: トレーサビリティ関係を検出しました</div>
+                    <div class="log-entry warn">[2025-10-19 14:31:05] WARN: 未保存の変更があります</div>
+                    <div class="log-entry info">[2025-10-19 14:32:00] INFO: ファイル「設計書.md」を読み込みました</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ステータスバー -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <span>総カード数: 23</span>
+            </div>
+            <div class="status-item">
+                <span>選択: カード #1</span>
+            </div>
+            <div class="status-item">
+                <span class="status-icon unsaved">●</span>
+                <span>未保存</span>
+            </div>
+        </div>
+        <div class="status-right">
+            <div class="status-item">
+                <span>UTF-8</span>
+            </div>
+            <div class="status-item">
+                <span id="themeMode">ライトモード</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // トレース表示切替
+        document.getElementById('traceToggle').addEventListener('click', function() {
+            this.classList.toggle('active');
+            const isActive = this.classList.contains('active');
+            addLog(isActive ? 'INFO: トレース表示を有効にしました' : 'INFO: トレース表示を無効にしました');
+        });
+
+        // コンパクト表示切替
+        document.getElementById('compactToggle').addEventListener('click', function() {
+            this.classList.toggle('active');
+            const cardList = document.getElementById('cardList1');
+            cardList.classList.toggle('compact');
+            const isCompact = cardList.classList.contains('compact');
+            addLog(isCompact ? 'INFO: コンパクト表示に切り替えました' : 'INFO: 詳細表示に切り替えました');
+        });
+
+        // カード選択
+        document.querySelectorAll('.card').forEach((card, index) => {
+            card.addEventListener('click', function(e) {
+                if (!e.ctrlKey) {
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                }
+                this.classList.toggle('selected');
+                const cardNum = index + 1;
+                document.querySelector('.status-left .status-item:nth-child(2) span').textContent = `選択: カード #${cardNum}`;
+                addLog(`INFO: カード #${cardNum} を選択しました`);
+            });
+        });
+
+        // 展開/折りたたみ
+        document.querySelectorAll('.expand-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isExpanded = this.textContent === '▼';
+                this.textContent = isExpanded ? '▶' : '▼';
+                addLog(isExpanded ? 'INFO: カードを折りたたみました' : 'INFO: カードを展開しました');
+            });
+        });
+
+        // ログクリア
+        document.getElementById('clearLogBtn').addEventListener('click', function() {
+            document.getElementById('logContent').innerHTML = '';
+            addLog('INFO: ログをクリアしました');
+        });
+
+        // ログ追加関数
+        function addLog(message) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).replace(/\//g, '-');
+
+            const logType = message.includes('INFO') ? 'info' :
+                          message.includes('WARN') ? 'warn' :
+                          message.includes('ERROR') ? 'error' : 'info';
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${logType}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContent.appendChild(logEntry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        // ダークモード切替（ステータスバーのテーマモードをクリック）
+        document.getElementById('themeMode').addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            this.textContent = isDark ? 'ダークモード' : 'ライトモード';
+            addLog(`INFO: ${isDark ? 'ダーク' : 'ライト'}モードに切り替えました`);
+        });
+
+        // 初期ログ
+        addLog('INFO: アプリケーションを起動しました');
+    </script>
+</body>
+</html>
