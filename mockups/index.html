@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Card Editor — モックアップ</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="menubar">ファイル(F)　編集(E)　表示(V)　ヘルプ(H)</div>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button title="開く">📂</button>
+      <button title="保存">💾</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="toggle" id="traceToggle">🔗 トレース</button>
+      <select aria-label="トレースフィルタ">
+        <option>trace</option>
+        <option>refines</option>
+        <option>tests</option>
+      </select>
+    </div>
+    <div class="toolbar-group right">
+      <button>分割↔</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="explorer">
+        <h4>エクスプローラ</h4>
+        <ul>
+          <li class="file active">spec.md <span class="unsaved">●</span></li>
+          <li class="file">design.md</li>
+          <li class="file">readme.md</li>
+        </ul>
+      </div>
+      <div class="search">
+        <input placeholder="検索... (CTRL+F)" />
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <section class="card-panel">
+        <div class="tabbar">
+          <div class="tabs">
+            <button class="tab active">spec.md</button>
+            <button class="tab">design.md</button>
+            <button class="tab">＋</button>
+          </div>
+        </div>
+
+        <div class="panel-toolbar">
+          <div>
+            <button id="expandAll">▼ すべて展開</button>
+            <button id="collapseAll">▶ すべて折りたたむ</button>
+            <button id="toggleCompact">☰ 表示切替</button>
+          </div>
+          <div class="panel-info">カード数: 12</div>
+        </div>
+
+        <div class="cards" id="cards">
+          <!-- サンプルカード（詳細表示） -->
+          <div class="card level-0 selected" data-id="c1">
+            <div class="connector left">●</div>
+            <div class="card-body">
+              <div class="card-head">
+                <span class="icon">📑</span>
+                <strong>ユーザ登録フロー</strong>
+                <span class="badge review">review</span>
+              </div>
+              <div class="card-text">ここにカードの本文が入ります。詳細表示モードでは改行を含むテキストを表示します。</div>
+              <div class="card-meta">最終更新: 2025-10-19 14:30</div>
+            </div>
+            <div class="connector right">●</div>
+          </div>
+
+          <div class="card level-1" data-id="c2">
+            <div class="connector left">○</div>
+            <div class="card-body compact">
+              <div class="card-row">
+                <span class="icon">📝</span>
+                <span class="truncate">ログイン画面の説明: ユーザ名/パスワードを入力する...</span>
+              </div>
+            </div>
+            <div class="connector right">○</div>
+          </div>
+
+          <div class="card level-0" data-id="c3">
+            <div class="connector left">●</div>
+            <div class="card-body">
+              <div class="card-head">
+                <span class="icon">🧪</span>
+                <strong>テストケース 001</strong>
+                <span class="badge approved">approved</span>
+              </div>
+              <div class="card-text">手順1: ... 手順2: ...</div>
+              <div class="card-meta">最終更新: 2025-10-20 09:10</div>
+            </div>
+            <div class="connector right">●</div>
+          </div>
+        </div>
+
+        <svg class="connectors" id="connectors" xmlns="http://www.w3.org/2000/svg"></svg>
+      </section>
+
+      <section class="log-area">
+        <div class="log-header">動作ログ <button class="clear">クリア</button></div>
+        <pre class="log">[2025-11-01 10:00:00] INFO: spec.md を読み込みました
+[2025-11-01 10:00:02] INFO: 変換処理を開始しました
+[2025-11-01 10:00:05] WARN: LLM レスポンスが遅延しました（200ms）
+</pre>
+      </section>
+    </main>
+  </div>
+
+  <div class="statusbar">
+    <div class="left">総カード: 12 ・ 選択: c1 ・ 状態: ● 未保存</div>
+    <div class="right">UTF-8 ・ ライト</div>
+  </div>
+
+  <script>
+    // 簡易的なコネクタ描画（カード間の接合点を繋ぐ）
+    function drawConnectors() {
+      const svg = document.getElementById('connectors');
+      svg.innerHTML = '';
+      const a = document.querySelector('[data-id="c1"] .connector.right');
+      const b = document.querySelector('[data-id="c3"] .connector.left');
+      if (!a || !b) return;
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      const parent = document.querySelector('.main-area');
+      const pr = parent.getBoundingClientRect();
+      const x1 = ra.right - pr.left;
+      const y1 = ra.top + ra.height/2 - pr.top;
+      const x2 = rb.left - pr.left;
+      const y2 = rb.top + rb.height/2 - pr.top;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const dx = Math.abs(x2-x1)*0.5;
+      const d = `M ${x1} ${y1} C ${x1+dx} ${y1} ${x2-dx} ${y2} ${x2} ${y2}`;
+      path.setAttribute('d', d);
+      path.setAttribute('stroke', '#3B82F6');
+      path.setAttribute('stroke-width','2');
+      path.setAttribute('fill','none');
+      path.setAttribute('opacity','0.8');
+      svg.appendChild(path);
+      svg.setAttribute('width', parent.clientWidth);
+      svg.setAttribute('height', parent.clientHeight);
+    }
+    window.addEventListener('resize', drawConnectors);
+    window.addEventListener('load', () => {
+      drawConnectors();
+      // 表示切替の簡易動作
+      document.getElementById('toggleCompact').addEventListener('click', () => {
+        document.getElementById('cards').classList.toggle('compact-mode');
+        drawConnectors();
+      });
+      document.getElementById('traceToggle').addEventListener('click', (e)=>{
+        e.target.classList.toggle('active');
+        document.getElementById('connectors').classList.toggle('hidden');
+      });
+    });
+  </script>
+</body>
+</html>
