@@ -19,8 +19,11 @@
     "types": ["node", "vite/client", "vitest"],
     "baseUrl": ".",
     "paths": {
+      "@shared": ["src/shared/index.ts"],
       "@shared/*": ["src/shared/*"],
+      "@main": ["src/main/*"],
       "@main/*": ["src/main/*"],
+      "@renderer": ["src/renderer/*"],
       "@renderer/*": ["src/renderer/*"]
     }
   },

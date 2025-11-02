@@ -6,6 +6,8 @@ import DailyRotateFile from "winston-daily-rotate-file";
 
 import type { AppSettings } from "@shared";
 
+type LogMetadata = Record<string, unknown>;
+
 export interface SettingsProvider {
   current: AppSettings;
   subscribe(listener: (settings: AppSettings) => void): () => void;
@@ -45,32 +47,41 @@ export class LogService {
     this.logger = null;
   }
 
-  info(message: string, meta?: winston.Logform.TransformableInfo): void {
+  info(message: string, meta?: LogMetadata): void {
     this.log("info", message, meta);
   }
 
-  warn(message: string, meta?: winston.Logform.TransformableInfo): void {
+  warn(message: string, meta?: LogMetadata): void {
     this.log("warn", message, meta);
   }
 
-  error(message: string, meta?: winston.Logform.TransformableInfo): void {
+  error(message: string, meta?: LogMetadata): void {
     this.log("error", message, meta);
   }
 
-  debug(message: string, meta?: winston.Logform.TransformableInfo): void {
+  debug(message: string, meta?: LogMetadata): void {
     this.log("debug", message, meta);
   }
 
-  audit(message: string, meta?: winston.Logform.TransformableInfo): void {
-    this.log("info", message, { ...meta, audit: true });
+  audit(message: string, meta?: LogMetadata): void {
+    const payload: LogMetadata = { ...meta, audit: true };
+    this.log("info", message, payload);
   }
 
-  private log(level: winston.LoggerOptions["level"], message: string, meta?: winston.Logform.TransformableInfo) {
+  private log(level: winston.LoggerOptions["level"], message: string, meta?: LogMetadata) {
     if (!this.logger) {
       throw new Error("LogService has not been initialized");
     }
 
-    this.logger.log(level, message, meta);
+    if (!level) {
+      throw new Error("Log level cannot be undefined");
+    }
+
+    if (meta && Object.keys(meta).length > 0) {
+      this.logger.log({ level, message, ...meta });
+    } else {
+      this.logger.log({ level, message });
+    }
   }
 
   private createLogger(settings: AppSettings) {

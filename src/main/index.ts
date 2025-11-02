@@ -81,6 +81,14 @@ app.whenReady().then(async () => {
   }
 
   app.on("activate", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      return;
+    }
+
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow().catch((error) => {
         console.error("Failed to recreate window", error);
