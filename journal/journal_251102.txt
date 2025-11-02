@@ -57,3 +57,8 @@
 - `npm run test` を実行したところ、`src/sum.test.ts:16-26` で存在しない `App` モジュール参照および JSX 構文が原因で TypeScript コンパイルエラーが発生することを確認。
 - ルートの加算ユーティリティを検証する目的に合わせ、`src/sum.test.ts:15-27` を `sum` 関数の正常系（正整数・負数混在）の Jest テストへ書き換え。
 - 修正後に `npm run test` を再実行し、全3テストスイートが成功することを確認。
+
+## T1-02 Electron起動時のアセット解決エラー対応
+- `npm run start` 実行後、Electron DevTools で `file:///assets/index-*.{js,css}` への読み込みが `ERR_FILE_NOT_FOUND` となり、`dist/renderer` 配下のアセットが参照できないことを確認。Vite の出力がデフォルト `base: '/'` のため、`file://` スキームでルート解決されるのが原因。
+- `vite.config.ts:6` に `base: './'` を追加し、ビルド済み `index.html` が相対パスでアセットを参照するよう修正。
+- `npm run start`（= `npm run dev`）を再実行し、Electron 上で `dist/renderer/index.html` が正しくスタイル・スクリプトを読み込むことを確認。
