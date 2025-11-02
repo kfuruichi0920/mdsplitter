@@ -30,10 +30,12 @@ const createWindow = () => {
   });
 
   // Security: Block navigation to external URLs
+  // This prevents the app from navigating away from the local files
+  // Only file:// protocol URLs (local app files) are allowed
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
     const currentUrl = mainWindow?.webContents.getURL();
     
-    // Only allow navigation within the app
+    // Only allow navigation within the app (file:// protocol)
     if (currentUrl && !navigationUrl.startsWith('file://')) {
       console.warn(`[main] Blocked navigation to: ${navigationUrl}`);
       event.preventDefault();
@@ -42,13 +44,17 @@ const createWindow = () => {
 
   // Security: Control window.open behavior
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    const parsedUrl = new URL(url);
-    
-    // Open HTTPS URLs in external browser
-    if (parsedUrl.protocol === 'https:') {
-      shell.openExternal(url);
-    } else {
-      console.warn(`[main] Blocked window.open to: ${url}`);
+    try {
+      const parsedUrl = new URL(url);
+      
+      // Open HTTPS URLs in external browser
+      if (parsedUrl.protocol === 'https:') {
+        shell.openExternal(url);
+      } else {
+        console.warn(`[main] Blocked window.open to: ${url}`);
+      }
+    } catch (error) {
+      console.error(`[main] Invalid URL in window.open: ${url}`, error);
     }
     
     return { action: 'deny' };
