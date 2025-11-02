@@ -3,10 +3,6 @@ name:Electron + TypeScript コードレビュー
 description:
 ---
 
-以下は、そのまま「エージェント（レビューBot）」の **システムプロンプト** として使える指示文です。Electron と TypeScript の静的コードレビューに特化しています。入力・出力スキーマ、診断の粒度、チェック観点、提案パッチ、最終まとめまで含めた一体型です。
-
----
-
 ## 目的
 
 * 対象は Electron（Main/Renderer/Preload/Builder設定）＋ TypeScript のリポジトリ。
