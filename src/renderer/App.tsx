@@ -156,7 +156,7 @@ export const App = () => {
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const theme = useUiStore((state) => state.theme);
-  const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const setThemeStore = useUiStore((state) => state.setTheme);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
 
@@ -215,6 +215,45 @@ export const App = () => {
 
     void bootstrap(); //! 副作用内で非同期処理を起動
   }, [pushLog]);
+
+  useEffect(() => {
+    const applySettings = async () => {
+      if (!window.app?.settings) {
+        pushLog({
+          id: `settings-missing-${Date.now()}`,
+          level: 'WARN',
+          message: '設定APIが未定義のため、既定値を使用します。',
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      try {
+        const settings = await window.app.settings.load();
+        const resolvedTheme: ThemeMode = settings.theme.mode === 'system'
+          ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : (settings.theme.mode === 'dark' ? 'dark' : 'light');
+
+        setThemeStore(resolvedTheme);
+        pushLog({
+          id: `settings-loaded-${Date.now()}`,
+          level: 'INFO',
+          message: `設定を読み込みました (テーマ: ${settings.theme.mode}).`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error('[renderer] failed to load settings', error);
+        pushLog({
+          id: `settings-load-failed-${Date.now()}`,
+          level: 'ERROR',
+          message: '設定の読込に失敗しました。コンソールログを確認してください。',
+          timestamp: new Date(),
+        });
+      }
+    };
+
+    void applySettings();
+  }, [pushLog, setThemeStore]);
 
   useEffect(() => {
     //! Tailwind ダークモード切替のため、html 要素へ `dark` クラスを付与する
@@ -286,14 +325,29 @@ export const App = () => {
    */
   const handleThemeToggle = useCallback(() => {
     const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
-    toggleTheme();
+    setThemeStore(nextTheme);
+
+    if (window.app?.settings) {
+      void window.app.settings
+        .update({ theme: { mode: nextTheme } })
+        .catch((error) => {
+          console.error('[renderer] failed to update settings', error);
+          pushLog({
+            id: `settings-update-failed-${Date.now()}`,
+            level: 'ERROR',
+            message: '設定の保存に失敗しました。コンソールログを確認してください。',
+            timestamp: new Date(),
+          });
+        });
+    }
+
     pushLog({
       id: `theme-${Date.now()}`,
       level: 'INFO',
       message: `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
       timestamp: new Date(),
     });
-  }, [pushLog, theme, toggleTheme]);
+  }, [pushLog, setThemeStore, theme]);
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {

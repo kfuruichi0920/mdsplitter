@@ -16,6 +16,8 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
+import type { AppSettings, AppSettingsPatch } from '../shared/settings';
+
 
 /**
  * @brief window.appで公開するAPI型定義。
@@ -31,6 +33,12 @@ type AppAPI = {
    * @note 通信失敗時は例外。@todo エラー処理方針明確化。
    */
   ping: (message: string) => Promise<{ ok: boolean; timestamp: number }>;
+  settings: {
+    /** 設定を読み込む。 */
+    load: () => Promise<AppSettings>;
+    /** 設定を更新する。 */
+    update: (patch: AppSettingsPatch) => Promise<AppSettings>;
+  };
 };
 
 
@@ -40,7 +48,11 @@ type AppAPI = {
  * メインプロセスの'app:ping'ハンドラを呼び出す。
  */
 const api: AppAPI = {
-  ping: async (message: string) => ipcRenderer.invoke('app:ping', message) //!< IPC経由でping
+  ping: async (message: string) => ipcRenderer.invoke('app:ping', message),
+  settings: {
+    load: async () => ipcRenderer.invoke('settings:load'),
+    update: async (patch: AppSettingsPatch) => ipcRenderer.invoke('settings:update', patch),
+  },
 };
 
 

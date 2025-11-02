@@ -18,6 +18,8 @@ import path from 'node:path';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 
+import { initializeWorkspace, loadSettings, updateSettings } from './workspace';
+
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
 /**
@@ -79,9 +81,22 @@ ipcMain.handle('app:ping', async (_event, payload: string) => {
   return { ok: true, timestamp: Date.now() };
 });
 
+ipcMain.handle('settings:load', async () => {
+  return loadSettings();
+});
+
+ipcMain.handle('settings:update', async (_event, patch) => {
+  if (typeof patch !== 'object' || patch === null) {
+    throw new Error('Invalid settings payload');
+  }
+
+  return updateSettings(patch);
+});
+
 
 // アプリ起動時の初期化処理
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initializeWorkspace();
   createWindow(); //!< 初回ウィンドウ生成
 
   app.on('activate', () => {

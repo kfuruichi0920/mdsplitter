@@ -6,13 +6,13 @@
     "target": "ES2021",
     "lib": ["ES2021"],
     "outDir": "dist/main",
-    "rootDir": "src/main",
+    "rootDir": "src",
     "noEmit": false,
     "resolveJsonModule": true,
     "sourceMap": true,
     "types": ["node", "electron"],
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/main/**/*"],
+  "include": ["src/main/**/*", "src/shared/**/*"],
   "exclude": ["node_modules"]
 }
