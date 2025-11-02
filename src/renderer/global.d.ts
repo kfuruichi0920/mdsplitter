@@ -1,4 +1,4 @@
-import type { AppSettings, AppSettingsPatch } from '@/shared/settings';
+import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
 
 export {};
 
@@ -10,6 +10,7 @@ declare global {
         load: () => Promise<AppSettings>;
         update: (patch: AppSettingsPatch) => Promise<AppSettings>;
       };
+      log: (level: LogLevel, message: string) => Promise<void>;
     };
   }
 }

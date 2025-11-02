@@ -18,7 +18,10 @@ import path from 'node:path';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 
+import type { LogLevel } from '../shared/settings';
+
 import { initializeWorkspace, loadSettings, updateSettings } from './workspace';
+import { initLogger, logMessage, updateLoggerSettings } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -90,13 +93,29 @@ ipcMain.handle('settings:update', async (_event, patch) => {
     throw new Error('Invalid settings payload');
   }
 
-  return updateSettings(patch);
+  const updated = await updateSettings(patch);
+  updateLoggerSettings(updated);
+  logMessage('info', '設定を更新しました');
+  return updated;
+});
+
+ipcMain.handle('log:write', async (_event, payload: { level: LogLevel; message: string }) => {
+  if (!payload || typeof payload.message !== 'string') {
+    throw new Error('Invalid log payload');
+  }
+
+  logMessage(payload.level, payload.message);
+  return { ok: true };
 });
 
 
 // アプリ起動時の初期化処理
 app.whenReady().then(async () => {
-  await initializeWorkspace();
+  const paths = await initializeWorkspace();
+  const settings = await loadSettings();
+  await initLogger(settings, paths);
+  logMessage('info', 'アプリケーションを起動しました');
+
   createWindow(); //!< 初回ウィンドウ生成
 
   app.on('activate', () => {

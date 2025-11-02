@@ -16,7 +16,7 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { AppSettings, AppSettingsPatch } from '../shared/settings';
+import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 
 
 /**
@@ -39,6 +39,8 @@ type AppAPI = {
     /** 設定を更新する。 */
     update: (patch: AppSettingsPatch) => Promise<AppSettings>;
   };
+  /** ログを書き込む。 */
+  log: (level: LogLevel, message: string) => Promise<void>;
 };
 
 
@@ -53,6 +55,7 @@ const api: AppAPI = {
     load: async () => ipcRenderer.invoke('settings:load'),
     update: async (patch: AppSettingsPatch) => ipcRenderer.invoke('settings:update', patch),
   },
+  log: async (level: LogLevel, message: string) => ipcRenderer.invoke('log:write', { level, message }),
 };
 
 

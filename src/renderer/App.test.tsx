@@ -21,6 +21,7 @@ describe('App', () => {
           return currentSettings;
         }),
       },
+      log: jest.fn().mockResolvedValue(undefined),
     };
 
     act(() => {

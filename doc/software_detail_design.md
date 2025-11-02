@@ -45,7 +45,8 @@
 | パス | 主な内容 | メモ | 状況 |
 | --- | --- | --- | --- |
 | `src/main/main.ts` | BrowserWindow 生成、設定/ワークスペース初期化、IPC ハンドラ登録。 | WSL2 では Electron 自体が GUI 動作不可、GUI ホストで確認する。 | ⚠️ |
-| `src/main/preload.ts` | `window.app` API を公開する contextBridge。 | 設定読み書き・ping を公開。 | ⚠️ |
+| `src/main/preload.ts` | `window.app` API を公開する contextBridge。 | 設定読み書き・ログ出力・ping を公開。 | ⚠️ |
+| `src/main/logger.ts` | ログレベル制御とファイルローテーションを担当するロガー。 | `settings.json` の logging セクションを参照し出力。 | ⚠️ |
 | `src/main/workspace.ts` | ワークスペースディレクトリ生成と設定ファイル管理。 | `_input/_out/_logs` 作成とサンプルファイル配置、設定既定値を提供。 | ⚠️ |
 | `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
 | `src/renderer/main.tsx` | React エントリポイント。`App` を `#root` にマウント。 | Vite ビルド対象。 | ⚠️ |
@@ -171,6 +172,7 @@ Deprecated --> Draft : 再利用
 - フェーズ P1-05: Tailwind CSS を導入し、`App` 全体を `@apply` ベースのユーティリティスタイルに刷新。テーマ設定ストアを新設し、ライト/ダークモード切替が UI 全域に反映される基盤とテストを整備。以降は実データ/コンポーネント化時に Tailwind の抽象化を進める。
 - フェーズ P2-01: `settings.json` の読み書き API を実装し、テーマ設定を IPC 経由で同期。設定読込/保存結果をログへ記録する処理を追加。
 - フェーズ P2-02: `app.getPath('userData')` 配下に `_input/_out/_logs` を自動生成し、サンプル入出力ファイルと初期ログを配置するワークスペース初期化を実装。
+- フェーズ P2-03: ファイルロガーを実装し、ログレベル設定とサイズローテーションに対応。レンダラからのログ送信 API を整備し、設定変更時にロガーへ反映するよう調整。
 - P1-05 追加対応: 文字サイズと余白を見直し、全 UI をコンパクト表示（text-sm 基準、ツールバー/ステータスバー高さ縮小、ログエリア 112px）へ調整。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。

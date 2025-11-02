@@ -23,6 +23,7 @@ import {
   type CardStatus,
 } from './store/workspaceStore';
 import { useUiStore, type ThemeMode } from './store/uiStore';
+import type { LogLevel } from '@/shared/settings';
 
 import './styles.css';
 
@@ -115,6 +116,8 @@ type LogEntry = {
   timestamp: Date; ///< 記録時刻。
 };
 
+const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
+
 /**
  * @brief 数値を指定範囲内に収める。
  * @param value 入力値。
@@ -170,6 +173,11 @@ export const App = () => {
    */
   const pushLog = useCallback((entry: LogEntry): void => {
     setLogs((current) => [...current, entry]);
+    if (window.app?.log) {
+      void window.app.log(toLogLevel(entry.level), entry.message).catch((error) => {
+        console.error('[renderer] failed to persist log', error);
+      });
+    }
   }, []);
 
   useEffect(() => {
