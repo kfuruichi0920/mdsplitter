@@ -11,7 +11,7 @@
 * 作業記録には、作業内容、決定事項およびその根拠を、不足なく示すこと。
 * 根拠には、ファイルパスと行番号／ADR番号／APIスキーマ等を示すこと。
 
-* 作業終了時、終了時点のコードベース対する詳細設計情報を更新すること(doc/詳細設計.md)
+* 作業終了時、終了時点のコードベース対する詳細設計情報を更新すること(doc/software_detail_design.md)
 * 詳細設計の内容は
 	- フォルダ、ファイル構成
 	- フォルダの説明、設定ファイル個別の説明
@@ -25,15 +25,15 @@
 * TDDを採用。
 
 ## 3. 実装還俗
-* コードコメント、テストコメントを書くこと。(`spec/コメントガイドライン.md`)
+* コードコメント、テストコメントを書くこと。(`spec/comment_guildline.md`)
 
 ## 4. コミットのルール
 以下を参照。
-- `spec/CommitMessage.md`を参照。
+- `spec/commit_message.md`を参照。
 
 ## 10. 開発対象
 以下を参照。
-- `spec/プロジェクト仕様.md`
-- `spec/SW要求仕様書.md`
-- `spec/UI設計書.md`
-- `doc/操作ガイドmd`
+- `doc/project_overview.md`
+- `doc/software_requirement.md`
+- `doc/user_interface_design.md`
+- `doc/operation_design.md`
