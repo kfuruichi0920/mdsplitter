@@ -62,3 +62,7 @@
 - `npm run start` 実行後、Electron DevTools で `file:///assets/index-*.{js,css}` への読み込みが `ERR_FILE_NOT_FOUND` となり、`dist/renderer` 配下のアセットが参照できないことを確認。Vite の出力がデフォルト `base: '/'` のため、`file://` スキームでルート解決されるのが原因。
 - `vite.config.ts:6` に `base: './'` を追加し、ビルド済み `index.html` が相対パスでアセットを参照するよう修正。
 - `npm run start`（= `npm run dev`）を再実行し、Electron 上で `dist/renderer/index.html` が正しくスタイル・スクリプトを読み込むことを確認。
+
+## T1-03 不要なCSSファイル削除
+- ルート `src/styles.css` が React エントリポイントの TypeScript コード断片を含んでおり、`src/renderer/App.tsx` などからも参照されていない重複ファイルであることを確認。
+- 実際のスタイルは `src/renderer/styles.css` で管理しているため、混乱防止のため `src/styles.css` を削除。
