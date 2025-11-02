@@ -42,6 +42,11 @@
 - メイン側: `src/main/main.ts:32-39` にて `ipcMain.handle('app:ping')` を定義し、コンソールログで受信メッセージとタイムスタンプを返す。
 - レンダラ側: `src/main/preload.ts:1-11` で `contextBridge.exposeInMainWorld('app', api)` を公開し、`src/renderer/App.tsx:6-30` から `window.app.ping('renderer-ready')` を呼び出してステータス表示を更新。
 - GUI 環境での検証時は DevTools で `[main] received ping: renderer-ready` ログを確認する。WSL2 では Electron 起動ができないため後日 GUI ホスト上での再検証が前提。
+
+## ドキュメント更新
+- `doc/詳細設計.md:6-163` を刷新し、Electron/React スケルトン構成 (`src/main/`, `src/renderer/`) と `npm run dev` の並列実行構成、WSL2 での GUI 制約、Node.js 22.20.0 への統一を反映した。
+
+## 課題事項
 - Playwright をサンドボックス有効で動作させるため、`playwright.config.ts:1-17` を Chromium 標準設定に戻し、`tests/e2e/smoke.spec.ts:1-7` の skip 制御を削除。
 - `npm run test:e2e` は `chrome_sandbox` が root 所有 + setuid でないため `Sandbox(Signal(6))` で失敗。
 - 解決策として `/home/katsu/.cache/ms-playwright/chromium-1140/chrome-linux/chrome_sandbox` を root:root 所有に変更し `chmod 4755` を適用する必要がある。`sudo chown root:root ... && sudo chmod 4755 ...` を管理者実行すること。
