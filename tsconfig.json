@@ -5,6 +5,8 @@
     "moduleResolution": "Node",
     "moduleDetection": "force",
     "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "esModuleInterop": true,
