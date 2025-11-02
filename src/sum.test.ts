@@ -1,4 +1,3 @@
-
 /**
  * @file sum.test.ts
  * @brief sum関数の単体テスト。
@@ -10,7 +9,7 @@
  * @copyright MIT
  */
 
-import { sum } from './sum';
+import { sum } from './utils/sum';
 
 /**
  * @brief sum関数の正常系挙動を検証するテストスイート。
