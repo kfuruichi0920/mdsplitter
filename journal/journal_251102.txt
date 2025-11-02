@@ -129,3 +129,5 @@
 - `src/renderer/App.test.tsx:1-120` にログAPIモックと `act` 待機を導入し、既存テストを更新。
 - `doc/software_detail_design.md:40-210` を更新し、ロガー構成とフェーズ進捗へ P2-03 完了を追記。`task/task_all.md:20-40` で P2-01/P2-02 を完了化し、新たに P2-17/P2-18 を追加。
 - `npm run typecheck` / `npm run test` を実行し、ロガー導入後も全テストが成功することを確認。
+- `tsconfig.main.json:1-20` の `outDir` を `dist` に変更し、`npm run build` でメインバンドルが常に最新コードを参照するよう修正。ビルド成果物を再生成し動作を確認。
+- `src/main/workspace.ts:1-190` にコンソール出力を追加し、`initializeWorkspace` が `userData` パスと各ディレクトリをログへ出力するようにした。`npm run start` 実行時、ログファイル位置がコンソールで確認可能。GPU 初期化警告は既知の WSL 環境依存であり、無視して差し支えない旨を確認。

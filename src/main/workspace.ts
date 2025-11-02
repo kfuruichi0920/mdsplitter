@@ -107,6 +107,8 @@ const ensureSettingsFile = async (paths: WorkspacePaths): Promise<AppSettings> =
 export const initializeWorkspace = async (): Promise<WorkspacePaths> => {
   const paths = resolveWorkspacePaths();
 
+  console.log('[workspace] userData path:', paths.root);
+
   await Promise.all([
     ensureDirectory(paths.root),
     ensureDirectory(paths.inputDir),
@@ -116,6 +118,13 @@ export const initializeWorkspace = async (): Promise<WorkspacePaths> => {
 
   await createSampleFiles(paths);
   await ensureSettingsFile(paths);
+
+  console.log('[workspace] initialized directories:', {
+    input: paths.inputDir,
+    output: paths.outputDir,
+    logs: paths.logsDir,
+    settings: paths.settingsFile,
+  });
 
   return paths;
 };
