@@ -1,0 +1,22 @@
+# 2025-11-02 作業記録
+## P0-01 ジャーナル運用開始
+- `AGENT.md:6-10` の指示に従い、ジャーナル記録用ディレクトリと当日ファイルを作成。
+- 今後の決定事項と根拠を本ファイルに追記する。
+
+## P0-02 Node.js/Electron バージョン決定
+- `spec/プロジェクト仕様.md:4-6` に Node.js 22.6.0 (LTS) と Electron ^32.0.0 採用方針を追記し、技術スタックに反映。
+- `.nvmrc:1` で開発チームの Node.js バージョンを固定。
+- `package.json:1-19` にエンジン要件と Electron 依存バージョンを設定し、`spec/プロジェクト仕様.md` の開発コマンドを実装準備できる状態に整備。
+
+## P0-03 パッケージマネージャ運用方針
+- `spec/プロジェクト仕様.md:8-13` の npm コマンド前提に合わせ、標準パッケージマネージャを npm とする方針を決定。
+- `CONTRIBUTING.md:1-21` を新規作成し、`npm ci`/`npm install` の利用ルールと `package-lock.json` 管理方針を明文化。
+
+## P0-04 TDD基盤導入
+- `package.json:11-20` に Jest/Playwright 用スクリプトを追加し、TDD 実行コマンドを整備。
+- `jest.config.cjs:1-11` と `jest.setup.ts:1` を設定し、`src/components/Hello.tsx:1-8`・`src/utils/sum.ts:1-4` のサンプルに対するテスト (`src/components/Hello.test.tsx:1-10`, `src/utils/sum.test.ts:1-7`) を `npm run test:unit` で緑にすることを確認。
+- `tests/e2e/smoke.spec.ts:1-5` と `playwright.config.ts:1-19` を用意し、E2E の最小構成を準備。Playwright ブラウザ実体が未インストールの場合は `npx playwright install` を別途実行する必要がある。
+
+## P0-05 Lint/TypeScript 設定
+- `.eslintrc.cjs:1-61`, `.eslintignore:1-3`, `.prettierrc.json:1-5`, `.prettierignore:1-3` を追加し、`npm run lint` の成功を確認。
+- `tsconfig.json:1-20` を整備し、`npm run typecheck` が成功することを確認。
