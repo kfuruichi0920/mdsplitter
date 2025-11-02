@@ -157,6 +157,8 @@ export const App = () => {
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
+  const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
 
   const selectedCard = useMemo<Card | null>(() => {
     return cards.find((card) => card.id === selectedCardId) ?? null;
@@ -417,6 +419,14 @@ export const App = () => {
   const themeLabel = theme === 'dark' ? 'ダークモード' : 'ライトモード';
   const themeButtonLabel = theme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード';
 
+  const handleExplorerToggle = useCallback(() => {
+    setExplorerOpen((prev) => !prev);
+  }, []);
+
+  const handleSearchToggle = useCallback(() => {
+    setSearchOpen((prev) => !prev);
+  }, []);
+
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
       <header className="menu-bar" role="menubar">
@@ -461,23 +471,56 @@ export const App = () => {
         <div className="workspace__content" ref={contentRef} style={contentStyle}>
           <aside className="sidebar" aria-label="エクスプローラと検索">
             <div className="sidebar__section">
-              <header className="sidebar__header">エクスプローラ</header>
-              <ul className="sidebar__tree" role="tree">
-                <li role="treeitem" aria-expanded="true">
-                  📁 requirements
-                  <ul role="group">
-                    <li role="treeitem">📄 system.md</li>
-                    <li role="treeitem">📄 ui.md</li>
-                  </ul>
-                </li>
-                <li role="treeitem">📁 outputs</li>
-              </ul>
+              <button
+                type="button"
+                className="sidebar__section-toggle"
+                onClick={handleExplorerToggle}
+                aria-expanded={isExplorerOpen}
+                aria-controls="sidebar-explorer"
+              >
+                <span className="sidebar__toggle-icon">{isExplorerOpen ? '▾' : '▸'}</span>
+                <span className="sidebar__header">エクスプローラ</span>
+              </button>
+              <div
+                id="sidebar-explorer"
+                className={`sidebar__content${isExplorerOpen ? '' : ' sidebar__content--collapsed'}`}
+                role="region"
+                aria-hidden={!isExplorerOpen}
+              >
+                <ul className="sidebar__tree" role="tree">
+                  <li role="treeitem" aria-expanded="true">
+                    📁 requirements
+                    <ul role="group">
+                      <li role="treeitem">📄 system.md</li>
+                      <li role="treeitem">📄 ui.md</li>
+                    </ul>
+                  </li>
+                  <li role="treeitem">📁 outputs</li>
+                </ul>
+              </div>
             </div>
             <div className="sidebar__section sidebar__section--search">
-              <label className="sidebar__label" htmlFor="sidebar-search">
-                🔍 検索
-              </label>
-              <input id="sidebar-search" className="sidebar__search" type="search" placeholder="キーワードを入力" />
+              <button
+                type="button"
+                className="sidebar__section-toggle"
+                onClick={handleSearchToggle}
+                aria-expanded={isSearchOpen}
+                aria-controls="sidebar-search-panel"
+              >
+                <span className="sidebar__toggle-icon">{isSearchOpen ? '▾' : '▸'}</span>
+                <span className="sidebar__header">検索</span>
+              </button>
+              <div
+                id="sidebar-search-panel"
+                className={`sidebar__content sidebar__content--search${isSearchOpen ? '' : ' sidebar__content--collapsed'}`}
+                role="region"
+                aria-hidden={!isSearchOpen}
+              >
+                <label className="sidebar__label" htmlFor="sidebar-search">
+                  🔍 検索
+                </label>
+                <input id="sidebar-search" className="sidebar__search" type="search" placeholder="キーワードを入力" />
+              </div>
             </div>
           </aside>
 
