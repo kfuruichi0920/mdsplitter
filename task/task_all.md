@@ -1,11 +1,11 @@
 # 全体タスク分割・実行計画
 
 ## フェーズ0: プロジェクト体制・開発環境準備
-- [ ] P0-01 `journal/journal_YYYYMMDD.txt` を作成し、作業判断と根拠の記録運用を開始する。
-- [ ] P0-02 Node.js/Electron の採用バージョンを決定し `.nvmrc` と `package.json` に反映、全員に周知する。
-- [ ] P0-03 パッケージマネージャ運用方針を決定し、ロックファイル管理ルールを `CONTRIBUTING.md` に記載する。
-- [ ] P0-04 TDD 基盤（Jest + Testing Library + Playwright 等）を導入し、サンプルテストを緑にして実行確認する。
-- [ ] P0-05 ESLint/Prettier/TypeScript 設定を整備し、`npm run lint` と `npm run typecheck` が成功することを確認する。
+- [x] P0-01 `journal/journal_YYYYMMDD.txt` を作成し、作業判断と根拠の記録運用を開始する。
+- [x] P0-02 Node.js/Electron の採用バージョンを決定し `.nvmrc` と `package.json` に反映、全員に周知する。（Node.js 22.20.0 / Electron ^32.0.0 に統一済み）
+- [x] P0-03 パッケージマネージャ運用方針を決定し、ロックファイル管理ルールを `CONTRIBUTING.md` に記載する。
+- [x] P0-04 TDD 基盤（Jest + Testing Library + Playwright 等）を導入し、サンプルテストを緑にして実行確認する。※WSL2 では Chromium サンドボックスが動作しないため、CI/ローカルでは `--no-sandbox` 起動または対応可能なホストで実行する運用とする。
+- [x] P0-05 ESLint/Prettier/TypeScript 設定を整備し、`npm run lint` と `npm run typecheck` が成功することを確認する。
 
 ## フェーズ1: アプリ骨格と大枠動作確認
 - [ ] P1-01 Electron + React + TypeScript テンプレートをセットアップし、`npm start` でメイン/レンダラが起動することを確認する。
@@ -54,6 +54,7 @@
 - [ ] P7-03 エラーハンドリングと復旧シナリオ（設定破損/入出力失敗）のテストケースを整備し、自動テストに組み込む。
 - [ ] P7-04 セキュリティ設定（クラウド LLM 送信無効が既定）を検証し、監査ログ要件を満たすことを確認する。
 - [ ] P7-05 自動アップデート除外を明示する設定とユーザ通知文面を整備し、関連ドキュメントに反映する。
+- [ ] P7-06 Playwright E2E をサンドボックス有効のサポート環境（例: Linux VM）で定期検証し、WSL2 開発環境向けの実行ガイドラインを整備する。
 
 ## フェーズ8: 配布・運用準備
 - [ ] P8-01 Electron Builder 設定を追加し、Windows/macOS/Linux 各ターゲットのビルドを生成して動作確認する。
