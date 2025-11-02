@@ -1,12 +1,11 @@
 /**
- * @file main.tsx
- * @brief Reactアプリケーションのエントリーポイント。
+ * @file global.d.ts
+ * @brief グローバル型定義ファイル。
  * @details
- * #root要素にAppコンポーネントをレンダリングします。
- * Vite + React + Electron + TypeScript の開発環境用。
- * @author Katsuuichi
- * @date 2024-06-06
- * @version 0.1.0
+ * プロジェクト全体で利用する型・インターフェースを宣言します。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
  * @copyright MIT
  */
 

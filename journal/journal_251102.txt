@@ -52,3 +52,8 @@
 - 解決策として `/home/katsu/.cache/ms-playwright/chromium-1140/chrome-linux/chrome_sandbox` を root:root 所有に変更し `chmod 4755` を適用する必要がある。`sudo chown root:root ... && sudo chmod 4755 ...` を管理者実行すること。
 - `chrome_sandbox` に SUID を付与後、`npm run test:e2e` を再実行したが `Sandbox(Signal(6))` のまま失敗。`chrome_sandbox --help` の出力より setuid sandbox API バージョン不一致と `PR_SET_NO_NEW_PRIVS` により権限昇格できていないことを確認。
 - WSL2 環境では Chromium setuid sandbox がサポートされないため、サンドボックス稼働には追加のカーネル設定変更や正式サポート環境への移行が必要。現状は `--no-sandbox` 起動を用いるしかない。
+
+## T1-01 sum単体テスト修正
+- `npm run test` を実行したところ、`src/sum.test.ts:16-26` で存在しない `App` モジュール参照および JSX 構文が原因で TypeScript コンパイルエラーが発生することを確認。
+- ルートの加算ユーティリティを検証する目的に合わせ、`src/sum.test.ts:15-27` を `sum` 関数の正常系（正整数・負数混在）の Jest テストへ書き換え。
+- 修正後に `npm run test` を再実行し、全3テストスイートが成功することを確認。

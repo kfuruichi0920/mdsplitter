@@ -1,12 +1,11 @@
 /**
- * @file main.tsx
- * @brief Reactアプリケーションのエントリーポイント。
+ * @file main.ts
+ * @brief Electronメインプロセスのエントリーポイント。
  * @details
- * #root要素にAppコンポーネントをレンダリングします。
- * Vite + React + Electron + TypeScript の開発環境用。
- * @author Katsuuichi
- * @date 2024-06-06
- * @version 0.1.0
+ * アプリケーションウィンドウの生成・イベント管理を行います。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
  * @copyright MIT
  */
 

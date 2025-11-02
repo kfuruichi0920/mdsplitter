@@ -1,12 +1,11 @@
 /**
- * @file main.tsx
- * @brief Reactアプリケーションのエントリーポイント。
+ * @file vite-env.d.ts
+ * @brief Vite環境用型定義ファイル。
  * @details
- * #root要素にAppコンポーネントをレンダリングします。
- * Vite + React + Electron + TypeScript の開発環境用。
- * @author Katsuuichi
- * @date 2024-06-06
- * @version 0.1.0
+ * Vite固有の型補完を提供します。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
  * @copyright MIT
  */
 
