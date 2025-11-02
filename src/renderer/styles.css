@@ -293,4 +293,20 @@
   .status-bar__section--right {
     @apply justify-end;
   }
+
+  .notification-center {
+    @apply fixed right-4 top-16 z-50 flex w-80 flex-col gap-2;
+  }
+
+  .notification {
+    @apply flex items-start gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur;
+  }
+
+  .notification__message {
+    @apply flex-1 leading-normal;
+  }
+
+  .notification__close {
+    @apply rounded-full px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400;
+  }
 }

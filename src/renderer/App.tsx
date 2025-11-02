@@ -23,9 +23,11 @@ import {
   type CardStatus,
 } from './store/workspaceStore';
 import { useUiStore, type ThemeMode } from './store/uiStore';
+import { useNotificationStore } from './store/notificationStore';
 import type { LogLevel } from '@/shared/settings';
 
 import './styles.css';
+import { NotificationCenter } from './components/NotificationCenter';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -160,6 +162,7 @@ export const App = () => {
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
+  const notify = useNotificationStore((state) => state.add);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
 
@@ -243,6 +246,7 @@ export const App = () => {
           : (settings.theme.mode === 'dark' ? 'dark' : 'light');
 
         setThemeStore(resolvedTheme);
+        notify('success', `設定を読み込みました (テーマ: ${settings.theme.mode}).`);
         pushLog({
           id: `settings-loaded-${Date.now()}`,
           level: 'INFO',
@@ -251,6 +255,7 @@ export const App = () => {
         });
       } catch (error) {
         console.error('[renderer] failed to load settings', error);
+        notify('error', '設定の読込に失敗しました。コンソールログを確認してください。');
         pushLog({
           id: `settings-load-failed-${Date.now()}`,
           level: 'ERROR',
@@ -340,6 +345,7 @@ export const App = () => {
         .update({ theme: { mode: nextTheme } })
         .catch((error) => {
           console.error('[renderer] failed to update settings', error);
+          notify('error', '設定の保存に失敗しました。コンソールログを確認してください。');
           pushLog({
             id: `settings-update-failed-${Date.now()}`,
             level: 'ERROR',
@@ -349,6 +355,7 @@ export const App = () => {
         });
     }
 
+    notify('success', `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`);
     pushLog({
       id: `theme-${Date.now()}`,
       level: 'INFO',
@@ -491,6 +498,7 @@ export const App = () => {
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
+      <NotificationCenter />
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">
           <button className="menu-bar__item" type="button">ファイル(F)</button>

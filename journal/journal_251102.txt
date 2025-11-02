@@ -131,3 +131,11 @@
 - `npm run typecheck` / `npm run test` を実行し、ロガー導入後も全テストが成功することを確認。
 - `tsconfig.main.json:1-20` の `outDir` を `dist` に変更し、`npm run build` でメインバンドルが常に最新コードを参照するよう修正。ビルド成果物を再生成し動作を確認。
 - `src/main/workspace.ts:1-190` にコンソール出力を追加し、`initializeWorkspace` が `userData` パスと各ディレクトリをログへ出力するようにした。`npm run start` 実行時、ログファイル位置がコンソールで確認可能。GPU 初期化警告は既知の WSL 環境依存であり、無視して差し支えない旨を確認。
+
+## P2-04 共通通知コンポーネント
+- `src/renderer/store/notificationStore.ts:1-52` を追加し、トースト通知の状態管理・自動消去ロジックを実装。`notificationStore.test.ts:1-18` で基本動作を検証。
+- `src/renderer/components/NotificationCenter.tsx:1-26` を実装し、右上にレベル別スタイルで通知を表示できるコンポーネントを追加。`styles.css:200-240` へ通知用の Tailwind スタイルを組み込んだ。
+- `src/renderer/App.tsx:150-360` に通知ストアを組み込み、設定読込/保存の成功・失敗時やテーマ切替時にトーストを表示しつつ、ファイルログにも同一メッセージを送信。
+- `src/renderer/App.test.tsx:1-130` を調整し、通知APIのモックを追加。既存テストが `act` で非同期処理を待機するよう更新。
+- `doc/user_interface_design.md:419-450` に通知コンポーネントの仕様と利用シナリオを追記。`doc/software_detail_design.md:40-210` へ通知ストア・フェーズ P2-04 完了を反映。
+- `task/task_all.md:20-40` で P2-04 を完了チェックに変更。`npm run typecheck` / `npm run test` を実行し、すべて成功することを確認。
