@@ -32,6 +32,16 @@
 ## E2E テスト暫定対応
 - Playwright の Chromium がサンドボックス制約で起動できないため、`playwright.config.ts:1-24` を `--no-sandbox` 等の起動フラグ付き構成に変更。合わせて `tests/e2e/smoke.spec.ts:1-8` を `PLAYWRIGHT_FORCE` 未指定時は自動 skip する形にし、`npm run test:e2e` をサンドボックス非対応環境でも成功させた。
 - 環境依存の制約を解消後は `PLAYWRIGHT_FORCE=1 npm run test:e2e` としてブラウザ実行を再開する。
+
+## P1-01 Electron/React/TS テンプレート整備
+- `package.json:7-36` に Vite 監視・tsc ウォッチ・Electron 起動を組み合わせた `npm run dev` スクリプトを定義。`dev:renderer` は `vite build --watch`、`dev:main` は `tsc --watch`、`electron:dev` は生成物 (`dist/renderer/index.html`, `dist/main/main.js`) を待機して Electron を起動する構成。
+- `tsconfig.main.json:1-16`, `src/main/main.ts:1-70`, `src/main/preload.ts:1-11` でメインプロセス骨格を実装。`src/renderer/App.tsx:1-32` などで Skeleton UI を表示し、レンダラ起動を確認。
+- WSL2 環境では Electron が GUI 非対応のため `require('electron')` が実体モジュールを返さず起動できないことを確認。GUI ホストでの動作確認が必要。
+
+## P1-02 IPC スタブ実装
+- メイン側: `src/main/main.ts:32-39` にて `ipcMain.handle('app:ping')` を定義し、コンソールログで受信メッセージとタイムスタンプを返す。
+- レンダラ側: `src/main/preload.ts:1-11` で `contextBridge.exposeInMainWorld('app', api)` を公開し、`src/renderer/App.tsx:6-30` から `window.app.ping('renderer-ready')` を呼び出してステータス表示を更新。
+- GUI 環境での検証時は DevTools で `[main] received ping: renderer-ready` ログを確認する。WSL2 では Electron 起動ができないため後日 GUI ホスト上での再検証が前提。
 - Playwright をサンドボックス有効で動作させるため、`playwright.config.ts:1-17` を Chromium 標準設定に戻し、`tests/e2e/smoke.spec.ts:1-7` の skip 制御を削除。
 - `npm run test:e2e` は `chrome_sandbox` が root 所有 + setuid でないため `Sandbox(Signal(6))` で失敗。
 - 解決策として `/home/katsu/.cache/ms-playwright/chromium-1140/chrome-linux/chrome_sandbox` を root:root 所有に変更し `chmod 4755` を適用する必要がある。`sudo chown root:root ... && sudo chmod 4755 ...` を管理者実行すること。
