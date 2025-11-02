@@ -1,38 +1,13 @@
 /**
  * @file main.ts
- * @brief Electronメインプロセスのエントリーポイント。
+ * @brief レンダラエントリ移行後の互換プレースホルダモジュール。
  * @details
- * アプリケーションウィンドウの生成・イベント管理を行います。
+ * Vite の実エントリポイントは `src/renderer/main.tsx` に移行済み。本ファイルは旧来の
+ * インポート経路を保持しつつ、追加処理を提供しない空モジュールとして公開する。
+ * 将来的に不要になった段階で削除を検討すること。@todo 互換レイヤの廃止判断を行う。
  * @author K.Furuichi
  * @date 2025-11-02
- * @version 0.1
+ * @version 0.2
  * @copyright MIT
  */
-
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-
-import { App } from './App';
-
-/**
- * @brief Reactアプリケーションを#root要素にレンダリングする。
- * @details
- * StrictModeでAppコンポーネントを描画します。
- * 
- * ReactDOMとは
- * ReactDOMは、Reactライブラリの一部で、Reactコンポーネントを実際のDOM（Document Object Model）に描画する役割を持っています。
- * 主な用途は、Reactの仮想DOM（Virtual DOM）で定義されたUIを、ブラウザの画面上に表示することです。
- * ReactDOM.createRoot(...) は、React 18以降で導入された新しいAPIで、コンポーネントを"root"要素にマウントします。
- * これにより、Reactの新しい機能（Concurrent Modeなど）が利用可能になります。
- * 
- * React.StrictModeとは
- * React.StrictModeは、Reactの開発モード専用のラッパーコンポーネントです。
- * これで囲まれたコンポーネントは、以下のような追加チェックや警告が有効になります。
- * 非推奨なライフサイクルメソッドの使用検出副作用の二重実行（開発時のみ）、安全でないパターンの警告
- * 本番環境では何も影響しません。主にコード品質向上や将来のReactバージョンへの対応のために使われます。
- */
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+export {};

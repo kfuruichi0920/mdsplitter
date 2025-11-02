@@ -46,9 +46,11 @@
 | --- | --- | --- | --- |
 | `src/main/main.ts` | BrowserWindow 生成、`app:ping` IPC ハンドラ実装、DevTools 起動（開発時）。 | WSL2 では Electron 自体が GUI 動作不可、GUI ホストで確認する。 | ⚠️ |
 | `src/main/preload.ts` | `window.app.ping` を公開する contextBridge。 | レンダラからの IPC 呼び出しを安全に橋渡し。 | ⚠️ |
+| `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
 | `src/renderer/main.tsx` | React エントリポイント。`App` を `#root` にマウント。 | Vite ビルド対象。 | ⚠️ |
-| `src/renderer/App.tsx` | Skeleton UI。本番導入前のステータス表示と IPC 経由のハンドシェイク。 | 将来の画面構築の土台。 | ⚠️ |
-| `src/renderer/styles.css` | Skeleton 用の簡易スタイル。 | Tailwind 導入までは暫定。 | ⚠️ |
+| `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | プレースホルダ表示で挙動確認済み。 | ⚠️ |
+| `src/renderer/styles.css` | レイアウト骨格用スタイル。グリッド/セパレータ/カード表示のプレースホルダを定義。 | Tailwind 導入までは暫定。 | ⚠️ |
+| `src/vite-env.d.ts` | Vite クライアント型補完の参照ディレクティブ。 | 実装コードは含まず型補助のみ提供。 | ✅ |
 | `src/components/Hello.tsx` | 挨拶コンポーネント。プロパティ `name` を受け取り、`role="status"` の段落で表示。 | テスト: `src/components/Hello.test.tsx`。日本語挨拶の確認のみ。 | ✅ (サンプル) |
 | `src/utils/sum.ts` | 純粋関数 `sum(a, b)` を提供。 | テスト: `src/utils/sum.test.ts`。 | ✅ (サンプル) |
 | `src/sum.ts` | ルート直下のサンプル `sum` 関数。 | テスト: `src/sum.test.ts` が正整数と負数の正常系を検証。 | ✅ (サンプル) |
@@ -157,7 +159,7 @@ Deprecated --> Draft : 再利用
 - PlantUML: 本ドキュメントの図式表現用 (サーバー/CLI いずれかで描画想定、生成プロセス未構築)。
 
 ## 6. 実装進捗と今後の観点
-- アプリ骨格は Electron + React スケルトンの段階。`task/task_all.md` フェーズ 1-03 以降でレイアウト構築・状態管理を実装する必要がある。
+- フェーズ P1-03: UI 設計書に沿ったレイアウト骨格（メニュー/ツールバー/サイドバー/カードパネル/ログ/ステータスバー）をプレースホルダで構築し、サイドバー幅とログエリア高さのドラッグリサイズを実装済み。次工程ではグローバルストア連携と実データ描画を進める。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。
 - テスト基盤は Jest/Playwright の設定が存在するが、網羅的なテストケースは未作成。機能実装に伴いユニット・統合・E2E テストを拡充する。
