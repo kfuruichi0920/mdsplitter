@@ -11,7 +11,7 @@
 - [x] P1-01 Electron + React + TypeScript テンプレートをセットアップし、`npm start` (`npm run dev`) でビルド・監視系（Viteウォッチ＋tscウォッチ＋Electron起動）が動作する構成を整える。※WSL2 環境では Electron が GUI 非対応のため `ipcMain` 等は無効となりウィンドウ表示は不可。GUI 環境では `npm run dev` で Skeleton 画面が表示される。
 - [x] P1-02 メイン/レンダラ間の IPC スタブを実装し、`window.app.ping('renderer-ready')` が `ipcMain.handle('app:ping')` を経由して応答する構造を整備。GUI 対応ホストでは DevTools ログでハンドシェイク確認、WSL2 では Electron 実行不可のため後日検証。
 - [x] P1-03 UI 設計書に基づきレイアウト骨格（メニューバー/ツールバー/サイドバー/カード領域/ログ/ステータスバー）をプレースホルダで構築し、画面分割リサイズが動作することを確認する。
-- [ ] P1-04 Zustand または Redux Toolkit によるグローバル状態ストアを構築し、ダミーカードデータの表示/更新が可能であることを確認する。
+- [x] P1-04 Zustand または Redux Toolkit によるグローバル状態ストアを構築し、ダミーカードデータの表示/更新が可能であることを確認する。
 - [ ] P1-05 Tailwind とテーマ切替基盤を導入し、ライト/ダークモードの切替が UI 全域に反映されることを確認する。
 
 ## フェーズ2: 共通機能の先行実装と動作確認

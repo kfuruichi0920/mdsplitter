@@ -79,3 +79,13 @@
 - `src/vite-env.d.ts:1-20` を Vite 型参照ディレクティブのみに整理し、React レンダリングコードを削除。型補完専用ファイルとして再定義。
 - `doc/software_detail_design.md:45-60` に `src/main.ts` と `src/vite-env.d.ts` の役割を追記し、現状構成へ反映。
 - `npm run typecheck` を実行し、JSX に起因した TS1005/TS1161 エラーが解消されたことを確認。
+
+## P1-04 グローバル状態ストア実装
+- `npm install zustand@4.5.2` を実行し、グローバル状態管理用ライブラリを依存追加。
+- `src/renderer/store/workspaceStore.ts:1-176` を新規作成し、Zustand ベースでカード配列・選択カード・更新アクション（`selectCard`/`updateCard`/`cycleCardStatus`）を実装。`getNextCardStatus` と `resetWorkspaceStore` をエクスポートしてテストや UI から再利用できるようにした。
+- `src/renderer/App.tsx:1-365` を改修し、ストアからカードダミーデータを取得して描画するよう変更。カードクリック/キー操作による選択、ツールバー `🔄 ステータス切替` ボタンでのステータス更新、ログ追記、カード総数・選択中インジケータの動的表示を実装。
+- `src/renderer/styles.css:1-360` にカードステータス（Draft/Review/Approved/Deprecated）向けバッジ、コネクタ強調、パネルヘッダー等のスタイルを追加。
+- テスト: `src/renderer/store/workspaceStore.test.ts:1-56` でストアの初期状態/更新/選択挙動を検証し、`src/renderer/App.test.tsx:1-33` で UI 経由のステータス更新を確認。
+- Jest調整: `jest.config.cjs:1-12` に CSS モック設定を追加し、`tests/__mocks__/styleMock.ts:1-6` を作成してスタイルインポートを無視。
+- `doc/software_detail_design.md:45-60,140-170,188-200` にストア構成と Zustand 依存を追記し、フェーズ P1-04 の進捗を記録。`task/task_all.md:11-20` で P1-04 を完了チェック。
+- `npm run typecheck` および `npm run test` を実行し、型チェックと単体テストが成功することを確認。

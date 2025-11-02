@@ -48,6 +48,7 @@
 | `src/main/preload.ts` | `window.app.ping` を公開する contextBridge。 | レンダラからの IPC 呼び出しを安全に橋渡し。 | ⚠️ |
 | `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
 | `src/renderer/main.tsx` | React エントリポイント。`App` を `#root` にマウント。 | Vite ビルド対象。 | ⚠️ |
+| `src/renderer/store/workspaceStore.ts` | Zustand ベースのワークスペースストア。カード一覧/選択/更新アクションを提供。 | ダミーデータとステータス循環を実装。 | ⚠️ |
 | `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | プレースホルダ表示で挙動確認済み。 | ⚠️ |
 | `src/renderer/styles.css` | レイアウト骨格用スタイル。グリッド/セパレータ/カード表示のプレースホルダを定義。 | Tailwind 導入までは暫定。 | ⚠️ |
 | `src/vite-env.d.ts` | Vite クライアント型補完の参照ディレクティブ。 | 実装コードは含まず型補助のみ提供。 | ✅ |
@@ -141,6 +142,7 @@ Deprecated --> Draft : 再利用
 | --- | --- | --- | --- |
 | `react` | UI コンポーネントフレームワーク | `src/renderer/App.tsx`、`src/components/Hello.tsx`。 | ⚠️ |
 | `react-dom` | React レンダラー | `src/renderer/main.tsx` で `App` をマウント。 | ⚠️ |
+| `zustand` | グローバル状態管理（Zustand） | `src/renderer/store/workspaceStore.ts`、`src/renderer/App.tsx`。 | ⚠️ |
 
 ### 5.2 開発・テスト依存
 | カテゴリ | ライブラリ | 用途 | 実装状況 |
@@ -160,6 +162,7 @@ Deprecated --> Draft : 再利用
 
 ## 6. 実装進捗と今後の観点
 - フェーズ P1-03: UI 設計書に沿ったレイアウト骨格（メニュー/ツールバー/サイドバー/カードパネル/ログ/ステータスバー）をプレースホルダで構築し、サイドバー幅とログエリア高さのドラッグリサイズを実装済み。次工程ではグローバルストア連携と実データ描画を進める。
+- フェーズ P1-04: Zustand ストアを導入し、カードダミーデータの表示とステータス更新アクションを UI へ接続。ストアの単体テストおよび App コンポーネントの振る舞いテストを追加済み。次フェーズでは実データソースへの接続やストア分割を検討する。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。
 - テスト基盤は Jest/Playwright の設定が存在するが、網羅的なテストケースは未作成。機能実装に伴いユニット・統合・E2E テストを拡充する。

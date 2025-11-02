@@ -2,17 +2,26 @@
  * @file App.tsx
  * @brief mdsplitterアプリケーションのUIシェル骨格コンポーネント。
  * @details
- * UI設計書に基づき、メニューバー/ツールバー/サイドバー/カードパネル/ログ/ステータスバーの
- * プレースホルダを配置する。サイドバー幅およびログエリア高さはリサイズ可能で、Electron
- * メインプロセスとのIPCハンドシェイク状態をログとステータスバーに反映する。
+ * メニューバーからステータスバーまでのレイアウトを構築し、Zustand ベースの
+ * グローバルストアからカードダミーデータを取得して表示・更新する。サイドバーと
+ * ログエリアはドラッグでリサイズ可能であり、IPC ハンドシェイクやストア操作を
+ * ログエントリとして記録する。
  * @author K.Furuichi
  * @date 2025-11-02
- * @version 0.2
+ * @version 0.3
  * @copyright MIT
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+
+import {
+  getNextCardStatus,
+  useWorkspaceStore,
+  type Card,
+  type CardKind,
+  type CardStatus,
+} from './store/workspaceStore';
 
 import './styles.css';
 
@@ -33,20 +42,80 @@ const V_SEPARATOR = 8;
 /** 水平セパレータ高さ (px)。 */
 const H_SEPARATOR = 6;
 
+/** ステータスラベル表示用マッピング。 */
+const CARD_STATUS_LABEL: Record<CardStatus, string> = {
+  draft: 'Draft',
+  review: 'Review',
+  approved: 'Approved',
+  deprecated: 'Deprecated',
+};
+
+/** ステータスバッジ用クラス名マッピング。 */
+const CARD_STATUS_CLASS: Record<CardStatus, string> = {
+  draft: 'card__status card__status--draft',
+  review: 'card__status card__status--review',
+  approved: 'card__status card__status--approved',
+  deprecated: 'card__status card__status--deprecated',
+};
+
+/** カード種別に応じたアイコン。 */
+const CARD_KIND_ICON: Record<CardKind, string> = {
+  heading: '📑',
+  paragraph: '📝',
+  bullet: '•',
+  figure: '🖼️',
+  table: '📊',
+  test: '🧪',
+  qa: '💬',
+};
+
 /**
- * @brief ログエントリの構造体。
- * @details
- * プレースホルダ用のログを保持し、ステータスバーやログビューで利用する。
+ * @brief トレース接合点の記号を返す。
+ * @param hasTrace トレース有無。
+ * @return 表示記号。
  */
+const connectorSymbol = (hasTrace: boolean): string => (hasTrace ? '●' : '○');
+
+/**
+ * @brief ISO8601日時文字列をローカライズして表示する。
+ * @param value ISO8601文字列。
+ * @return ローカライズした日時文字列。
+ */
+const formatUpdatedAt = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '---';
+  }
+  return date.toLocaleString();
+};
+
+/**
+ * @brief カードIDから `#001` 形式の番号を生成する。
+ * @param cards カード配列。
+ * @param id 対象ID。
+ * @return ゼロ埋め番号文字列。
+ */
+const toDisplayNumber = (cards: Card[], id: string | null): string => {
+  if (!id) {
+    return '--';
+  }
+  const index = cards.findIndex((card) => card.id === id);
+  if (index === -1) {
+    return '--';
+  }
+  return `#${String(index + 1).padStart(3, '0')}`;
+};
+
+/** ログエントリ構造体。 */
 type LogEntry = {
   id: string; ///< 一意識別子。
   level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'; ///< ログレベル。
-  message: string; ///< 表示する本文。
+  message: string; ///< メッセージ本文。
   timestamp: Date; ///< 記録時刻。
 };
 
 /**
- * @brief 数値を指定範囲に収める補助関数。
+ * @brief 数値を指定範囲内に収める。
  * @param value 入力値。
  * @param minimum 下限値。
  * @param maximum 上限値。
@@ -61,7 +130,8 @@ const clamp = (value: number, minimum: number, maximum: number): number => {
  * @brief React レンダラーメインコンポーネント。
  * @details
  * 起動時にメインプロセスへ ping を送信し、レイアウト骨格とログビューを初期化する。
- * サイドバーとログ領域はドラッグでリサイズ可能。
+ * Zustand ストアからカード情報を取得して描画し、カード選択及びステータス更新操作に
+ * 追随して UI を更新する。
  * @return アプリケーションシェルの JSX。
  */
 export const App = () => {
@@ -70,7 +140,7 @@ export const App = () => {
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
-  const [status, setStatus] = useState<string>('起動準備中...'); ///< IPC 状態メッセージ。
+  const [ipcStatus, setIpcStatus] = useState<string>('起動準備中...'); ///< IPC 状態メッセージ。
   const [logs, setLogs] = useState<LogEntry[]>(() => [
     {
       id: 'startup',
@@ -80,12 +150,20 @@ export const App = () => {
     },
   ]);
 
+  const cards = useWorkspaceStore((state) => state.cards);
+  const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
+  const selectCard = useWorkspaceStore((state) => state.selectCard);
+  const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
+
+  const selectedCard = useMemo<Card | null>(() => {
+    return cards.find((card) => card.id === selectedCardId) ?? null;
+  }, [cards, selectedCardId]);
+
   /**
    * @brief ログエントリを追加する。
    * @param entry 追加するログ。
    */
   const pushLog = useCallback((entry: LogEntry): void => {
-    //! 最新ログを末尾に追加する
     setLogs((current) => [...current, entry]);
   }, []);
 
@@ -98,8 +176,7 @@ export const App = () => {
     const bootstrap = async () => {
       const maybeApp = (window as Window & { app?: Window['app'] }).app; //! JSDOM 実行時の undefined を許容
       if (!maybeApp?.ping) {
-        //! IPC 未定義の場合は警告ログを記録
-        setStatus('メインプロセスIPC未検出');
+        setIpcStatus('メインプロセスIPC未検出');
         pushLog({
           id: 'ipc-missing',
           level: 'WARN',
@@ -110,9 +187,9 @@ export const App = () => {
       }
 
       try {
-        setStatus('ハンドシェイク送信中...'); //! 状態更新
+        setIpcStatus('ハンドシェイク送信中...'); //! 状態更新
         const result = await maybeApp.ping('renderer-ready'); //! メインプロセスへ Ping
-        setStatus('メインプロセスと接続済み'); //! 正常終了
+        setIpcStatus('メインプロセスと接続済み'); //! 正常終了
         pushLog({
           id: 'ipc-success',
           level: 'INFO',
@@ -121,7 +198,7 @@ export const App = () => {
         });
       } catch (error) {
         console.error('[renderer] handshake failed', error); //! エラー内容を出力
-        setStatus('メインプロセスとの接続に失敗しました'); //! 状態を失敗に更新
+        setIpcStatus('メインプロセスとの接続に失敗しました'); //! 状態を失敗に更新
         pushLog({
           id: 'ipc-failed',
           level: 'ERROR',
@@ -135,13 +212,87 @@ export const App = () => {
   }, [pushLog]);
 
   /**
+   * @brief カードを選択する。
+   * @param card 対象カード。
+   */
+  const handleCardSelect = useCallback(
+    (card: Card) => {
+      if (card.id === selectedCardId) {
+        return;
+      }
+      selectCard(card.id);
+      pushLog({
+        id: `select-${card.id}-${Date.now()}`,
+        level: 'INFO',
+        message: `カード「${card.title}」を選択しました。`,
+        timestamp: new Date(),
+      });
+    },
+    [pushLog, selectCard, selectedCardId],
+  );
+
+  /**
+   * @brief キーボード操作でカードを選択する。
+   * @param event キーイベント。
+   * @param card 対象カード。
+   */
+  const handleCardKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>, card: Card) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      handleCardSelect(card);
+    },
+    [handleCardSelect],
+  );
+
+  /**
+   * @brief 選択カードのステータスを次段へ遷移させる。
+   */
+  const handleCycleStatus = useCallback(() => {
+    if (!selectedCard) {
+      pushLog({
+        id: `cycle-missing-${Date.now()}`,
+        level: 'WARN',
+        message: 'ステータス更新対象のカードが選択されていません。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    const nextStatus = getNextCardStatus(selectedCard.status);
+    cycleCardStatus(selectedCard.id);
+    pushLog({
+      id: `cycle-${selectedCard.id}-${Date.now()}`,
+      level: 'INFO',
+      message: `カード「${selectedCard.title}」のステータスを ${CARD_STATUS_LABEL[nextStatus]} に変更しました。`,
+      timestamp: new Date(),
+    });
+  }, [cycleCardStatus, pushLog, selectedCard]);
+
+  /** サイドバーとカード領域の列レイアウトスタイル。 */
+  const contentStyle = useMemo<CSSProperties>(() => {
+    return {
+      gridTemplateColumns: `${sidebarWidth}px ${V_SEPARATOR}px minmax(0, 1fr)`,
+    } satisfies CSSProperties;
+  }, [sidebarWidth]);
+
+  /** ワークスペースの行レイアウトスタイル。 */
+  const workspaceStyle = useMemo<CSSProperties>(() => {
+    return {
+      gridTemplateRows: `minmax(${MAIN_MIN_HEIGHT}px, 1fr) ${H_SEPARATOR}px ${logHeight}px`,
+    } satisfies CSSProperties;
+  }, [logHeight]);
+
+  /**
    * @brief サイドバーのリサイズ開始処理。
    * @param event PointerDown イベント。
    */
   const handleSidebarPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId); //! ドラッグ中のイベントを捕捉
+      event.currentTarget.setPointerCapture(event.pointerId);
       setDragTarget('sidebar');
     },
     [],
@@ -162,7 +313,7 @@ export const App = () => {
         return;
       }
 
-      const rect = host.getBoundingClientRect(); //! レイアウト領域の位置
+      const rect = host.getBoundingClientRect();
       const next = clamp(event.clientX - rect.left - V_SEPARATOR / 2, SIDEBAR_MIN, SIDEBAR_MAX);
       setSidebarWidth(next);
     },
@@ -214,9 +365,9 @@ export const App = () => {
       }
 
       const rect = host.getBoundingClientRect();
-      const available = rect.height - H_SEPARATOR - MAIN_MIN_HEIGHT; //! ログ高さの最大値計算
+      const available = rect.height - H_SEPARATOR - MAIN_MIN_HEIGHT;
       const maxHeight = Math.max(LOG_MIN, available);
-      const offset = rect.bottom - event.clientY - H_SEPARATOR / 2; //! マウス位置から高さを算出
+      const offset = rect.bottom - event.clientY - H_SEPARATOR / 2;
       const next = clamp(offset, LOG_MIN, maxHeight);
       setLogHeight(next);
     },
@@ -239,41 +390,8 @@ export const App = () => {
     [dragTarget],
   );
 
-  /**
-   * @brief ワークスペースの行レイアウトスタイル。
-   */
-  const workspaceStyle = useMemo(() => {
-    return {
-      gridTemplateRows: `minmax(${MAIN_MIN_HEIGHT}px, 1fr) ${H_SEPARATOR}px ${logHeight}px`,
-    } satisfies CSSProperties;
-  }, [logHeight]);
-
-  /**
-   * @brief サイドバーとカード領域の列レイアウトスタイル。
-   */
-  const contentStyle = useMemo(() => {
-    return {
-      gridTemplateColumns: `${sidebarWidth}px ${V_SEPARATOR}px minmax(0, 1fr)`,
-    } satisfies CSSProperties;
-  }, [sidebarWidth]);
-
-  /**
-   * @brief ログ表示用の文字列を生成する。
-   * @param entry 表示対象のログ。
-   * @return 整形したログ文字列。
-   */
-  const formatLogLine = useCallback((entry: LogEntry): string => {
-    const timestamp = entry.timestamp.toLocaleString('ja-JP', {
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    return `[${timestamp}] ${entry.level}: ${entry.message}`;
-  }, []);
+  const cardCount = cards.length;
+  const selectedDisplayNumber = toDisplayNumber(cards, selectedCardId);
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
@@ -296,6 +414,9 @@ export const App = () => {
           <button type="button" className="toolbar-button">種別フィルタ</button>
         </div>
         <div className="toolbar-group">
+          <button type="button" className="toolbar-button" onClick={handleCycleStatus}>
+            🔄 ステータス切替
+          </button>
           <button type="button" className="toolbar-button">⇅ 水平分割</button>
           <button type="button" className="toolbar-button">⇆ 垂直分割</button>
         </div>
@@ -350,6 +471,12 @@ export const App = () => {
                   <button type="button" className="tab-bar__tab">📄 detail.md ●</button>
                   <button type="button" className="tab-bar__tab">➕</button>
                 </div>
+
+                <div className="panel-header">
+                  <span className="panel-header__title">overview.md</span>
+                  <span className="panel-header__meta">カード総数: {cardCount}</span>
+                </div>
+
                 <div className="panel-toolbar">
                   <div className="panel-toolbar__group">
                     <button type="button" className="panel-toolbar__button">▼ すべて展開</button>
@@ -364,29 +491,34 @@ export const App = () => {
                     <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
                   </div>
                 </div>
-                <div className="panel-cards">
-                  <article className="card card--active" aria-selected="true">
-                    <header className="card__header">
-                      <span className="card__connector">●</span>
-                      <span className="card__icon">📑</span>
-                      <span className="card__status card__status--approved">Approved</span>
-                      <span className="card__title">プロジェクト概要</span>
-                      <span className="card__connector">●</span>
-                    </header>
-                    <p className="card__body">アプリケーションの目的と主要ユースケースを記述します。</p>
-                    <footer className="card__footer">最終更新: 2025-10-19 14:30</footer>
-                  </article>
-                  <article className="card">
-                    <header className="card__header">
-                      <span className="card__connector">○</span>
-                      <span className="card__icon">📝</span>
-                      <span className="card__status card__status--draft">Draft</span>
-                      <span className="card__title">詳細設計の棚卸し</span>
-                      <span className="card__connector">○</span>
-                    </header>
-                    <p className="card__body">ユースケース一覧と詳細設計の整備方針をまとめます。</p>
-                    <footer className="card__footer">最終更新: 2025-10-18 09:15</footer>
-                  </article>
+
+                <div className="panel-cards" role="list">
+                  {cards.map((card) => {
+                    const isActive = card.id === selectedCardId;
+                    const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
+                    const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+                    return (
+                      <article
+                        key={card.id}
+                        className={`card${isActive ? ' card--active' : ''}`}
+                        aria-selected={isActive}
+                        role="listitem"
+                        tabIndex={0}
+                        onClick={() => handleCardSelect(card)}
+                        onKeyDown={(event) => handleCardKeyDown(event, card)}
+                      >
+                        <header className="card__header">
+                          <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+                          <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+                          <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+                          <span className="card__title">{card.title}</span>
+                          <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+                        </header>
+                        <p className="card__body">{card.body}</p>
+                        <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -426,11 +558,20 @@ export const App = () => {
         <section className="log-area" aria-label="動作ログ">
           <header className="log-area__header">
             <span>動作ログ</span>
-            <button type="button" className="log-area__clear">クリア</button>
+            <button
+              type="button"
+              className="log-area__clear"
+              onClick={() => setLogs([{ id: 'log-clear', level: 'INFO', message: 'ログをクリアしました。', timestamp: new Date() }])}
+            >
+              クリア
+            </button>
           </header>
           <pre className="log-area__body" aria-live="polite">
             {logs.map((entry) => (
-              <span key={entry.id}>{formatLogLine(entry)}{'\n'}</span>
+              <span key={entry.id}>
+                {`[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`}
+                {'\n'}
+              </span>
             ))}
           </pre>
         </section>
@@ -438,14 +579,14 @@ export const App = () => {
 
       <footer className="status-bar" aria-label="ステータスバー">
         <div className="status-bar__section">
-          <span>総カード数: --</span>
-          <span>選択カード: #001</span>
+          <span>総カード数: {cardCount}</span>
+          <span>選択カード: {selectedDisplayNumber}</span>
           <span>保存状態: ● 未保存</span>
         </div>
         <div className="status-bar__section status-bar__section--right">
           <span>文字コード: UTF-8</span>
           <span>テーマ: ライトモード</span>
-          <span>接続状態: {status}</span>
+          <span>接続状態: {ipcStatus}</span>
         </div>
       </footer>
     </div>
