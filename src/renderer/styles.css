@@ -43,7 +43,19 @@
   }
 
   .toolbar-group {
-    @apply flex items-center gap-1.5 border-r border-slate-200 pr-3 last:border-r-0 last:pr-0 dark:border-slate-700;
+    @apply flex items-center gap-1.5 border-r border-slate-200 pr-3 dark:border-slate-700;
+  }
+
+  .toolbar-group:last-of-type {
+    @apply border-r-0 pr-0;
+  }
+
+  .toolbar-group--right {
+    @apply gap-2;
+  }
+
+  .toolbar-spacer {
+    @apply flex-1 border-b border-transparent;
   }
 
   .toolbar-button {
@@ -146,16 +158,8 @@
     @apply flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2 text-xs font-medium dark:border-slate-700 dark:bg-slate-900;
   }
 
-  .panel-header__title {
-    @apply text-sm font-semibold;
-  }
-
-  .panel-header__meta {
-    @apply text-[0.65rem] uppercase tracking-wide text-slate-400 dark:text-slate-500;
-  }
-
   .panel-toolbar {
-    @apply flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
+    @apply flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
   }
 
   .panel-toolbar__group {
@@ -168,6 +172,14 @@
 
   .panel-toolbar__input {
     @apply rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .panel-toolbar__spacer {
+    @apply flex-1;
+  }
+
+  .panel-toolbar__meta {
+    @apply text-[0.65rem] text-slate-500 dark:text-slate-400;
   }
 
   .panel-cards {

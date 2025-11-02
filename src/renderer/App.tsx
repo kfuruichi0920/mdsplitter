@@ -436,16 +436,19 @@ export const App = () => {
         <div className="toolbar-group">
           <button type="button" className="toolbar-button">⛓️ トレース</button>
           <button type="button" className="toolbar-button">種別フィルタ</button>
-        </div>
-        <div className="toolbar-group">
-          <button type="button" className="toolbar-button" onClick={handleThemeToggle}>
-            {themeButtonLabel}
-          </button>
           <button type="button" className="toolbar-button" onClick={handleCycleStatus}>
             🔄 ステータス切替
           </button>
+        </div>
+        <div className="toolbar-group">
           <button type="button" className="toolbar-button">⇅ 水平分割</button>
           <button type="button" className="toolbar-button">⇆ 垂直分割</button>
+        </div>
+        <div className="toolbar-spacer" />
+        <div className="toolbar-group toolbar-group--right">
+          <button type="button" className="toolbar-button" onClick={handleThemeToggle}>
+            {themeButtonLabel}
+          </button>
         </div>
       </section>
 
@@ -499,11 +502,6 @@ export const App = () => {
                   <button type="button" className="tab-bar__tab">➕</button>
                 </div>
 
-                <div className="panel-header">
-                  <span className="panel-header__title">overview.md</span>
-                  <span className="panel-header__meta">カード総数: {cardCount}</span>
-                </div>
-
                 <div className="panel-toolbar">
                   <div className="panel-toolbar__group">
                     <button type="button" className="panel-toolbar__button">⏬ 展開</button>
@@ -517,6 +515,8 @@ export const App = () => {
                   <div className="panel-toolbar__group">
                     <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
                   </div>
+                  <div className="panel-toolbar__spacer" />
+                  <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
                 </div>
 
                 <div className="panel-cards" role="list">
@@ -563,6 +563,8 @@ export const App = () => {
                     <button type="button" className="panel-toolbar__button">トレーサ種別</button>
                     <button type="button" className="panel-toolbar__button">☰ 表示</button>
                   </div>
+                  <div className="panel-toolbar__spacer" />
+                  <div className="panel-toolbar__meta">カード総数: --</div>
                 </div>
                 <div className="panel-placeholder">トレーサビリティコネクタのプレビュー領域</div>
               </div>
