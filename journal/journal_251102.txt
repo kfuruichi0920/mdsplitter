@@ -89,3 +89,12 @@
 - Jest調整: `jest.config.cjs:1-12` に CSS モック設定を追加し、`tests/__mocks__/styleMock.ts:1-6` を作成してスタイルインポートを無視。
 - `doc/software_detail_design.md:45-60,140-170,188-200` にストア構成と Zustand 依存を追記し、フェーズ P1-04 の進捗を記録。`task/task_all.md:11-20` で P1-04 を完了チェック。
 - `npm run typecheck` および `npm run test` を実行し、型チェックと単体テストが成功することを確認。
+
+## P1-05 Tailwind導入とテーマ切替基盤
+- `npm install -D tailwindcss@3.4.13 postcss@8.4.38 autoprefixer@10.4.20` を実行し、`tailwind.config.js:1-13`・`postcss.config.js:1-6` を新規作成。`darkMode: 'class'` を有効化し、ビルドチェーンを構築。
+- `src/renderer/styles.css:1-220` を Tailwind の `@tailwind` ディレクティブと `@apply` ベースのコンポーネントスタイルへ刷新し、ライト/ダーク両テーマに対応する共通デザインを整備。
+- `src/renderer/store/uiStore.ts:1-48` を追加し、テーマ状態（light/dark）のトグルとリセットを提供。`src/renderer/store/uiStore.test.ts:1-33` で挙動を検証。
+- `src/renderer/App.tsx:1-620` にテーマストアを接続し、html 要素への `dark` class 付与、副作用ログ、ツールバーのテーマ切替ボタン、ステータスバー表示を実装。ログクリア処理のID重複対策も実施。
+- `src/renderer/App.test.tsx:1-80` を拡充し、テーマトグル時の `document.documentElement` クラス制御を検証。既存のストアリセットに UI ストアも統合。
+- `doc/software_detail_design.md:45-70,140-190` に Tailwind/テーマ基盤の構成と依存を追記し、進捗章へ P1-05 完了を記載。`task/task_all.md:11-21` で P1-05 を完了チェック。
+- `npm run typecheck` および `npm run test` を実行し、型チェックと単体テストが成功することを確認。

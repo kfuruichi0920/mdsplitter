@@ -2,11 +2,13 @@ import { act, render, screen } from '@testing-library/react';
 
 import { App } from './App';
 import { resetWorkspaceStore } from './store/workspaceStore';
+import { resetUiStore } from './store/uiStore';
 
 describe('App', () => {
   beforeEach(() => {
     act(() => {
       resetWorkspaceStore();
+      resetUiStore();
     });
     jest.useRealTimers();
   });
@@ -15,6 +17,7 @@ describe('App', () => {
     jest.useRealTimers();
     act(() => {
       resetWorkspaceStore();
+      resetUiStore();
     });
   });
 
@@ -37,5 +40,19 @@ describe('App', () => {
 
     expect(screen.getByText('Deprecated')).toBeInTheDocument();
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
+  });
+
+  it('toggles theme via toolbar button', () => {
+    render(<App />);
+
+    const initialButton = screen.getByRole('button', { name: /ライトモード/ });
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+
+    act(() => {
+      initialButton.click();
+    });
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(screen.getByRole('button', { name: /ダークモード/ })).toBeInTheDocument();
   });
 });

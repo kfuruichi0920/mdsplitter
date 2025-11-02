@@ -8,7 +8,7 @@
  * ログエントリとして記録する。
  * @author K.Furuichi
  * @date 2025-11-02
- * @version 0.3
+ * @version 0.4
  * @copyright MIT
  */
 
@@ -22,6 +22,7 @@ import {
   type CardKind,
   type CardStatus,
 } from './store/workspaceStore';
+import { useUiStore, type ThemeMode } from './store/uiStore';
 
 import './styles.css';
 
@@ -154,6 +155,8 @@ export const App = () => {
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
 
   const selectedCard = useMemo<Card | null>(() => {
     return cards.find((card) => card.id === selectedCardId) ?? null;
@@ -210,6 +213,11 @@ export const App = () => {
 
     void bootstrap(); //! 副作用内で非同期処理を起動
   }, [pushLog]);
+
+  useEffect(() => {
+    //! Tailwind ダークモード切替のため、html 要素へ `dark` クラスを付与する
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
   /**
    * @brief カードを選択する。
@@ -270,6 +278,20 @@ export const App = () => {
       timestamp: new Date(),
     });
   }, [cycleCardStatus, pushLog, selectedCard]);
+
+  /**
+   * @brief テーマを切り替える。
+   */
+  const handleThemeToggle = useCallback(() => {
+    const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+    toggleTheme();
+    pushLog({
+      id: `theme-${Date.now()}`,
+      level: 'INFO',
+      message: `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
+      timestamp: new Date(),
+    });
+  }, [pushLog, theme, toggleTheme]);
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {
@@ -392,6 +414,8 @@ export const App = () => {
 
   const cardCount = cards.length;
   const selectedDisplayNumber = toDisplayNumber(cards, selectedCardId);
+  const themeLabel = theme === 'dark' ? 'ダークモード' : 'ライトモード';
+  const themeButtonLabel = theme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード';
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
@@ -414,6 +438,9 @@ export const App = () => {
           <button type="button" className="toolbar-button">種別フィルタ</button>
         </div>
         <div className="toolbar-group">
+          <button type="button" className="toolbar-button" onClick={handleThemeToggle}>
+            {themeButtonLabel}
+          </button>
           <button type="button" className="toolbar-button" onClick={handleCycleStatus}>
             🔄 ステータス切替
           </button>
@@ -561,7 +588,16 @@ export const App = () => {
             <button
               type="button"
               className="log-area__clear"
-              onClick={() => setLogs([{ id: 'log-clear', level: 'INFO', message: 'ログをクリアしました。', timestamp: new Date() }])}
+              onClick={() =>
+                setLogs([
+                  {
+                    id: `log-clear-${Date.now()}`,
+                    level: 'INFO',
+                    message: 'ログをクリアしました。',
+                    timestamp: new Date(),
+                  },
+                ])
+              }
             >
               クリア
             </button>
@@ -585,7 +621,7 @@ export const App = () => {
         </div>
         <div className="status-bar__section status-bar__section--right">
           <span>文字コード: UTF-8</span>
-          <span>テーマ: ライトモード</span>
+          <span>テーマ: {themeLabel}</span>
           <span>接続状態: {ipcStatus}</span>
         </div>
       </footer>
