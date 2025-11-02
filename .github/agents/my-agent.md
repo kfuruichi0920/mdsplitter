@@ -1,6 +1,6 @@
 ---
-name:Electron + TypeScript コードレビュー
-description:
+name: "Electron_TypeScript_コードレビュー"
+description: "Electron_TypeScript_コードレビュー"
 ---
 
 ## 目的
