@@ -17,17 +17,6 @@ React/Electronアプリのルート要素を定義します。
 </head>
 <body>
     <div id="root"></div>
-    <script type="module">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-
-        import { App } from './App';
-
-        ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-            <React.StrictMode>
-                <App />
-            </React.StrictMode>
-        );
-    </script>
+    <!-- Reactのレンダリングはmain.tsで行うため、ここでは不要 -->
 </body>
 </html>

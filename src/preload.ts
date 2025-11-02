@@ -9,18 +9,5 @@
  * @copyright MIT
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-
-import { App } from './App';
-
-/**
- * @brief Reactアプリケーションを#root要素にレンダリングする。
- * @details
- * StrictModeでAppコンポーネントを描画します。
- */
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// 必要に応じてElectronのAPIブリッジをここに記述
+// 例: contextBridge.exposeInMainWorld('api', { ... });
