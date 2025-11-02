@@ -98,3 +98,9 @@
 - `src/renderer/App.test.tsx:1-80` を拡充し、テーマトグル時の `document.documentElement` クラス制御を検証。既存のストアリセットに UI ストアも統合。
 - `doc/software_detail_design.md:45-70,140-190` に Tailwind/テーマ基盤の構成と依存を追記し、進捗章へ P1-05 完了を記載。`task/task_all.md:11-21` で P1-05 を完了チェック。
 - `npm run typecheck` および `npm run test` を実行し、型チェックと単体テストが成功することを確認。
+
+## UIコンパクト化調整
+- `src/renderer/styles.css:1-240` の `@apply` 値を見直し、テキストを `text-sm` 基準に縮小。メニューバー/ツールバー/ステータスバーの高さと各種パディング・ギャップを減らし、カード・ログエリアをコンパクト表示に改修。
+- `src/renderer/App.tsx:34-46` の定数を更新し、サイドバー既定幅を 240px、ログエリア高さを 112px（最小 80px）、メイン領域の最小高さを 280px に調整。
+- `doc/user_interface_design.md:15-220` にコンパクトレイアウトの配色・寸法・タイポグラフィを反映。ツールバー構成やカード詳細、ログ/ステータスバー仕様を現行 UI に合わせて更新。
+- `doc/software_detail_design.md:50-60,190-200` を更新し、App/スタイルのコンパクト化対応とフェーズ進捗を追記。

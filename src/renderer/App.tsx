@@ -27,21 +27,21 @@ import { useUiStore, type ThemeMode } from './store/uiStore';
 import './styles.css';
 
 /** サイドバー幅のデフォルト (px)。 */
-const SIDEBAR_DEFAULT = 256;
+const SIDEBAR_DEFAULT = 240;
 /** サイドバー幅の下限 (px)。 */
-const SIDEBAR_MIN = 200;
+const SIDEBAR_MIN = 180;
 /** サイドバー幅の上限 (px)。 */
 const SIDEBAR_MAX = 480;
 /** ログエリア高さのデフォルト (px)。 */
-const LOG_DEFAULT = 128;
+const LOG_DEFAULT = 112;
 /** ログエリア高さの下限 (px)。 */
-const LOG_MIN = 96;
+const LOG_MIN = 80;
 /** ログエリア高さ調整時に確保するメイン領域の最小高さ (px)。 */
-const MAIN_MIN_HEIGHT = 320;
+const MAIN_MIN_HEIGHT = 280;
 /** 垂直セパレータ幅 (px)。 */
-const V_SEPARATOR = 8;
+const V_SEPARATOR = 4;
 /** 水平セパレータ高さ (px)。 */
-const H_SEPARATOR = 6;
+const H_SEPARATOR = 4;
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -61,11 +61,11 @@ const CARD_STATUS_CLASS: Record<CardStatus, string> = {
 
 /** カード種別に応じたアイコン。 */
 const CARD_KIND_ICON: Record<CardKind, string> = {
-  heading: '📑',
+  heading: '🔖',
   paragraph: '📝',
-  bullet: '•',
-  figure: '🖼️',
-  table: '📊',
+  bullet: '📍',
+  figure: '📊',
+  table: '📅',
   test: '🧪',
   qa: '💬',
 };
