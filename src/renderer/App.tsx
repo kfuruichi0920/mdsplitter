@@ -506,13 +506,13 @@ export const App = () => {
 
                 <div className="panel-toolbar">
                   <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">▼ すべて展開</button>
-                    <button type="button" className="panel-toolbar__button">▶ すべて折畳</button>
+                    <button type="button" className="panel-toolbar__button">⏬ 展開</button>
+                    <button type="button" className="panel-toolbar__button">⏫ 折畳</button>
                   </div>
                   <div className="panel-toolbar__group">
-                    <input className="panel-toolbar__input" placeholder="文字列フィルタ" />
-                    <button type="button" className="panel-toolbar__button">カード種別</button>
-                    <button type="button" className="panel-toolbar__button">🔽 トレースのみ</button>
+                    <input className="panel-toolbar__input" placeholder="👓 文字列フィルタ" />
+                    <button type="button" className="panel-toolbar__button">📚 カード種別</button>
+                    <button type="button" className="panel-toolbar__button">🧐 トレースのみ</button>
                   </div>
                   <div className="panel-toolbar__group">
                     <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
@@ -556,8 +556,8 @@ export const App = () => {
                 </div>
                 <div className="panel-toolbar">
                   <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">▼ 展開</button>
-                    <button type="button" className="panel-toolbar__button">▶ 折畳</button>
+                    <button type="button" className="panel-toolbar__button">⏭️ 展開</button>
+                    <button type="button" className="panel-toolbar__button">⏮️ 折畳</button>
                   </div>
                   <div className="panel-toolbar__group">
                     <button type="button" className="panel-toolbar__button">トレーサ種別</button>
