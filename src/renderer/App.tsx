@@ -25,6 +25,7 @@ import {
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import type { LogLevel } from '@/shared/settings';
+import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
@@ -169,12 +170,73 @@ export const App = () => {
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
+  const hydrateWorkspace = useWorkspaceStore((state) => state.hydrate);
+  const resetWorkspace = useWorkspaceStore((state) => state.reset);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const hasInitializedCards = useRef<boolean>(false); ///< 初期カードロード判定。
+
+  const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
+  const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
+
+  const sanitizeSnapshotCards = useCallback(
+    (input: Card[]) => {
+      const validCards: Card[] = [];
+      const invalidMessages: string[] = [];
+
+      input.forEach((card, index) => {
+        if (!card || typeof card !== 'object') {
+          invalidMessages.push(`index ${index}: カードデータが不正です`);
+          return;
+        }
+
+        const cardId = typeof card.id === 'string' && card.id.trim() !== '' ? card.id : `index ${index}`;
+
+        if (typeof card.id !== 'string' || card.id.trim() === '') {
+          invalidMessages.push(`${cardId}: ID が空です`);
+          return;
+        }
+
+        if (typeof card.title !== 'string' || card.title.trim() === '') {
+          invalidMessages.push(`${cardId}: タイトルが空です`);
+          return;
+        }
+
+        if (!allowedStatuses.has(card.status as CardStatus)) {
+          invalidMessages.push(`${cardId}: 不正なステータス (${String(card.status)})`);
+          return;
+        }
+
+        if (!allowedKinds.has(card.kind as CardKind)) {
+          invalidMessages.push(`${cardId}: 不正なカード種別 (${String(card.kind)})`);
+          return;
+        }
+
+        if (typeof card.body !== 'string') {
+          invalidMessages.push(`${cardId}: 本文が文字列ではありません`);
+          return;
+        }
+
+        if (typeof card.hasLeftTrace !== 'boolean' || typeof card.hasRightTrace !== 'boolean') {
+          invalidMessages.push(`${cardId}: トレースフラグが不正です`);
+          return;
+        }
+
+        if (typeof card.updatedAt !== 'string' || Number.isNaN(Date.parse(card.updatedAt))) {
+          invalidMessages.push(`${cardId}: 更新日時が不正です`);
+          return;
+        }
+
+        validCards.push(card);
+      });
+
+      return { validCards, invalidMessages };
+    },
+    [allowedKinds, allowedStatuses],
+  );
 
   const selectedCard = useMemo<Card | null>(() => {
     return cards.find((card) => card.id === selectedCardId) ?? null;
@@ -285,6 +347,113 @@ export const App = () => {
 
     void applySettings();
   }, [pushLog, setThemeStore]);
+
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      const loadApi = window.app?.workspace?.load;
+      if (!loadApi) {
+        pushLog({
+          id: `workspace-load-missing-${Date.now()}`,
+          level: 'WARN',
+          message: 'workspace.load API が未定義のため、ダミーカードを表示します。',
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      try {
+        const snapshot = await loadApi();
+        if (!snapshot || !Array.isArray(snapshot.cards)) {
+          pushLog({
+            id: `workspace-load-empty-${Date.now()}`,
+            level: 'INFO',
+            message: '保存済みスナップショットが見つからないため、ダミーカードを表示します。',
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        const { validCards, invalidMessages } = sanitizeSnapshotCards(snapshot.cards);
+        const savedAtDate =
+          snapshot.savedAt && !Number.isNaN(Date.parse(snapshot.savedAt))
+            ? new Date(snapshot.savedAt)
+            : null;
+        const savedAtIssue = Boolean(snapshot.savedAt && !savedAtDate);
+
+        if (validCards.length === 0) {
+          hasInitializedCards.current = false;
+          resetWorkspace();
+          setDirty(false);
+          setSaving(false);
+          setLastSavedAt(null);
+          notify('error', '保存済みデータに有効なカードが存在しなかったため、初期状態に戻しました。');
+          pushLog({
+            id: `workspace-load-invalid-${Date.now()}`,
+            level: 'ERROR',
+            message: '保存済みスナップショットに有効なカードが存在しなかったため、初期状態を維持しました。',
+            timestamp: new Date(),
+          });
+          if (invalidMessages.length > 0) {
+            pushLog({
+              id: `workspace-load-invalid-list-${Date.now()}`,
+              level: 'WARN',
+              message: `除外理由: ${invalidMessages.join(' / ')}`,
+              timestamp: new Date(),
+            });
+          }
+          return;
+        }
+
+        hasInitializedCards.current = false;
+        hydrateWorkspace(validCards);
+        setDirty(false);
+        setSaving(false);
+        setLastSavedAt(savedAtDate);
+
+        const issues: string[] = [];
+        if (invalidMessages.length > 0) {
+          issues.push(`無効カード ${invalidMessages.length} 件`);
+        }
+        if (savedAtIssue) {
+          issues.push('保存時刻が不正');
+        }
+
+        const notifyLevel = issues.length > 0 ? 'warning' : 'success';
+        let notifyMessage = issues.length > 0
+          ? `保存済みワークスペースを読み込みました (${issues.join(' / ')})。`
+          : '保存済みワークスペースを読み込みました。';
+        notify(notifyLevel, notifyMessage);
+
+        const logLevel = issues.length > 0 ? 'WARN' : 'INFO';
+        pushLog({
+          id: `workspace-loaded-${Date.now()}`,
+          level: logLevel,
+          message: notifyMessage,
+          timestamp: new Date(),
+        });
+
+        if (invalidMessages.length > 0) {
+          pushLog({
+            id: `workspace-invalid-cards-${Date.now()}`,
+            level: 'WARN',
+            message: `除外したカード: ${invalidMessages.join(' / ')}`,
+            timestamp: new Date(),
+          });
+        }
+      } catch (error) {
+        console.error('[renderer] failed to load workspace snapshot', error);
+        notify('error', 'ワークスペースの読込に失敗しました。ログを確認してください。');
+        pushLog({
+          id: `workspace-load-failed-${Date.now()}`,
+          level: 'ERROR',
+          message: 'ワークスペースの読込に失敗しました。コンソールログを確認してください。',
+          timestamp: new Date(),
+        });
+      }
+    };
+
+    void loadWorkspace();
+  }, [hydrateWorkspace, notify, pushLog, resetWorkspace, sanitizeSnapshotCards]);
 
   useEffect(() => {
     //! Tailwind ダークモード切替のため、html 要素へ `dark` クラスを付与する

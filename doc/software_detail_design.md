@@ -167,6 +167,32 @@ Deprecated --> Draft : 再利用
 - npm: 10.8.0 以上。
 - PlantUML: 本ドキュメントの図式表現用 (サーバー/CLI いずれかで描画想定、生成プロセス未構築)。
 
+### 5.4 ワークスペーススナップショット
+- 保存先: `_out/workspace.snapshot.json` (`WORKSPACE_SNAPSHOT_FILENAME`)。
+- フォーマット:
+
+```json
+{
+  "cards": [
+    {
+      "id": "card-001",
+      "title": "プロジェクト概要",
+      "body": "…",
+      "status": "approved",
+      "kind": "heading",
+      "hasLeftTrace": true,
+      "hasRightTrace": true,
+      "updatedAt": "2025-11-03T09:15:00.000Z"
+    }
+  ],
+  "savedAt": "2025-11-03T09:15:05.000Z"
+}
+```
+
+- バリデーション: `src/shared/workspace.ts:1-73` の `isWorkspaceSnapshot` が id/title/body 等の必須フィールドをチェック。
+- I/O: `src/main/main.ts:82-133` が `workspace:save` / `workspace:load` IPC を提供し、`src/main/workspace.ts:19-168` で JSON を読み書きする。
+- レンダラー: `src/renderer/App.tsx:146-466` が初回マウント時に `workspace.load` を呼び出してストアへハイドレートし、保存完了後も `Ctrl+S` で同ファイルを更新する。
+
 ## 6. 実装進捗と今後の観点
 - フェーズ P1-03: UI 設計書に沿ったレイアウト骨格（メニュー/ツールバー/サイドバー/カードパネル/ログ/ステータスバー）をプレースホルダで構築し、サイドバー幅とログエリア高さのドラッグリサイズを実装済み。次工程ではグローバルストア連携と実データ描画を進める。
 - フェーズ P1-04: Zustand ストアを導入し、カードダミーデータの表示とステータス更新アクションを UI へ接続。ストアの単体テストおよび App コンポーネントの振る舞いテストを追加済み。次フェーズでは実データソースへの接続やストア分割を検討する。
@@ -175,7 +201,7 @@ Deprecated --> Draft : 再利用
 - フェーズ P2-02: `app.getPath('userData')` 配下に `_input/_out/_logs` を自動生成し、サンプル入出力ファイルと初期ログを配置するワークスペース初期化を実装。
 - フェーズ P2-03: ファイルロガーを実装し、ログレベル設定とサイズローテーションに対応。レンダラからのログ送信 API を整備し、設定変更時にロガーへ反映するよう調整。
 - フェーズ P2-04: 共通通知コンポーネントと Zustand ストアを実装し、テーマ設定やエラーハンドリングで再利用。Tailwind スタイルでトースト表示を整備し、自動消去と手動閉じを提供。
-- フェーズ P2-05: `src/renderer/App.tsx:340-720` で保存 (`Ctrl+S`)、水平/垂直分割 (`Ctrl+Shift+\\` / `Ctrl+\\`)、検索 (`Ctrl+F`) のショートカットマッピングと保存状態管理 (`isDirty`/`isSaving`) を実装。`src/shared/workspace.ts:1-45` にカードモデル/スナップショット共通型を定義し、`src/main/preload.ts:35-69`・`src/main/main.ts:82-123`・`src/main/workspace.ts:19-158` で `workspace:save` IPC を通じて `_out/workspace.snapshot.json` へ永続化。保存状態とパネル分割モードをステータスバー (`App.tsx:640-650`) と `split-grid` レイアウト (`App.tsx:795-818`, `styles.css:157-184`) に反映し、`src/renderer/App.test.tsx:87-140` でショートカット操作と保存処理の UI テストを追加。
+- フェーズ P2-05: `src/renderer/App.tsx:340-838` で保存 (`Ctrl+S`)、水平/垂直分割 (`Ctrl+Shift+\\` / `Ctrl+\\`)、検索 (`Ctrl+F`) のショートカットマッピングと保存状態管理 (`isDirty`/`isSaving`) を実装。`src/shared/workspace.ts:1-90` にカードモデル/スナップショット共通型・バリデーション (`isWorkspaceSnapshot`/`CARD_KIND_VALUES`) を定義し、`src/main/preload.ts:35-72`・`src/main/main.ts:82-145`・`src/main/workspace.ts:19-190` で `workspace:save/load` IPC を通じて `_out/workspace.snapshot.json` を読み書きする。読み込み時にカード内容を検証し、無効カードがあれば除外してトースト通知・ログ出力を行う。保存状態とパネル分割モードをステータスバー (`App.tsx:640-650`) と `split-grid` レイアウト (`App.tsx:795-818`, `styles.css:157-184`) に反映し、`src/renderer/App.test.tsx:49-172` でショートカット操作と保存・バリデーションの UI テストを追加。
 - P1-05 追加対応: 文字サイズと余白を見直し、全 UI をコンパクト表示（text-sm 基準、ツールバー/ステータスバー高さ縮小、ログエリア 112px）へ調整。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。

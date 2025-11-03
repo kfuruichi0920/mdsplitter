@@ -14,6 +14,7 @@ declare global {
       log: (level: LogLevel, message: string) => Promise<void>;
       workspace: {
         save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+        load: () => Promise<WorkspaceSnapshot | null>;
       };
     };
   }

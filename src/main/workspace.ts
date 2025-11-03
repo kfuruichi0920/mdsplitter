@@ -13,7 +13,11 @@ import {
   defaultSettings,
   mergeSettings,
 } from '../shared/settings';
-import type { WorkspaceSnapshot } from '../shared/workspace';
+import {
+  WORKSPACE_SNAPSHOT_FILENAME,
+  isWorkspaceSnapshot,
+  type WorkspaceSnapshot,
+} from '../shared/workspace';
 
 export interface WorkspacePaths {
   root: string;
@@ -25,8 +29,6 @@ export interface WorkspacePaths {
 
 const SAMPLE_INPUT_NAME = 'SampleDocument.md';
 const SAMPLE_OUTPUT_NAME = 'SampleCards.json';
-const WORKSPACE_SNAPSHOT_NAME = 'workspace.snapshot.json';
-
 let cachedSettings: AppSettings | null = null;
 let cachedPaths: WorkspacePaths | null = null;
 
@@ -153,7 +155,28 @@ export const getWorkspacePaths = (): WorkspacePaths => resolveWorkspacePaths();
 
 export const saveWorkspaceSnapshot = async (snapshot: WorkspaceSnapshot): Promise<string> => {
   const paths = resolveWorkspacePaths();
-  const filePath = path.join(paths.outputDir, WORKSPACE_SNAPSHOT_NAME);
+  const filePath = path.join(paths.outputDir, WORKSPACE_SNAPSHOT_FILENAME);
   await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf8');
   return filePath;
+};
+
+export const loadWorkspaceSnapshot = async (): Promise<WorkspaceSnapshot | null> => {
+  const paths = resolveWorkspacePaths();
+  const filePath = path.join(paths.outputDir, WORKSPACE_SNAPSHOT_FILENAME);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (isWorkspaceSnapshot(parsed)) {
+      return parsed;
+    }
+    console.warn('[workspace] invalid snapshot structure, ignoring');
+    return null;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      return null;
+    }
+    console.error('[workspace] failed to load snapshot', error);
+    return null;
+  }
 };

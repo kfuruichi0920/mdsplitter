@@ -45,6 +45,8 @@ type AppAPI = {
   workspace: {
     /** カードスナップショットを保存する。 */
     save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+    /** 保存済みスナップショットを読み込む。 */
+    load: () => Promise<WorkspaceSnapshot | null>;
   };
 };
 
@@ -63,6 +65,7 @@ const api: AppAPI = {
   log: async (level: LogLevel, message: string) => ipcRenderer.invoke('log:write', { level, message }),
   workspace: {
     save: async (snapshot: WorkspaceSnapshot) => ipcRenderer.invoke('workspace:save', snapshot),
+    load: async () => ipcRenderer.invoke('workspace:load'),
   },
 };
 

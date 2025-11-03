@@ -32,6 +32,7 @@ export interface WorkspaceStore {
   selectCard: (id: string) => void; ///< カードを選択する。
   updateCard: (id: string, patch: CardPatch) => void; ///< カード内容を更新する。
   cycleCardStatus: (id: string) => CardStatus | null; ///< ステータスを次段へ遷移させる。
+  hydrate: (cards: Card[]) => void; ///< 外部スナップショットからワークスペースを読み込む。
   reset: () => void; ///< 初期状態へリセットする。
 }
 
@@ -122,6 +123,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       }),
     }));
     return nextStatus;
+  },
+  hydrate: (cards: Card[]) => {
+    set({
+      cards,
+      selectedCardId: cards[0]?.id ?? null,
+    });
   },
   reset: () => {
     const base = createBaseState();

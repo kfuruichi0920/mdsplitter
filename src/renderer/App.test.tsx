@@ -8,12 +8,49 @@ import { resetUiStore } from './store/uiStore';
 
 describe('App', () => {
   const cloneSettings = () => JSON.parse(JSON.stringify(defaultSettings)) as typeof defaultSettings;
+  const snapshotCards = [
+    {
+      id: 'card-001',
+      title: 'プロジェクト概要',
+      body: 'アプリケーションの目的と主要ユースケースを記述します。',
+      status: 'approved',
+      kind: 'heading',
+      hasLeftTrace: true,
+      hasRightTrace: true,
+      updatedAt: '2025-10-19T05:30:00.000Z',
+    },
+    {
+      id: 'card-002',
+      title: '詳細設計の棚卸し',
+      body: 'ユースケース一覧と詳細設計の整備方針をまとめます。',
+      status: 'draft',
+      kind: 'paragraph',
+      hasLeftTrace: false,
+      hasRightTrace: true,
+      updatedAt: '2025-10-18T00:15:00.000Z',
+    },
+    {
+      id: 'card-003',
+      title: 'リスクアセスメント概要',
+      body: '既知の運用リスクと緩和策を列挙します。',
+      status: 'review',
+      kind: 'bullet',
+      hasLeftTrace: true,
+      hasRightTrace: false,
+      updatedAt: '2025-10-17T11:05:00.000Z',
+    },
+  ] as const;
   let currentSettings = cloneSettings();
   let saveWorkspaceMock: jest.Mock;
+  let loadWorkspaceMock: jest.Mock;
 
   beforeEach(() => {
     currentSettings = cloneSettings();
     saveWorkspaceMock = jest.fn().mockResolvedValue({ path: '/tmp/workspace.snapshot.json' });
+    loadWorkspaceMock = jest.fn().mockResolvedValue({
+      cards: snapshotCards,
+      savedAt: '2025-10-20T09:00:00.000Z',
+    });
     (window as any).app = {
       ping: jest.fn().mockResolvedValue({ ok: true, timestamp: Date.now() }),
       settings: {
@@ -26,6 +63,7 @@ describe('App', () => {
       log: jest.fn().mockResolvedValue(undefined),
       workspace: {
         save: saveWorkspaceMock,
+        load: loadWorkspaceMock,
       },
     };
 
@@ -44,11 +82,13 @@ describe('App', () => {
     });
     delete (window as any).app;
     saveWorkspaceMock.mockReset?.();
+    loadWorkspaceMock.mockReset?.();
   });
 
   it('renders cards from the workspace store', async () => {
     render(<App />);
     await act(async () => {});
+    await waitFor(() => expect(loadWorkspaceMock).toHaveBeenCalled());
     expect(screen.getByText('プロジェクト概要')).toBeInTheDocument();
     expect(screen.getByText(/カード総数: 3/)).toBeInTheDocument();
   });
@@ -89,8 +129,8 @@ describe('App', () => {
 
     render(<App />);
     await act(async () => {});
-
-    expect(screen.getByText('保存状態: ✓ 保存済み')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/保存状態:/)).toBeInTheDocument());
+    expect(screen.getByText(/保存状態: ✓ 保存済み/)).toBeInTheDocument();
 
     const statusButton = screen.getByRole('button', { name: /ステータス切替/ });
     act(() => {
@@ -139,6 +179,33 @@ describe('App', () => {
 
     expect(grid).toHaveAttribute('data-split-mode', 'single');
     expect(screen.queryByText('トレーサビリティコネクタのプレビュー領域')).not.toBeInTheDocument();
+  });
+
+  it('warns when invalid cards are removed during snapshot load', async () => {
+    loadWorkspaceMock.mockResolvedValueOnce({
+      cards: [
+        { ...snapshotCards[0] },
+        {
+          id: 'invalid-card',
+          title: '',
+          body: 'invalid',
+          status: 'deprecated',
+          kind: 'heading',
+          hasLeftTrace: true,
+          hasRightTrace: false,
+          updatedAt: 'invalid-date',
+        },
+      ],
+      savedAt: '2025-11-03T09:00:00.000Z',
+    });
+
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByText('保存済みワークスペースを読み込みました (無効カード 1 件)。')).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/カード総数: 1/)).toBeInTheDocument();
+    expect(screen.queryByText('invalid-card')).not.toBeInTheDocument();
   });
 
   it('opens search panel and focuses input via Ctrl+F shortcut', async () => {

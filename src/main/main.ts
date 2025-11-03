@@ -20,7 +20,13 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 
 import type { LogLevel } from '../shared/settings';
 
-import { initializeWorkspace, loadSettings, saveWorkspaceSnapshot, updateSettings } from './workspace';
+import {
+  initializeWorkspace,
+  loadSettings,
+  loadWorkspaceSnapshot,
+  saveWorkspaceSnapshot,
+  updateSettings,
+} from './workspace';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
@@ -120,6 +126,14 @@ ipcMain.handle('workspace:save', async (_event, snapshot) => {
   const path = await saveWorkspaceSnapshot(snapshot);
   logMessage('info', `ワークスペースを保存しました: ${path}`);
   return { path };
+});
+
+ipcMain.handle('workspace:load', async () => {
+  const snapshot = await loadWorkspaceSnapshot();
+  if (snapshot) {
+    logMessage('info', 'ワークスペーススナップショットを読み込みました');
+  }
+  return snapshot;
 });
 
 
