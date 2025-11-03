@@ -1,70 +1,89 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-
-type SplitDirection = 'horizontal' | 'vertical';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
+import { getTraceabilityStubs } from '@/shared/traceability';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { shallow } from 'zustand/shallow';
 
 interface TraceConnectorLayerProps {
   containerRef: React.RefObject<HTMLDivElement>;
-  direction: SplitDirection;
+  direction: 'horizontal' | 'vertical';
   splitRatio: number;
   nodeId: string;
+  leftLeafIds: string[];
+  rightLeafIds: string[];
 }
 
-interface ConnectorGeometry {
+interface ViewBox {
   width: number;
   height: number;
-  path: string;
+  rect: DOMRectReadOnly;
 }
 
-/**
- * @brief 左右パネル間の仮コネクタを描画するレイヤ。
- * @details
- * P2-10a では左右ペアの検出と SVG コンテナの配置のみを行い、
- * 中央同士を結ぶ単一のベジェ曲線を描画する。
- */
+interface ConnectorPathEntry {
+  id: string;
+  path: string;
+  className: string;
+}
+
+const directionSwap = (direction: 'forward' | 'backward' | 'bidirectional'): 'forward' | 'backward' | 'bidirectional' => {
+  if (direction === 'forward') return 'backward';
+  if (direction === 'backward') return 'forward';
+  return 'bidirectional';
+};
+
 export const TraceConnectorLayer = ({
   containerRef,
   direction,
   splitRatio,
   nodeId,
+  leftLeafIds,
+  rightLeafIds,
 }: TraceConnectorLayerProps) => {
-  const [geometry, setGeometry] = useState<ConnectorGeometry | null>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const [viewBox, setViewBox] = useState<ViewBox | null>(null);
   const rafRef = useRef<number | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const cards = useConnectorLayoutStore((state) => state.cards);
+  const highlightedCardIds = useWorkspaceStore(
+    (state) => {
+      const ids: string[] = [];
+      Object.values(state.tabs).forEach((tab) => {
+        if (tab?.selectedCardId) {
+          ids.push(tab.selectedCardId);
+        }
+      });
+      return ids;
+    },
+    shallow,
+  );
+  const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
+
+  const traceLinks = useMemo(() => getTraceabilityStubs(), []);
 
   useLayoutEffect(() => {
     if (direction !== 'vertical') {
-      setGeometry(null);
+      setViewBox(null);
       return () => {};
     }
 
     const element = containerRef.current;
     if (!element) {
-      setGeometry(null);
+      setViewBox(null);
       return () => {};
     }
 
-    const computeGeometry = () => {
+    const updateViewBox = () => {
       if (!containerRef.current) {
         return;
       }
       const rect = containerRef.current.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) {
-        setGeometry(null);
+        setViewBox(null);
         return;
       }
-
-      const leftX = (rect.width * splitRatio) / 2;
-      const rightBase = rect.width * splitRatio;
-      const rightX = rightBase + (rect.width - rightBase) / 2;
-      const midY = rect.height / 2;
-      const controlOffset = Math.max((rightX - leftX) * 0.35, 24);
-
-      const path = `M ${leftX} ${midY} C ${leftX + controlOffset} ${midY}, ${rightX - controlOffset} ${midY}, ${rightX} ${midY}`;
-
-      setGeometry({
+      setViewBox({
         width: rect.width,
         height: rect.height,
-        path,
+        rect,
       });
     };
 
@@ -74,14 +93,13 @@ export const TraceConnectorLayer = ({
       }
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
-        computeGeometry();
+        updateViewBox();
       });
     };
 
-    computeGeometry();
+    updateViewBox();
 
     window.addEventListener('resize', scheduleUpdate);
-
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserverRef.current = new ResizeObserver(scheduleUpdate);
       resizeObserverRef.current.observe(element);
@@ -96,9 +114,73 @@ export const TraceConnectorLayer = ({
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
     };
-  }, [containerRef, direction, splitRatio]);
+  }, [containerRef, direction]);
 
-  if (direction !== 'vertical' || !geometry) {
+  const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
+    if (direction !== 'vertical' || !viewBox) {
+      return [];
+    }
+    const containerRect = viewBox.rect;
+    const entries = Object.values(cards);
+    const findEntry = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
+      entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
+
+    const toLocalPoint = (anchor: CardAnchorEntry, side: 'left' | 'right') => {
+      const x = side === 'left' ? anchor.rect.left : anchor.rect.right;
+      return {
+        x: x - containerRect.left,
+        y: anchor.rect.midY - containerRect.top,
+      };
+    };
+
+    return traceLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
+      let source = findEntry(link.sourceCardId, leftLeafIds);
+      let target = findEntry(link.targetCardId, rightLeafIds);
+      let effectiveDirection = link.direction;
+
+      if (!source || !target) {
+        // 左右が逆の場合を考慮
+        const altSource = findEntry(link.sourceCardId, rightLeafIds);
+        const altTarget = findEntry(link.targetCardId, leftLeafIds);
+        if (!altSource || !altTarget) {
+          return acc;
+        }
+        source = altTarget;
+        target = altSource;
+        effectiveDirection = directionSwap(link.direction);
+      }
+
+      const start = toLocalPoint(source, 'right');
+      const end = toLocalPoint(target, 'left');
+      const deltaX = end.x - start.x;
+      if (deltaX <= 0) {
+        return acc;
+      }
+      const curvature = Math.max(deltaX * 0.35, 24);
+      const path = `M ${start.x} ${start.y} C ${start.x + curvature} ${start.y}, ${end.x - curvature} ${end.y}, ${end.x} ${end.y}`;
+
+      const className = [
+        'trace-connector-path',
+        `trace-connector-path--${link.relation}`,
+        `trace-connector-path--dir-${effectiveDirection}`,
+        (highlightedSet.has(link.sourceCardId) || highlightedSet.has(link.targetCardId))
+          ? 'trace-connector-path--highlight'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      acc.push({
+        id: link.id,
+        path,
+        className,
+      });
+
+      return acc;
+    }, []);
+  }, [cards, direction, highlightedSet, leftLeafIds, rightLeafIds, traceLinks, viewBox]);
+
+  if (direction !== 'vertical' || !viewBox) {
     return null;
   }
 
@@ -111,10 +193,34 @@ export const TraceConnectorLayer = ({
     >
       <svg
         className="trace-connector-layer__svg"
-        viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+        viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
         preserveAspectRatio="none"
       >
-        <path className="trace-connector-path trace-connector-path--placeholder" d={geometry.path} />
+        <defs>
+          <marker
+            id="trace-connector-arrow"
+            markerWidth="8"
+            markerHeight="8"
+            refX="6"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path d="M 0 0 L 6 3 L 0 6 z" fill="#60a5fa" />
+          </marker>
+        </defs>
+        {connectorPaths.length === 0 ? (
+          <path
+            className="trace-connector-path trace-connector-path--placeholder"
+            d={`M ${(viewBox.width * splitRatio) / 2} ${viewBox.height / 2} C ${(viewBox.width * splitRatio) / 2 + 48} ${
+              viewBox.height / 2
+            }, ${(viewBox.width * (1 + splitRatio)) / 2 - 48} ${viewBox.height / 2}, ${(viewBox.width * (1 + splitRatio)) / 2} ${
+              viewBox.height / 2
+            }`}
+          />
+        ) : (
+          connectorPaths.map((connector) => <path key={connector.id} className={connector.className} d={connector.path} />)
+        )}
       </svg>
     </div>
   );

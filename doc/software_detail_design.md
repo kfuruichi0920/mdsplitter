@@ -64,10 +64,10 @@
 #### 2.3.1 コネクタ描画関連コンポーネント（計画）
 | パス | 主な内容 | 備考 | 状況 |
 | --- | --- | --- | --- |
-| `src/renderer/components/TraceConnectorLayer.tsx` | 隣接する左右パネル間のコネクタを SVG で描画するレイヤ。 | SVG `<path>` ベース、パネルごとの仮想化・インタラクション対応。 | ⛔ |
-| `src/renderer/store/connectorLayoutStore.ts` | カード要素の位置情報と可視状態を保持するストア。 | ResizeObserver/MutationObserver を用いて DOM 位置をトラッキング。 | ⛔ |
-| `src/renderer/hooks/useConnectorLayout.ts` | カードコンポーネントから位置情報を登録/更新するフック。 | `CardPanel` 内のカード要素に適用し、アンカー座標を測定。 | ⛔ |
-| `src/shared/traceability.ts` | コネクタ定義（方向・種類・スタイル）の共通型。 | 後続フェーズでメイン/レンダラ間共有。 | ⛔ |
+| `src/renderer/components/TraceConnectorLayer.tsx` | 隣接する左右パネル間のコネクタを SVG で描画するレイヤ。 | SVG `<path>` ベース、パネルごとの仮想化・インタラクション対応。 | ⚠️ |
+| `src/renderer/store/connectorLayoutStore.ts` | カード要素の位置情報と可視状態を保持するストア。 | ResizeObserver/MutationObserver を用いて DOM 位置をトラッキング。 | ⚠️ |
+| `src/renderer/hooks/useConnectorLayout.ts` | カードコンポーネントから位置情報を登録/更新するフック。 | `CardPanel` 内のカード要素に適用し、アンカー座標を測定。 | ⚠️ |
+| `src/shared/traceability.ts` | コネクタ定義（方向・種類・スタイル）の共通型。 | 後続フェーズでメイン/レンダラ間共有。 | ⚠️ |
 
 ## 3. ユースケース一覧
 全ユースケースは仕様段階であり、現行コードには未実装。ステータスを明示する。
@@ -243,12 +243,16 @@ Deprecated --> Draft : 再利用
 
 ### 8.3 フェーズ別タスク細分化案
 - **P2-10a**: `TraceConnectorLayer` の土台を実装し、左右ペア判定と SVG コンテナの表示を行う。ダミー座標を用いた単一コネクタ描画でレンダリング経路を検証する。
-- **P2-10b**: `useConnectorLayout`/`connectorLayoutStore` を導入し、カード DOM からアンカー座標を収集。スクロール・リサイズに追従するよう更新処理を整備する。
-- **P2-10c**: スタブトレースデータとカード ID を紐付け、左右パネル双方で存在するカードのみコネクタ化。方向性・種別に応じたスタイル付与、ハイライト状態の受け口を設置。
-- **P2-11**: コネクタ描画の統合テスト（React Testing Library + DOMRect モック）と Storybook/Playwright 用のスタブシナリオを追加し、負荷検証の取っ掛かりを用意。
+- **P2-10b**: `useConnectorLayout`/`connectorLayoutStore` を導入し、カード DOM からアンカー座標を収集。スクロール・リサイズに追従するよう更新処理を整備する。→ 実装着手済み（ResizeObserver＋scroll イベントで計測）。
+- **P2-10c**: スタブトレースデータとカード ID を紐付け、左右パネル双方で存在するカードのみコネクタ化。方向性・種別に応じたスタイル付与、ハイライト状態の受け口を設置。→ 実装着手済み（`traceability.ts` にスタブ定義）。
+- **P2-11**: コネクタ描画の統合テスト（React Testing Library + DOMRect モック）と Storybook/Playwright 用のスタブシナリオを追加し、負荷検証の取っ掛かりを用意。→ 第一段として jest ベースのユニットテスト・Node ベンチスクリプトを整備。
 - **先行検討 (P2-12 以降)**: カード折畳みとの連動、トグル表示、ホバー/選択インタラクション、ライン編集 UI を順次追加。
 
 ### 8.4 将来拡張ポイント
 - コネクタ本数が閾値を超えた場合、SVG 内で `visibility` 切替と仮想化を行う。
 - トレーサビリティ編集機能（ドラッグ、新規作成）は専用 Interaction Layer を追加し、命令はストア経由でメインプロセスと同期する。
 - WebGL / Canvas へのスイッチを想定し、コネクタ描画ロジックはアダプタパターンで分離する。
+
+### 8.5 ベンチマーク・スタブシナリオ
+- `scripts/trace-benchmark.js` を追加し、100/500/1000/2000 本のコネクタ生成時間を計測する CLI (`npm run perf:trace`) を整備。
+- `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx` で DOMRect モックを用いた描画確認テストを追加し、P2-11a のスタブシナリオを最小構成で実現。

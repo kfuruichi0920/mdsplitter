@@ -10,9 +10,10 @@
  * @copyright MIT
  */
 
-import { useCallback, useMemo, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -77,6 +78,7 @@ export interface CardPanelProps {
  * タブバー、ツールバー、カード一覧を含むカードパネルを描画する。
  */
 export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
+  const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const leafTabs = useWorkspaceStore(
     useCallback((state) => {
       const leaf = state.leafs[leafId];
@@ -285,33 +287,23 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       </div>
 
       {/* カード一覧: 各カードをリスト表示 */}
-      <div className="panel-cards" role="list" id={activeTab ? `panel-${leafId}-${activeTab.id}` : undefined}>
-        {cards.map((card) => {
-          const isActive = card.id === selectedCardId;
-          const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
-          const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
-          return (
-            <article
-              key={card.id}
-              className={`card${isActive ? ' card--active' : ''}`}
-              aria-selected={isActive}
-              role="listitem"
-              tabIndex={0}
-              onClick={() => handleCardSelect(card)}
-              onKeyDown={(event) => handleCardKeyDown(event, card)}
-            >
-              <header className="card__header">
-                <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
-                <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
-                <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-                <span className="card__title">{card.title}</span>
-                <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
-              </header>
-              <p className="card__body">{card.body}</p>
-              <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
-            </article>
-          );
-        })}
+      <div
+        className="panel-cards"
+        role="list"
+        ref={panelScrollRef}
+        id={activeTab ? `panel-${leafId}-${activeTab.id}` : undefined}
+      >
+        {cards.map((card) => (
+          <CardListItem
+            key={card.id}
+            card={card}
+            leafId={leafId}
+            isActive={card.id === selectedCardId}
+            onSelect={handleCardSelect}
+            onKeyDown={handleCardKeyDown}
+            panelScrollRef={panelScrollRef}
+          />
+        ))}
         {cards.length === 0 && (
           <div className="panel-cards__empty" role="note">
             表示するカードがありません。
@@ -319,5 +311,42 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
         )}
       </div>
     </div>
+  );
+};
+
+interface CardListItemProps {
+  card: Card;
+  isActive: boolean;
+  leafId: string;
+  panelScrollRef: React.RefObject<HTMLDivElement | null>;
+  onSelect: (card: Card) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
+}
+
+const CardListItem = ({ card, isActive, leafId, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
+  const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, scrollContainerRef: panelScrollRef });
+  const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
+  const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+
+  return (
+    <article
+      className={`card${isActive ? ' card--active' : ''}`}
+      aria-selected={isActive}
+      role="listitem"
+      tabIndex={0}
+      ref={anchorRef}
+      onClick={() => onSelect(card)}
+      onKeyDown={(event) => onKeyDown(event, card)}
+    >
+      <header className="card__header">
+        <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+        <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+        <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+        <span className="card__title">{card.title}</span>
+        <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+      </header>
+      <p className="card__body">{card.body}</p>
+      <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
+    </article>
   );
 };

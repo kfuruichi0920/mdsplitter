@@ -12,9 +12,16 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
-import type { SplitNode } from '../store/splitStore';
+import type { SplitNode, SplitContainerNode as SplitContainerNodeType } from '../store/splitStore';
 import { useSplitStore } from '../store/splitStore';
 import { TraceConnectorLayer } from './TraceConnectorLayer';
+
+const collectLeafIds = (node: SplitNode): string[] => {
+  if (node.type === 'leaf') {
+    return [node.id];
+  }
+  return [...collectLeafIds(node.first), ...collectLeafIds(node.second)];
+};
 
 /**
  * @brief 分割コンテナコンポーネントのプロパティ。
@@ -51,16 +58,13 @@ const SplitContainerNode = ({
   node,
   renderLeaf,
 }: {
-  node: SplitNode;
+  node: SplitContainerNodeType;
   renderLeaf: (leafId: string) => ReactNode;
 }) => {
-  //! 葉ノードは型チェック用（実際は通らない）
-  if (node.type === 'leaf') {
-    return null;
-  }
-
   const updateSplitRatio = useSplitStore((state) => state.updateSplitRatio);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const leftLeafIds = useMemo(() => collectLeafIds(node.first), [node.first]);
+  const rightLeafIds = useMemo(() => collectLeafIds(node.second), [node.second]);
 
   /**
    * @brief 分割比率を更新するコールバック。
@@ -123,6 +127,8 @@ const SplitContainerNode = ({
         direction={node.direction}
         splitRatio={node.splitRatio}
         nodeId={node.id}
+        leftLeafIds={leftLeafIds}
+        rightLeafIds={rightLeafIds}
       />
     </div>
   );

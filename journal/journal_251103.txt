@@ -50,8 +50,15 @@
 - `src/renderer/App.test.tsx:52-177` と `src/renderer/store/workspaceStore.test.ts:1-169` のテストを更新。ワークスペースストアのタブ排他制御・タブ閉鎖挙動のユニットテストを追加し、App の統合テストは通知文の変更に合わせて期待値を調整。
 - `doc/software_detail_design.md:45-76,208-215` を更新。`workspaceStore` の説明をタブ管理仕様に差し替え、P2-09a/b で実装した多タブ・排他制御の概要と関係ファイルを追記。
 - `npm test -- workspaceStore`, `npm test -- App` を実行し、ユニット/統合テストがグリーンであることを確認。
+## P2-10a
 - `doc/software_detail_design.md:44-75,200-215` にトレーサビリティコネクタの実現方針 (SVG レイヤ、レイアウトストア、仮想化計画) を追記し、P2-10a〜P2-11b の細分化タスクを整理。
 - `task/task_all.md:27-35` を更新し、コネクタ描画フェーズのサブタスク (P2-10a〜P2-11b) を詳細化。
 - `src/renderer/components/TraceConnectorLayer.tsx` を新規追加。左右ペア検出のため `containerRef` を受け取り、P2-10a 向けダミーコネクタ（中央同士を結ぶベジェ曲線）を描画。
 - `src/renderer/components/SplitContainer.tsx:11-122` に `TraceConnectorLayer` を組み込み、垂直分割ノードに対して overlay を付与。`containerRef` を付与し、ノード方向・分割比率を渡す。
 - `src/renderer/styles.css:188-218` にコネクタレイヤ用のスタイル（`position:absolute`、`stroke-dasharray` 等）を追加し、`split-container` を `relative` に変更。
+## P2-10b
+- `src/renderer/store/connectorLayoutStore.ts` と `src/renderer/hooks/useConnectorLayout.ts` を実装し、ResizeObserver と scroll イベントでカード DOMRect を追跡 (P2-10b)。`CardPanel` のカード要素は `CardListItem` サブコンポーネントへ分離し、アンカー登録フックを適用。
+- `src/shared/traceability.ts` にスタブリンク 3 件を定義し、`TraceConnectorLayer.tsx` で左右パネルのカードアンカーからベジェパスを生成。方向・種別クラス、選択カード連動ハイライトを追加 (P2-10c)。
+- `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx` と `src/renderer/store/__tests__/connectorLayoutStore.test.ts` を追加し、Jest で描画/ストア挙動を検証。`scripts/trace-benchmark.js` と npm スクリプト `perf:trace` を用意し、100〜2000 本のコネクタ生成時間をログ出力できるようにした (P2-11a/b)。
+- `package.json` に `perf:trace` スクリプト、`doc/software_detail_design.md` にコネクタセクションの進捗・ベンチマーク記載を追記。
+- `npm test -- connectorLayoutStore`, `npm test -- TraceConnectorLayer`, `npm test -- App` を実行し、コネクタ関連の回帰を確認。

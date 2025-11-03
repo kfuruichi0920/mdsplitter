@@ -23,7 +23,8 @@
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
     "lint": "eslint \"{src,tests}/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "perf:trace": "node scripts/trace-benchmark.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
