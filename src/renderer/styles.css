@@ -330,4 +330,43 @@
   .notification__close {
     @apply rounded-full px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400;
   }
+
+  /* 分割コンテナ関連スタイル */
+  .split-container {
+    @apply h-full w-full;
+  }
+
+  .split-container--horizontal {
+    @apply flex flex-col;
+  }
+
+  .split-container--vertical {
+    @apply flex flex-row;
+  }
+
+  .split-leaf {
+    @apply h-full w-full overflow-hidden;
+  }
+
+  .splitter {
+    @apply relative bg-blue-200 transition-colors dark:bg-slate-700;
+  }
+
+  .splitter::after {
+    content: '';
+    @apply absolute inset-0 bg-blue-300 opacity-0 transition-opacity dark:bg-slate-600;
+  }
+
+  .splitter:hover::after,
+  .splitter:active::after {
+    @apply opacity-100;
+  }
+
+  .splitter--horizontal {
+    @apply h-1 cursor-row-resize;
+  }
+
+  .splitter--vertical {
+    @apply w-1 cursor-col-resize;
+  }
 }

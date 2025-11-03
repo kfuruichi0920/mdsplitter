@@ -1,0 +1,190 @@
+/**
+ * @file SplitContainer.tsx
+ * @brief 分割ノードを再帰的に描画するコンテナコンポーネント。
+ * @details
+ * 分割ノードツリーを走査し、葉ノードにはカードパネルを、分割ノードには
+ * Splitter コンポーネントで区切られた2つの子コンテナを描画する。
+ * @author K.Furuichi
+ * @date 2025-11-03
+ * @version 0.1
+ * @copyright MIT
+ */
+
+import type { CSSProperties, ReactNode } from 'react';
+import { useCallback, useMemo } from 'react';
+import type { SplitNode } from '../store/splitStore';
+import { useSplitStore } from '../store/splitStore';
+
+/**
+ * @brief 分割コンテナコンポーネントのプロパティ。
+ */
+export interface SplitContainerProps {
+  node: SplitNode; ///< 描画対象のノード。
+  renderLeaf: (leafId: string) => ReactNode; ///< 葉ノードを描画する関数。
+}
+
+/**
+ * @brief 分割コンテナコンポーネント。
+ * @details
+ * 再帰的に分割ノードツリーを描画する。葉ノードの場合は renderLeaf を呼び出し、
+ * 分割ノードの場合は Splitter で区切られた2つの SplitContainer を描画する。
+ */
+export const SplitContainer = ({ node, renderLeaf }: SplitContainerProps) => {
+  //! 葉ノードの場合、renderLeaf を呼び出して描画
+  if (node.type === 'leaf') {
+    return (
+      <div className="split-leaf" data-leaf-id={node.id} data-testid={`split-leaf-${node.id}`}>
+        {renderLeaf(node.id)}
+      </div>
+    );
+  }
+
+  //! 分割ノードの場合、Splitter で区切られた2つの子コンテナを描画
+  return <SplitContainerNode node={node} renderLeaf={renderLeaf} />;
+};
+
+/**
+ * @brief 分割ノードの内部コンポーネント（Hooks を使用）。
+ */
+const SplitContainerNode = ({
+  node,
+  renderLeaf,
+}: {
+  node: SplitNode;
+  renderLeaf: (leafId: string) => ReactNode;
+}) => {
+  if (node.type === 'leaf') {
+    //! このパスは通らないが、型チェックのために残す
+    return null;
+  }
+
+  const updateSplitRatio = useSplitStore((state) => state.updateSplitRatio);
+
+  /**
+   * @brief 分割比率を更新するコールバック。
+   * @param ratio 新しい分割比率（0.0 〜 1.0）。
+   */
+  const handleRatioChange = useCallback(
+    (ratio: number) => {
+      updateSplitRatio(node.id, ratio);
+    },
+    [node.id, updateSplitRatio],
+  );
+
+  const isHorizontal = node.direction === 'horizontal';
+  const containerClass = `split-container split-container--${node.direction}`;
+
+  //! 分割比率に基づいてグリッドテンプレートを計算
+  const gridTemplate = useMemo<string>(() => {
+    const firstPercent = node.splitRatio * 100;
+    const secondPercent = (1 - node.splitRatio) * 100;
+    return `${firstPercent}% 4px ${secondPercent}%`;
+  }, [node.splitRatio]);
+
+  const containerStyle = useMemo<CSSProperties>(() => {
+    if (isHorizontal) {
+      return {
+        display: 'grid',
+        gridTemplateRows: gridTemplate,
+        height: '100%',
+        width: '100%',
+      } satisfies CSSProperties;
+    }
+
+    return {
+      display: 'grid',
+      gridTemplateColumns: gridTemplate,
+      height: '100%',
+      width: '100%',
+    } satisfies CSSProperties;
+  }, [gridTemplate, isHorizontal]);
+
+  return (
+    <div className={containerClass} style={containerStyle} data-split-id={node.id}>
+      <SplitContainer node={node.first} renderLeaf={renderLeaf} />
+      <Splitter
+        direction={node.direction}
+        splitRatio={node.splitRatio}
+        onRatioChange={handleRatioChange}
+      />
+      <SplitContainer node={node.second} renderLeaf={renderLeaf} />
+    </div>
+  );
+};
+
+/**
+ * @brief 分割境界コンポーネントのプロパティ。
+ */
+interface SplitterProps {
+  direction: 'horizontal' | 'vertical'; ///< 分割方向。
+  splitRatio: number; ///< 現在の分割比率。
+  onRatioChange: (ratio: number) => void; ///< 分割比率変更時のコールバック。
+}
+
+/**
+ * @brief 分割境界コンポーネント。
+ * @details
+ * ドラッグ&ドロップで分割比率を変更できる境界線を描画する。
+ */
+const Splitter = ({ direction, splitRatio, onRatioChange }: SplitterProps) => {
+  const isHorizontal = direction === 'horizontal';
+  const splitterClass = `splitter splitter--${direction}`;
+
+  /**
+   * @brief ドラッグ開始処理。
+   * @param event PointerDown イベント。
+   */
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+
+      const container = event.currentTarget.parentElement;
+      if (!container) {
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+
+      /**
+       * @brief ドラッグ中の処理。
+       * @param moveEvent PointerMove イベント。
+       */
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (isHorizontal) {
+          const offset = moveEvent.clientY - rect.top;
+          const ratio = offset / rect.height;
+          onRatioChange(ratio);
+        } else {
+          const offset = moveEvent.clientX - rect.left;
+          const ratio = offset / rect.width;
+          onRatioChange(ratio);
+        }
+      };
+
+      /**
+       * @brief ドラッグ終了処理。
+       */
+      const handlePointerUp = () => {
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+      };
+
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+    },
+    [isHorizontal, onRatioChange],
+  );
+
+  return (
+    <div
+      className={splitterClass}
+      role="separator"
+      aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(splitRatio * 100)}
+      onPointerDown={handlePointerDown}
+    />
+  );
+};

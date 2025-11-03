@@ -24,12 +24,15 @@ import {
 } from './store/workspaceStore';
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
+import { useSplitStore } from './store/splitStore';
 import type { LogLevel } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
+import { SplitContainer } from './components/SplitContainer';
+import { CardPanel } from './components/CardPanel';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -47,53 +50,6 @@ const MAIN_MIN_HEIGHT = 280;
 const V_SEPARATOR = 4;
 /** 水平セパレータ高さ (px)。 */
 const H_SEPARATOR = 4;
-
-/** ステータスラベル表示用マッピング。 */
-const CARD_STATUS_LABEL: Record<CardStatus, string> = {
-  draft: 'Draft',
-  review: 'Review',
-  approved: 'Approved',
-  deprecated: 'Deprecated',
-};
-
-/** ステータスバッジ用クラス名マッピング。 */
-const CARD_STATUS_CLASS: Record<CardStatus, string> = {
-  draft: 'card__status card__status--draft',
-  review: 'card__status card__status--review',
-  approved: 'card__status card__status--approved',
-  deprecated: 'card__status card__status--deprecated',
-};
-
-/** カード種別に応じたアイコン。 */
-const CARD_KIND_ICON: Record<CardKind, string> = {
-  heading: '🔖',
-  paragraph: '📝',
-  bullet: '📍',
-  figure: '📊',
-  table: '📅',
-  test: '🧪',
-  qa: '💬',
-};
-
-/**
- * @brief トレース接合点の記号を返す。
- * @param hasTrace トレース有無。
- * @return 表示記号。
- */
-const connectorSymbol = (hasTrace: boolean): string => (hasTrace ? '●' : '○');
-
-/**
- * @brief ISO8601日時文字列をローカライズして表示する。
- * @param value ISO8601文字列。
- * @return ローカライズした日時文字列。
- */
-const formatUpdatedAt = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '---';
-  }
-  return date.toLocaleString();
-};
 
 /**
  * @brief カードIDから `#001` 形式の番号を生成する。
@@ -119,9 +75,6 @@ type LogEntry = {
   message: string; ///< メッセージ本文。
   timestamp: Date; ///< 記録時刻。
 };
-
-/** パネル分割モード。 */
-type SplitMode = 'single' | 'vertical' | 'horizontal';
 
 const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
 
@@ -165,7 +118,6 @@ export const App = () => {
   const [isDirty, setDirty] = useState<boolean>(false); ///< 未保存状態フラグ。
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null); ///< 最終保存時刻。
-  const [splitMode, setSplitMode] = useState<SplitMode>('single'); ///< 現在のパネル分割モード。
   const cards = useWorkspaceStore((state) => state.cards);
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
@@ -175,6 +127,10 @@ export const App = () => {
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
+  const splitRoot = useSplitStore((state) => state.root);
+  const splitLeaf = useSplitStore((state) => state.splitLeaf);
+  const activeLeafId = useSplitStore((state) => state.activeLeafId);
+  const setActiveLeaf = useSplitStore((state) => state.setActiveLeaf);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const hasInitializedCards = useRef<boolean>(false); ///< 初期カードロード判定。
@@ -461,39 +417,20 @@ export const App = () => {
   }, [theme]);
 
   /**
-   * @brief カードを選択する。
-   * @param card 対象カード。
+   * @brief ログエントリをプッシュするラッパー（CardPanel に渡す用）。
+   * @param level ログレベル。
+   * @param message メッセージ。
    */
-  const handleCardSelect = useCallback(
-    (card: Card) => {
-      if (card.id === selectedCardId) {
-        return;
-      }
-      selectCard(card.id);
+  const handleLog = useCallback(
+    (level: 'INFO' | 'WARN' | 'ERROR', message: string) => {
       pushLog({
-        id: `select-${card.id}-${Date.now()}`,
-        level: 'INFO',
-        message: `カード「${card.title}」を選択しました。`,
+        id: `${level.toLowerCase()}-${Date.now()}`,
+        level,
+        message,
         timestamp: new Date(),
       });
     },
-    [pushLog, selectCard, selectedCardId],
-  );
-
-  /**
-   * @brief キーボード操作でカードを選択する。
-   * @param event キーイベント。
-   * @param card 対象カード。
-   */
-  const handleCardKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLElement>, card: Card) => {
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
-      }
-      event.preventDefault();
-      handleCardSelect(card);
-    },
-    [handleCardSelect],
+    [pushLog],
   );
 
   /**
@@ -515,7 +452,7 @@ export const App = () => {
     pushLog({
       id: `cycle-${selectedCard.id}-${Date.now()}`,
       level: 'INFO',
-      message: `カード「${selectedCard.title}」のステータスを ${CARD_STATUS_LABEL[nextStatus]} に変更しました。`,
+      message: `カード「${selectedCard.title}」のステータスを ${nextStatus} に変更しました。`,
       timestamp: new Date(),
     });
   }, [cycleCardStatus, pushLog, selectedCard]);
@@ -619,40 +556,36 @@ export const App = () => {
   }, [cards, isDirty, isSaving, notify, pushLog]);
 
   /**
-   * @brief パネル分割モードを切り替える。
-   * @param mode 適用する分割モード。
+   * @brief パネル分割を実行する。
+   * @param direction 分割方向。
    */
   const handleSplit = useCallback(
-    (mode: Exclude<SplitMode, 'single'>) => {
-      const nextMode: SplitMode = splitMode === mode ? 'single' : mode;
-      if (nextMode === splitMode) {
-        return;
-      }
-
-      setSplitMode(nextMode);
-      const now = new Date();
-
-      if (nextMode === 'single') {
-        notify('info', 'パネル分割を解除しました。');
+    (direction: 'horizontal' | 'vertical') => {
+      //! アクティブな葉ノードがあればそれを分割、なければルートを分割
+      const targetLeafId = activeLeafId ?? splitRoot.id;
+      if (splitRoot.type === 'split' && !activeLeafId) {
+        notify('warning', '分割対象のパネルを選択してください。');
         pushLog({
-          id: `split-reset-${now.valueOf()}`,
-          level: 'INFO',
-          message: 'パネル分割を解除しました。',
-          timestamp: now,
+          id: `split-no-target-${Date.now()}`,
+          level: 'WARN',
+          message: '分割対象のパネルが選択されていません。',
+          timestamp: new Date(),
         });
         return;
       }
 
-      const modeLabel = nextMode === 'vertical' ? '垂直' : '水平';
+      splitLeaf(targetLeafId, direction);
+      const now = new Date();
+      const modeLabel = direction === 'vertical' ? '左右' : '上下';
       notify('info', `パネルを${modeLabel}分割しました。`);
       pushLog({
-        id: `split-${nextMode}-${now.valueOf()}`,
+        id: `split-${direction}-${now.valueOf()}`,
         level: 'INFO',
         message: `パネルを${modeLabel}分割しました。`,
         timestamp: now,
       });
     },
-    [notify, pushLog, splitMode],
+    [activeLeafId, notify, pushLog, splitLeaf, splitRoot],
   );
 
   /**
@@ -811,9 +744,6 @@ export const App = () => {
     : isDirty
       ? '保存状態: ● 未保存'
       : `保存状態: ✓ 保存済み${lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString()})` : ''}`;
-  const splitGridClass = `split-grid split-grid--${splitMode}`;
-  const isVerticalSplit = splitMode === 'vertical';
-  const isHorizontalSplit = splitMode === 'horizontal';
 
   const handleExplorerToggle = useCallback(() => {
     setExplorerOpen((prev) => !prev);
@@ -914,21 +844,11 @@ export const App = () => {
           </button>
         </div>
         <div className="toolbar-group">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => handleSplit('horizontal')}
-            aria-pressed={isHorizontalSplit}
-          >
-            ⇅ 水平分割
+          <button type="button" className="toolbar-button" onClick={() => handleSplit('horizontal')}>
+            ⇅ 上下分割
           </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => handleSplit('vertical')}
-            aria-pressed={isVerticalSplit}
-          >
-            ⇆ 垂直分割
+          <button type="button" className="toolbar-button" onClick={() => handleSplit('vertical')}>
+            ⇆ 左右分割
           </button>
         </div>
         <div className="toolbar-spacer" />
@@ -1020,82 +940,10 @@ export const App = () => {
           />
 
           <section className="panels" aria-label="カードパネル領域">
-            <div className={splitGridClass} data-split-mode={splitMode} data-testid="panel-grid">
-              <div className="split-node">
-                <div className="tab-bar">
-                  <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 overview.md</button>
-                  <button type="button" className="tab-bar__tab">📄 detail.md ●</button>
-                  <button type="button" className="tab-bar__tab">➕</button>
-                </div>
-
-                <div className="panel-toolbar">
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">⏬ 展開</button>
-                    <button type="button" className="panel-toolbar__button">⏫ 折畳</button>
-                  </div>
-                  <div className="panel-toolbar__group">
-                    <input className="panel-toolbar__input" placeholder="👓 文字列フィルタ" />
-                    <button type="button" className="panel-toolbar__button">📚 カード種別</button>
-                    <button type="button" className="panel-toolbar__button">🧐 トレースのみ</button>
-                  </div>
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
-                  </div>
-                  <div className="panel-toolbar__spacer" />
-                  <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
-                </div>
-
-                <div className="panel-cards" role="list">
-                  {cards.map((card) => {
-                    const isActive = card.id === selectedCardId;
-                    const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
-                    const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
-                    return (
-                      <article
-                        key={card.id}
-                        className={`card${isActive ? ' card--active' : ''}`}
-                        aria-selected={isActive}
-                        role="listitem"
-                        tabIndex={0}
-                        onClick={() => handleCardSelect(card)}
-                        onKeyDown={(event) => handleCardKeyDown(event, card)}
-                      >
-                        <header className="card__header">
-                          <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
-                          <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
-                          <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-                          <span className="card__title">{card.title}</span>
-                          <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
-                        </header>
-                        <p className="card__body">{card.body}</p>
-                        <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-              {splitMode !== 'single' && (
-                <div className="split-node">
-                  <div className="tab-bar">
-                    <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 trace.json</button>
-                    <button type="button" className="tab-bar__tab">➕</button>
-                  </div>
-                  <div className="panel-toolbar">
-                    <div className="panel-toolbar__group">
-                      <button type="button" className="panel-toolbar__button">⏭️ 展開</button>
-                      <button type="button" className="panel-toolbar__button">⏮️ 折畳</button>
-                    </div>
-                    <div className="panel-toolbar__group">
-                      <button type="button" className="panel-toolbar__button">トレーサ種別</button>
-                      <button type="button" className="panel-toolbar__button">☰ 表示</button>
-                    </div>
-                    <div className="panel-toolbar__spacer" />
-                    <div className="panel-toolbar__meta">カード総数: --</div>
-                  </div>
-                  <div className="panel-placeholder">トレーサビリティコネクタのプレビュー領域</div>
-                </div>
-              )}
-            </div>
+            <SplitContainer
+              node={splitRoot}
+              renderLeaf={(leafId) => <CardPanel leafId={leafId} onLog={handleLog} />}
+            />
           </section>
         </div>
 
