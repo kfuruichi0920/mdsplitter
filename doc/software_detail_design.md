@@ -175,6 +175,7 @@ Deprecated --> Draft : 再利用
 - フェーズ P2-02: `app.getPath('userData')` 配下に `_input/_out/_logs` を自動生成し、サンプル入出力ファイルと初期ログを配置するワークスペース初期化を実装。
 - フェーズ P2-03: ファイルロガーを実装し、ログレベル設定とサイズローテーションに対応。レンダラからのログ送信 API を整備し、設定変更時にロガーへ反映するよう調整。
 - フェーズ P2-04: 共通通知コンポーネントと Zustand ストアを実装し、テーマ設定やエラーハンドリングで再利用。Tailwind スタイルでトースト表示を整備し、自動消去と手動閉じを提供。
+- フェーズ P2-05: `src/renderer/App.tsx:340-720` で保存 (`Ctrl+S`)、水平/垂直分割 (`Ctrl+Shift+\\` / `Ctrl+\\`)、検索 (`Ctrl+F`) のショートカットマッピングと保存状態管理 (`isDirty`/`isSaving`) を実装。`src/shared/workspace.ts:1-45` にカードモデル/スナップショット共通型を定義し、`src/main/preload.ts:35-69`・`src/main/main.ts:82-123`・`src/main/workspace.ts:19-158` で `workspace:save` IPC を通じて `_out/workspace.snapshot.json` へ永続化。保存状態とパネル分割モードをステータスバー (`App.tsx:640-650`) と `split-grid` レイアウト (`App.tsx:795-818`, `styles.css:157-184`) に反映し、`src/renderer/App.test.tsx:87-140` でショートカット操作と保存処理の UI テストを追加。
 - P1-05 追加対応: 文字サイズと余白を見直し、全 UI をコンパクト表示（text-sm 基準、ツールバー/ステータスバー高さ縮小、ログエリア 112px）へ調整。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。

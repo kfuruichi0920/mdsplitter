@@ -62,6 +62,10 @@
     @apply inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-blue-200 dark:hover:bg-slate-700;
   }
 
+  .toolbar-button:disabled {
+    @apply cursor-not-allowed opacity-60 hover:bg-blue-100 dark:hover:bg-slate-800;
+  }
+
   .workspace {
     @apply grid min-h-0 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
   }
@@ -155,7 +159,24 @@
   }
 
   .split-grid {
-    @apply grid h-full gap-3 overflow-auto p-3 md:grid-cols-2;
+    @apply grid h-full gap-3 overflow-auto p-3;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .split-grid--single {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .split-grid--vertical {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .split-grid--horizontal {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
   }
 
   .split-node {

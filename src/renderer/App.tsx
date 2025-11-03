@@ -25,6 +25,7 @@ import {
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import type { LogLevel } from '@/shared/settings';
+import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
@@ -118,6 +119,9 @@ type LogEntry = {
   timestamp: Date; ///< 記録時刻。
 };
 
+/** パネル分割モード。 */
+type SplitMode = 'single' | 'vertical' | 'horizontal';
+
 const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
 
 /**
@@ -143,6 +147,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => {
 export const App = () => {
   const workspaceRef = useRef<HTMLDivElement | null>(null); ///< ワークスペース全体。
   const contentRef = useRef<HTMLDivElement | null>(null); ///< サイドバー+カード領域。
+  const searchInputRef = useRef<HTMLInputElement | null>(null); ///< 検索入力フィールド。
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
@@ -156,6 +161,10 @@ export const App = () => {
     },
   ]);
 
+  const [isDirty, setDirty] = useState<boolean>(false); ///< 未保存状態フラグ。
+  const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null); ///< 最終保存時刻。
+  const [splitMode, setSplitMode] = useState<SplitMode>('single'); ///< 現在のパネル分割モード。
   const cards = useWorkspaceStore((state) => state.cards);
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
@@ -165,10 +174,19 @@ export const App = () => {
   const notify = useNotificationStore((state) => state.add);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
+  const hasInitializedCards = useRef<boolean>(false); ///< 初期カードロード判定。
 
   const selectedCard = useMemo<Card | null>(() => {
     return cards.find((card) => card.id === selectedCardId) ?? null;
   }, [cards, selectedCardId]);
+
+  useEffect(() => {
+    if (!hasInitializedCards.current) {
+      hasInitializedCards.current = true;
+      return;
+    }
+    setDirty(true);
+  }, [cards]);
 
   /**
    * @brief ログエントリを追加する。
@@ -362,7 +380,139 @@ export const App = () => {
       message: `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
       timestamp: new Date(),
     });
-  }, [pushLog, setThemeStore, theme]);
+  }, [notify, pushLog, setThemeStore, theme]);
+
+  /**
+   * @brief ワークスペースを保存する。
+   */
+  const handleSave = useCallback(async () => {
+    if (isSaving) {
+      notify('info', '保存処理が進行中です。');
+      return;
+    }
+
+    if (!isDirty) {
+      const now = new Date();
+      notify('info', '保存対象の変更はありません。');
+      pushLog({
+        id: `save-skip-${now.valueOf()}`,
+        level: 'INFO',
+        message: '保存操作を実行しましたが未保存の変更はありませんでした。',
+        timestamp: now,
+      });
+      return;
+    }
+
+    const saveApi = window.app?.workspace?.save;
+    if (!saveApi) {
+      const now = new Date();
+      notify('error', '保存APIが利用できません。再起動後に再試行してください。');
+      pushLog({
+        id: `save-missing-${now.valueOf()}`,
+        level: 'ERROR',
+        message: 'workspace.save API が未定義のため保存を実行できませんでした。',
+        timestamp: now,
+      });
+      return;
+    }
+
+    const startedAt = new Date();
+    setSaving(true);
+    try {
+      const snapshot: WorkspaceSnapshot = {
+        cards,
+        savedAt: startedAt.toISOString(),
+      };
+
+      const result = await saveApi(snapshot);
+      setDirty(false);
+      setLastSavedAt(startedAt);
+      notify('success', 'ワークスペースを保存しました。');
+      pushLog({
+        id: `save-${startedAt.valueOf()}`,
+        level: 'INFO',
+        message: `ワークスペースを保存しました (出力: ${result?.path ?? '不明'})。`,
+        timestamp: startedAt,
+      });
+    } catch (error) {
+      console.error('[renderer] failed to save workspace', error);
+      const failedAt = new Date();
+      notify('error', 'ワークスペースの保存に失敗しました。ログを確認してください。');
+      pushLog({
+        id: `save-failed-${failedAt.valueOf()}`,
+        level: 'ERROR',
+        message: 'ワークスペースの保存に失敗しました。コンソールログを確認してください。',
+        timestamp: failedAt,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [cards, isDirty, isSaving, notify, pushLog]);
+
+  /**
+   * @brief パネル分割モードを切り替える。
+   * @param mode 適用する分割モード。
+   */
+  const handleSplit = useCallback(
+    (mode: Exclude<SplitMode, 'single'>) => {
+      const nextMode: SplitMode = splitMode === mode ? 'single' : mode;
+      if (nextMode === splitMode) {
+        return;
+      }
+
+      setSplitMode(nextMode);
+      const now = new Date();
+
+      if (nextMode === 'single') {
+        notify('info', 'パネル分割を解除しました。');
+        pushLog({
+          id: `split-reset-${now.valueOf()}`,
+          level: 'INFO',
+          message: 'パネル分割を解除しました。',
+          timestamp: now,
+        });
+        return;
+      }
+
+      const modeLabel = nextMode === 'vertical' ? '垂直' : '水平';
+      notify('info', `パネルを${modeLabel}分割しました。`);
+      pushLog({
+        id: `split-${nextMode}-${now.valueOf()}`,
+        level: 'INFO',
+        message: `パネルを${modeLabel}分割しました。`,
+        timestamp: now,
+      });
+    },
+    [notify, pushLog, splitMode],
+  );
+
+  /**
+   * @brief 検索パネルを開いて検索欄へフォーカスする。
+   */
+  const openSearchPanel = useCallback(() => {
+    const focusInput = () => {
+      window.setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }, 0);
+    };
+
+    if (!isSearchOpen) {
+      setSearchOpen(true);
+      const now = new Date();
+      notify('info', '検索パネルを表示しました。');
+      pushLog({
+        id: `search-open-${now.valueOf()}`,
+        level: 'INFO',
+        message: '検索パネルを表示しました。',
+        timestamp: now,
+      });
+      focusInput();
+      return;
+    }
+
+    focusInput();
+  }, [isSearchOpen, notify, pushLog]);
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {
@@ -487,14 +637,78 @@ export const App = () => {
   const selectedDisplayNumber = toDisplayNumber(cards, selectedCardId);
   const themeLabel = theme === 'dark' ? 'ダークモード' : 'ライトモード';
   const themeButtonLabel = theme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード';
+  const saveStatusText = isSaving
+    ? '保存状態: ⏳ 保存中...'
+    : isDirty
+      ? '保存状態: ● 未保存'
+      : `保存状態: ✓ 保存済み${lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString()})` : ''}`;
+  const splitGridClass = `split-grid split-grid--${splitMode}`;
+  const isVerticalSplit = splitMode === 'vertical';
+  const isHorizontalSplit = splitMode === 'horizontal';
 
   const handleExplorerToggle = useCallback(() => {
     setExplorerOpen((prev) => !prev);
   }, []);
 
   const handleSearchToggle = useCallback(() => {
-    setSearchOpen((prev) => !prev);
-  }, []);
+    if (isSearchOpen) {
+      setSearchOpen(false);
+      const now = new Date();
+      notify('info', '検索パネルを非表示にしました。');
+      pushLog({
+        id: `search-close-${now.valueOf()}`,
+        level: 'INFO',
+        message: '検索パネルを非表示にしました。',
+        timestamp: now,
+      });
+      return;
+    }
+    openSearchPanel();
+  }, [isSearchOpen, notify, openSearchPanel, pushLog]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      const platform = window.navigator?.platform ?? '';
+      const isMac = platform.toLowerCase().includes('mac');
+      const primaryPressed = isMac ? event.metaKey : event.ctrlKey;
+
+      if (!primaryPressed) {
+        return;
+      }
+
+      if (event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === 's' && !event.shiftKey) {
+        event.preventDefault();
+        void handleSave();
+        return;
+      }
+
+      if (key === 'f' && !event.shiftKey) {
+        event.preventDefault();
+        openSearchPanel();
+        return;
+      }
+
+      if (event.key === '\\' && !event.shiftKey) {
+        event.preventDefault();
+        handleSplit('vertical');
+        return;
+      }
+
+      if ((event.key === '\\' && event.shiftKey) || event.key === '|') {
+        event.preventDefault();
+        handleSplit('horizontal');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave, handleSplit, openSearchPanel]);
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
@@ -511,7 +725,17 @@ export const App = () => {
       <section className="top-toolbar" aria-label="グローバルツールバー">
         <div className="toolbar-group">
           <button type="button" className="toolbar-button">📂 開く</button>
-          <button type="button" className="toolbar-button">💾 保存</button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={isSaving}
+            aria-disabled={isSaving}
+          >
+            💾 保存
+          </button>
         </div>
         <div className="toolbar-group">
           <button type="button" className="toolbar-button">⛓️ トレース</button>
@@ -521,8 +745,22 @@ export const App = () => {
           </button>
         </div>
         <div className="toolbar-group">
-          <button type="button" className="toolbar-button">⇅ 水平分割</button>
-          <button type="button" className="toolbar-button">⇆ 垂直分割</button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('horizontal')}
+            aria-pressed={isHorizontalSplit}
+          >
+            ⇅ 水平分割
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('vertical')}
+            aria-pressed={isVerticalSplit}
+          >
+            ⇆ 垂直分割
+          </button>
         </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-group toolbar-group--right">
@@ -589,7 +827,13 @@ export const App = () => {
                 <label className="sidebar__label" htmlFor="sidebar-search">
                   🔍 検索
                 </label>
-                <input id="sidebar-search" className="sidebar__search" type="search" placeholder="キーワードを入力" />
+                <input
+                  id="sidebar-search"
+                  ref={searchInputRef}
+                  className="sidebar__search"
+                  type="search"
+                  placeholder="キーワードを入力"
+                />
               </div>
             </div>
           </aside>
@@ -607,7 +851,7 @@ export const App = () => {
           />
 
           <section className="panels" aria-label="カードパネル領域">
-            <div className="split-grid">
+            <div className={splitGridClass} data-split-mode={splitMode} data-testid="panel-grid">
               <div className="split-node">
                 <div className="tab-bar">
                   <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 overview.md</button>
@@ -661,26 +905,27 @@ export const App = () => {
                   })}
                 </div>
               </div>
-
-              <div className="split-node">
-                <div className="tab-bar">
-                  <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 trace.json</button>
-                  <button type="button" className="tab-bar__tab">➕</button>
-                </div>
-                <div className="panel-toolbar">
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">⏭️ 展開</button>
-                    <button type="button" className="panel-toolbar__button">⏮️ 折畳</button>
+              {splitMode !== 'single' && (
+                <div className="split-node">
+                  <div className="tab-bar">
+                    <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 trace.json</button>
+                    <button type="button" className="tab-bar__tab">➕</button>
                   </div>
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">トレーサ種別</button>
-                    <button type="button" className="panel-toolbar__button">☰ 表示</button>
+                  <div className="panel-toolbar">
+                    <div className="panel-toolbar__group">
+                      <button type="button" className="panel-toolbar__button">⏭️ 展開</button>
+                      <button type="button" className="panel-toolbar__button">⏮️ 折畳</button>
+                    </div>
+                    <div className="panel-toolbar__group">
+                      <button type="button" className="panel-toolbar__button">トレーサ種別</button>
+                      <button type="button" className="panel-toolbar__button">☰ 表示</button>
+                    </div>
+                    <div className="panel-toolbar__spacer" />
+                    <div className="panel-toolbar__meta">カード総数: --</div>
                   </div>
-                  <div className="panel-toolbar__spacer" />
-                  <div className="panel-toolbar__meta">カード総数: --</div>
+                  <div className="panel-placeholder">トレーサビリティコネクタのプレビュー領域</div>
                 </div>
-                <div className="panel-placeholder">トレーサビリティコネクタのプレビュー領域</div>
-              </div>
+              )}
             </div>
           </section>
         </div>
@@ -732,7 +977,7 @@ export const App = () => {
         <div className="status-bar__section">
           <span>総カード数: {cardCount}</span>
           <span>選択カード: {selectedDisplayNumber}</span>
-          <span>保存状態: ● 未保存</span>
+          <span>{saveStatusText}</span>
         </div>
         <div className="status-bar__section status-bar__section--right">
           <span>文字コード: UTF-8</span>

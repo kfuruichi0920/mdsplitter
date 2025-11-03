@@ -20,7 +20,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 
 import type { LogLevel } from '../shared/settings';
 
-import { initializeWorkspace, loadSettings, updateSettings } from './workspace';
+import { initializeWorkspace, loadSettings, saveWorkspaceSnapshot, updateSettings } from './workspace';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
@@ -106,6 +106,20 @@ ipcMain.handle('log:write', async (_event, payload: { level: LogLevel; message: 
 
   logMessage(payload.level, payload.message);
   return { ok: true };
+});
+
+ipcMain.handle('workspace:save', async (_event, snapshot) => {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('Invalid workspace payload');
+  }
+
+  if (!Array.isArray(snapshot.cards)) {
+    throw new Error('Workspace payload requires cards array');
+  }
+
+  const path = await saveWorkspaceSnapshot(snapshot);
+  logMessage('info', `ワークスペースを保存しました: ${path}`);
+  return { path };
 });
 
 

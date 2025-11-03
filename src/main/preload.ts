@@ -17,6 +17,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
+import type { WorkspaceSnapshot } from '../shared/workspace';
 
 
 /**
@@ -41,6 +42,10 @@ type AppAPI = {
   };
   /** ログを書き込む。 */
   log: (level: LogLevel, message: string) => Promise<void>;
+  workspace: {
+    /** カードスナップショットを保存する。 */
+    save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+  };
 };
 
 
@@ -56,6 +61,9 @@ const api: AppAPI = {
     update: async (patch: AppSettingsPatch) => ipcRenderer.invoke('settings:update', patch),
   },
   log: async (level: LogLevel, message: string) => ipcRenderer.invoke('log:write', { level, message }),
+  workspace: {
+    save: async (snapshot: WorkspaceSnapshot) => ipcRenderer.invoke('workspace:save', snapshot),
+  },
 };
 
 

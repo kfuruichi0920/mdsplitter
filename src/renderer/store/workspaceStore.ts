@@ -13,41 +13,17 @@
 
 import { create } from 'zustand';
 
-/** カードの表示種別。 */
-export type CardKind = 'heading' | 'paragraph' | 'bullet' | 'figure' | 'table' | 'test' | 'qa';
+import {
+  CARD_STATUS_SEQUENCE,
+  getNextCardStatus,
+  type Card,
+  type CardKind,
+  type CardPatch,
+  type CardStatus,
+} from '@/shared/workspace';
 
-/** カードのステータス。 */
-export type CardStatus = 'draft' | 'review' | 'approved' | 'deprecated';
-
-/** カード情報を表す構造体。 */
-export interface Card {
-  id: string; ///< 一意識別子。
-  title: string; ///< タイトルもしくは先頭行。
-  body: string; ///< 本文。
-  status: CardStatus; ///< 現在のステータス。
-  kind: CardKind; ///< 表示種別。
-  hasLeftTrace: boolean; ///< 左接合点のトレース有無。
-  hasRightTrace: boolean; ///< 右接合点のトレース有無。
-  updatedAt: string; ///< 最終更新日時 (ISO8601)。
-}
-
-/** カード更新用パッチ。 */
-export type CardPatch = Partial<Omit<Card, 'id'>>;
-
-/** ステータス遷移順序。 */
-export const CARD_STATUS_SEQUENCE: CardStatus[] = ['draft', 'review', 'approved', 'deprecated'];
-
-/**
- * @brief カードステータスを次段に遷移させる。
- * @param current 現在のステータス。
- * @return 遷移後のステータス。
- */
-export const getNextCardStatus = (current: CardStatus): CardStatus => {
-  const index = CARD_STATUS_SEQUENCE.indexOf(current);
-  //! 未定義ステータスの場合も循環列の先頭にフォールバックする
-  const nextIndex = index === -1 ? 0 : (index + 1) % CARD_STATUS_SEQUENCE.length;
-  return CARD_STATUS_SEQUENCE[nextIndex];
-};
+export { CARD_STATUS_SEQUENCE, getNextCardStatus };
+export type { Card, CardKind, CardPatch, CardStatus };
 
 /** ワークスペースストアの状態とアクション。 */
 export interface WorkspaceStore {

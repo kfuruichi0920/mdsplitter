@@ -1,0 +1,8 @@
+# 2025-11-03 作業記録
+## P2-05 ショートカットキー実装
+- `src/renderer/App.tsx:146-452` に保存状態管理 (`isDirty`/`isSaving`/`lastSavedAt`) と `handleSave`/`handleSplit`/`openSearchPanel`/`useEffect`(グローバル `keydown`) を実装し、`Ctrl+S`/`Ctrl+\\`/`Ctrl+Shift+\\`/`Ctrl+F` を処理。保存API未定義時のガードと保存中の二重起動防止、検索ショートカット時の入力フォーカス制御を追加。
+- `src/renderer/App.tsx:640-818` でステータスバーの `saveStatusText`、保存ボタンの `disabled` 制御、`split-grid` の `data-split-mode` とセカンダリパネル表示切替を調整。`src/renderer/styles.css:157-184` へ分割レイアウト/保存ボタンの無効化スタイルを反映。
+- `src/shared/workspace.ts:1-45` にカードモデルと `WorkspaceSnapshot` を集約し、`src/main/preload.ts:35-69`・`src/main/main.ts:82-123`・`src/main/workspace.ts:19-158` で `workspace:save` IPC を定義。レンダラー保存処理と連携して `_out/workspace.snapshot.json` へ永続化できるようにした。
+- `src/renderer/App.test.tsx:49-140` を更新し、`Ctrl+S` 実行時にカード変更→保存API呼び出し→状態更新までを `waitFor` で検証。分割／検索ショートカットのテストも最新挙動に追従。
+- `doc/software_detail_design.md:170-179` の P2-05 節を更新し、保存API導入と関連モジュールへの参照を追記。
+- `npm run test:unit` を実行し、全 8 スイート成功を確認。

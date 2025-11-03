@@ -1,4 +1,5 @@
 import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
+import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 export {};
 
@@ -11,6 +12,9 @@ declare global {
         update: (patch: AppSettingsPatch) => Promise<AppSettings>;
       };
       log: (level: LogLevel, message: string) => Promise<void>;
+      workspace: {
+        save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+      };
     };
   }
 }
