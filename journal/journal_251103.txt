@@ -42,3 +42,11 @@
   1. ユーザーの環境で実際にアプリを起動すると正常に表示される可能性がある（WSL2での実行制限のため、本環境では視覚的確認ができない）
   2. ユーザーが `.js` 拡張子と誤認している（実際は `.json`）
   3. ユーザーの環境で何らかのキャッシュ問題や初期化問題が発生している
+## P2-09a/b タブ管理実装
+- `src/renderer/store/workspaceStore.ts:1-231` を多タブ対応へ全面改修。`PanelTabState`/`LeafWorkspaceState` を定義し、`openTab/closeTab/closeLeaf` で葉ノードごとのタブ配列と `fileToLeaf` マップを更新。カード更新 (`updateCard`/`cycleCardStatus`)、保存フラグ (`markSaved`) をタブ単位で管理するよう実装。
+- `src/renderer/components/CardPanel.tsx:1-235` をタブバー実装に刷新。Zustand ストアから葉ノードのタブ一覧を取得して動的に描画し、タブ選択・タブ閉じ・空状態表示を追加。カードリストはアクティブタブのカードを参照し、選択/ログ出力を葉ノードIDと関連付け。
+- `src/renderer/styles.css:192-235` にタブ用スタイル (`tab-bar__tab-container` / `tab-bar__tab-close` / `tab-bar__tab-dirty` 等) と空表示スタイルを追加し、新UI に合わせて調整。
+- `src/renderer/App.tsx:107-724` でタブストアの新APIを利用するよう更新。アクティブ葉ノードのタブ状態から `cards`/`selectedCardId`/`isDirty`/`lastSavedAt` を取得し、保存 (`handleSave`)、カードファイル読み込み (`handleLoadCardFile`)、ワークスペース初期読み込み、ステータス更新をタブ単位で処理。葉ノード閉鎖時に `closeLeaf` を呼び出すよう変更。
+- `src/renderer/App.test.tsx:52-177` と `src/renderer/store/workspaceStore.test.ts:1-169` のテストを更新。ワークスペースストアのタブ排他制御・タブ閉鎖挙動のユニットテストを追加し、App の統合テストは通知文の変更に合わせて期待値を調整。
+- `doc/software_detail_design.md:45-76,208-215` を更新。`workspaceStore` の説明をタブ管理仕様に差し替え、P2-09a/b で実装した多タブ・排他制御の概要と関係ファイルを追記。
+- `npm test -- workspaceStore`, `npm test -- App` を実行し、ユニット/統合テストがグリーンであることを確認。

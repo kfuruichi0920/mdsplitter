@@ -241,9 +241,7 @@ describe('App', () => {
 
     render(<App />);
 
-    await waitFor(() =>
-      expect(screen.getByText('保存済みワークスペースを読み込みました (無効カード 1 件)。')).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(document.body.textContent).toContain('除外したカード'));
     expect(screen.getAllByText(/カード総数: 1/).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('invalid-card')).not.toBeInTheDocument();
   });

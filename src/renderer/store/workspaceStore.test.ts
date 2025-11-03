@@ -2,11 +2,7 @@
  * @file workspaceStore.test.ts
  * @brief ワークスペースストアの単体テスト。
  * @details
- * useWorkspaceStoreの初期化・カード選択・更新・ステータス遷移を検証。
- * @author K.Furuichi
- * @date 2025-11-03
- * @version 0.1
- * @copyright MIT
+ * 分割パネルごとのタブ管理とカード操作の挙動を検証する。
  */
 import { act } from '@testing-library/react';
 
@@ -14,71 +10,178 @@ import {
   getNextCardStatus,
   resetWorkspaceStore,
   useWorkspaceStore,
-  type CardStatus,
+  type Card,
+  type OpenTabResult,
 } from './workspaceStore';
 
-describe('workspaceStore', () => {
+describe('workspaceStore (multi-panel tabs)', () => {
+  const baseCards: Card[] = [
+    {
+      id: 'card-001',
+      title: 'カード1',
+      body: '本文1',
+      status: 'draft',
+      kind: 'heading',
+      hasLeftTrace: false,
+      hasRightTrace: true,
+      updatedAt: '2025-11-01T00:00:00.000Z',
+    },
+    {
+      id: 'card-002',
+      title: 'カード2',
+      body: '本文2',
+      status: 'review',
+      kind: 'paragraph',
+      hasLeftTrace: true,
+      hasRightTrace: false,
+      updatedAt: '2025-11-01T01:00:00.000Z',
+    },
+  ];
+
+  const otherCards: Card[] = [
+    {
+      id: 'card-101',
+      title: '別カード1',
+      body: '別本文1',
+      status: 'approved',
+      kind: 'bullet',
+      hasLeftTrace: true,
+      hasRightTrace: true,
+      updatedAt: '2025-11-01T02:00:00.000Z',
+    },
+  ];
+
   beforeEach(() => {
     resetWorkspaceStore();
     jest.useRealTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
     resetWorkspaceStore();
+    jest.useRealTimers();
   });
 
-  /**
-   * @brief workspaceStoreのテストスイート。
-   */
-  it('initializes cards and selected ID', () => {
+  it('opens a new tab per leaf and selects the first card', () => {
+    let openResult: OpenTabResult | null = null;
+    act(() => {
+      openResult = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+    });
+
+    const result = openResult!;
+    expect(result.status).toBe('opened');
     const state = useWorkspaceStore.getState();
-    expect(state.cards).toHaveLength(3);
-    expect(state.selectedCardId).toBe('card-001');
+    const leaf = state.leafs['leaf-A'];
+    expect(leaf?.tabIds).toHaveLength(1);
+    const tabId = leaf?.activeTabId;
+    expect(tabId).toBeDefined();
+    const tab = tabId ? state.tabs[tabId] : undefined;
+    expect(tab?.fileName).toBe('alpha.json');
+    expect(tab?.cards).toHaveLength(2);
+    expect(tab?.selectedCardId).toBe('card-001');
   });
 
-  it('cycles the status of a card and updates timestamp', () => {
-    const fixed = new Date('2025-11-02T12:34:56.000Z');
-    jest.useFakeTimers().setSystemTime(fixed);
+  it('activates existing tab when opening same file in same leaf', () => {
+    let first: OpenTabResult | null = null;
+    let second: OpenTabResult | null = null;
 
-    let nextStatus: CardStatus | null = null;
     act(() => {
-      nextStatus = useWorkspaceStore.getState().cycleCardStatus('card-001');
+      first = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
     });
 
-    expect(nextStatus).toBe(getNextCardStatus('approved'));
-    const updated = useWorkspaceStore.getState().cards.find((card) => card.id === 'card-001');
-    expect(updated?.status).toBe('deprecated');
-    expect(updated?.updatedAt).toBe(fixed.toISOString());
+    act(() => {
+      second = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+    });
+
+    expect(first!.status).toBe('opened');
+    expect(second!.status).toBe('activated');
+    const state = useWorkspaceStore.getState();
+    expect(state.leafs['leaf-A']?.tabIds).toHaveLength(1);
   });
 
-  /**
-   * @brief 初期カード配列と選択IDの初期値を検証。
-   */
-  it('updates card body content via updateCard', () => {
-    const fixed = new Date('2025-11-02T13:00:00.000Z');
-    jest.useFakeTimers().setSystemTime(fixed);
-
+  it('denies opening the same file in a different leaf', () => {
     act(() => {
-      useWorkspaceStore.getState().updateCard('card-002', {
-        body: '更新後の本文です。',
-      });
+      useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
     });
 
-    const card = useWorkspaceStore.getState().cards.find((item) => item.id === 'card-002');
-    expect(card?.body).toBe('更新後の本文です。');
-    expect(card?.updatedAt).toBe(fixed.toISOString());
+    const result = useWorkspaceStore.getState().openTab('leaf-B', 'alpha.json', baseCards);
+    expect(result.status).toBe('denied');
+    if (result.status === 'denied') {
+      expect(result.reason).toMatch(/開かれています/);
+    }
+    const state = useWorkspaceStore.getState();
+    expect(state.leafs['leaf-B']).toBeUndefined();
   });
 
-  it('selects an existing card ID and ignores unknown IDs', () => {
-    act(() => {
-      useWorkspaceStore.getState().selectCard('card-002');
-    });
-    expect(useWorkspaceStore.getState().selectedCardId).toBe('card-002');
+  it('closes a tab and reassigns active tab within the leaf', () => {
+    let firstTabId = '';
+    let secondTabId = '';
 
     act(() => {
-      useWorkspaceStore.getState().selectCard('unknown-card');
+      const firstResult = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(firstResult.status).toBe('opened');
+      if (firstResult.status !== 'denied') {
+        firstTabId = firstResult.tabId;
+      }
     });
-    expect(useWorkspaceStore.getState().selectedCardId).toBe('card-002');
+
+    act(() => {
+      const secondResult = useWorkspaceStore.getState().openTab('leaf-A', 'beta.json', otherCards);
+      expect(secondResult.status).toBe('opened');
+      if (secondResult.status !== 'denied') {
+        secondTabId = secondResult.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().setActiveTab('leaf-A', firstTabId);
+      useWorkspaceStore.getState().closeTab('leaf-A', firstTabId);
+    });
+
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs[firstTabId]).toBeUndefined();
+    expect(state.fileToLeaf['alpha.json']).toBeUndefined();
+    expect(state.leafs['leaf-A']?.tabIds).toEqual([secondTabId]);
+    expect(state.leafs['leaf-A']?.activeTabId).toBe(secondTabId);
+  });
+
+  it('cycles card status within a tab', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    const beforeStatus = baseCards[0].status;
+    let nextStatus;
+    act(() => {
+      nextStatus = useWorkspaceStore.getState().cycleCardStatus('leaf-A', tabId, 'card-001');
+    });
+
+    expect(nextStatus).toBe(getNextCardStatus(beforeStatus));
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs[tabId]?.cards[0].status).toBe(getNextCardStatus(beforeStatus));
+  });
+
+  it('removes all tabs when a leaf is closed', () => {
+    let tabId: string = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().closeLeaf('leaf-A');
+    });
+
+    const state = useWorkspaceStore.getState();
+    expect(state.leafs['leaf-A']).toBeUndefined();
+    expect(state.tabs[tabId]).toBeUndefined();
+    expect(state.fileToLeaf['alpha.json']).toBeUndefined();
   });
 });

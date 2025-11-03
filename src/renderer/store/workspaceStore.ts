@@ -1,17 +1,13 @@
 /**
  * @file workspaceStore.ts
- * @brief ワークスペース全体で共有するカード状態ストア。
+ * @brief 分割パネルごとのカードファイル管理ストア。
  * @details
- * Zustand を利用してカード一覧・選択状態・更新アクションを管理する。UI からは
- * `useWorkspaceStore` を介して状態とアクションを取得し、カードのステータス更新や
- * コンテンツ変更を行う。テストからのリセット用途に `resetWorkspaceStore` も提供する。
- * @author K.Furuichi
- * @date 2025-11-02
- * @version 0.1
- * @copyright MIT
+ * 各分割パネル（葉ノード）に紐づくタブとカードデータを管理する。タブは
+ * ファイル単位で一意とし、同一ファイルを複数パネルで同時に開くことを禁止する。
  */
 
 import { create } from 'zustand';
+import { nanoid } from 'nanoid';
 
 import {
   CARD_STATUS_SEQUENCE,
@@ -25,113 +21,283 @@ import {
 export { CARD_STATUS_SEQUENCE, getNextCardStatus };
 export type { Card, CardKind, CardPatch, CardStatus };
 
-/** ワークスペースストアの状態とアクション。 */
-export interface WorkspaceStore {
-  cards: Card[]; ///< 表示中のカードコレクション。
-  selectedCardId: string | null; ///< 選択中カードのID。
-  selectCard: (id: string) => void; ///< カードを選択する。
-  updateCard: (id: string, patch: CardPatch) => void; ///< カード内容を更新する。
-  cycleCardStatus: (id: string) => CardStatus | null; ///< ステータスを次段へ遷移させる。
-  hydrate: (cards: Card[]) => void; ///< 外部スナップショットからワークスペースを読み込む。
-  reset: () => void; ///< 初期状態へリセットする。
+/**
+ * @brief タブの状態。
+ */
+export interface PanelTabState {
+  id: string;
+  leafId: string;
+  fileName: string;
+  title: string;
+  cards: Card[];
+  selectedCardId: string | null;
+  isDirty: boolean;
+  lastSavedAt: string | null;
 }
 
 /**
- * @brief ダミーカードの初期配列を生成する。
- * @return カード配列。
+ * @brief 葉ノード単位のタブ集合。
  */
-const createInitialCards = (): Card[] => [
-  {
-    id: 'card-001',
-    title: 'プロジェクト概要',
-    body: 'アプリケーションの目的と主要ユースケースを記述します。',
-    status: 'approved',
-    kind: 'heading',
-    hasLeftTrace: true,
-    hasRightTrace: true,
-    updatedAt: '2021-10-19T05:30:00.000Z',
-  },
-  {
-    id: 'card-002',
-    title: '詳細設計の棚卸し',
-    body: 'ユースケース一覧と詳細設計の整備方針をまとめます。',
-    status: 'draft',
-    kind: 'paragraph',
-    hasLeftTrace: false,
-    hasRightTrace: true,
-    updatedAt: '2025-10-18T00:15:00.000Z',
-  },
-  {
-    id: 'card-003',
-    title: 'リスクアセスメント概要',
-    body: '既知の運用リスクと緩和策を列挙します。',
-    status: 'review',
-    kind: 'bullet',
-    hasLeftTrace: true,
-    hasRightTrace: false,
-    updatedAt: '2025-10-17T11:05:00.000Z',
-  },
-];
+export interface LeafWorkspaceState {
+  leafId: string;
+  tabIds: string[];
+  activeTabId: string | null;
+}
 
 /**
- * @brief ストアの基礎状態を生成する。
- * @return カード配列と選択IDを含む基礎状態。
+ * @brief タブオープン時の戻り値。
  */
-const createBaseState = () => {
-  const cards = createInitialCards();
-  return {
-    cards,
-    selectedCardId: cards[0]?.id ?? null,
-  } satisfies Pick<WorkspaceStore, 'cards' | 'selectedCardId'>;
+export type OpenTabResult =
+  | { status: 'opened'; tabId: string; leafId: string }
+  | { status: 'activated'; tabId: string; leafId: string }
+  | { status: 'denied'; tabId: null; leafId: string; reason: string; conflictLeafId: string | null };
+
+/**
+ * @brief ストア全体の状態とアクション。
+ */
+export interface WorkspaceStore {
+  tabs: Record<string, PanelTabState>;
+  leafs: Record<string, LeafWorkspaceState>;
+  fileToLeaf: Record<string, string>;
+  openTab: (leafId: string, fileName: string, cards: Card[], options?: { savedAt?: string; title?: string }) => OpenTabResult;
+  closeTab: (leafId: string, tabId: string) => void;
+  closeLeaf: (leafId: string) => void;
+  setActiveTab: (leafId: string, tabId: string) => void;
+  selectCard: (leafId: string, tabId: string, cardId: string) => void;
+  updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
+  cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
+  hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
+  markSaved: (tabId: string, savedAt: string) => void;
+  reset: () => void;
+}
+
+/** @brief 空の葉ステートを生成する。 */
+const createLeafState = (leafId: string): LeafWorkspaceState => ({ leafId, tabIds: [], activeTabId: null });
+
+/** @brief 初期ストア状態。 */
+const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'> = {
+  tabs: {},
+  leafs: {},
+  fileToLeaf: {},
 };
 
-/** Zustand ストア本体。 */
+/**
+ * @brief 分割パネル用ワークスペースストア定義。
+ */
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
-  ...createBaseState(),
-  /**
-   * @brief カードを選択。
-   * @details
-   * 指定IDが存在しなければ何もしない。
-   * @param id カードID。
-   */
-  selectCard: (id: string) => {
-    const exists = get().cards.some((card) => card.id === id);
-    if (!exists) {
-      return;
-    }
-    set({ selectedCardId: id });
+  ...initialState,
+
+  openTab: (leafId, fileName, cards, options) => {
+    let outcome: OpenTabResult = { status: 'denied', tabId: null, leafId, reason: 'unknown', conflictLeafId: null };
+
+    set((state) => {
+      const existingLeafId = state.fileToLeaf[fileName];
+      if (existingLeafId && existingLeafId !== leafId) {
+        outcome = {
+          status: 'denied',
+          tabId: null,
+          leafId,
+          reason: `ファイル "${fileName}" は別パネルで開かれています。`,
+          conflictLeafId: existingLeafId,
+        } satisfies OpenTabResult;
+        return state;
+      }
+
+      const currentLeaf = state.leafs[leafId] ?? createLeafState(leafId);
+      const existingTabId = currentLeaf.tabIds.find((id) => state.tabs[id]?.fileName === fileName);
+
+      if (existingTabId) {
+        //! 同一パネル内で開いている場合は再アクティブ化し、内容を最新化する
+        const prevTab = state.tabs[existingTabId];
+        const nextTab: PanelTabState = {
+          ...prevTab,
+          cards: [...cards],
+          selectedCardId: cards[0]?.id ?? null,
+          isDirty: false,
+          lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
+        } satisfies PanelTabState;
+
+        outcome = { status: 'activated', tabId: existingTabId, leafId } satisfies OpenTabResult;
+
+        return {
+          ...state,
+          tabs: { ...state.tabs, [existingTabId]: nextTab },
+          leafs: {
+            ...state.leafs,
+            [leafId]: { ...currentLeaf, activeTabId: existingTabId },
+          },
+        } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
+      }
+
+      const tabId = nanoid();
+      const nextTab: PanelTabState = {
+        id: tabId,
+        leafId,
+        fileName,
+        title: options?.title ?? fileName,
+        cards: [...cards],
+        selectedCardId: cards[0]?.id ?? null,
+        isDirty: false,
+        lastSavedAt: options?.savedAt ?? null,
+      } satisfies PanelTabState;
+
+      const nextLeaf: LeafWorkspaceState = {
+        leafId,
+        tabIds: [...currentLeaf.tabIds, tabId],
+        activeTabId: tabId,
+      } satisfies LeafWorkspaceState;
+
+      outcome = { status: 'opened', tabId, leafId } satisfies OpenTabResult;
+
+      return {
+        tabs: { ...state.tabs, [tabId]: nextTab },
+        leafs: { ...state.leafs, [leafId]: nextLeaf },
+        fileToLeaf: { ...state.fileToLeaf, [fileName]: leafId },
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
+    });
+
+    return outcome;
   },
-  /**
-   * @brief カード内容を更新。
-   * @details
-   * 指定IDのカードをpatchで上書き。updatedAt未指定時は現在時刻。
-   * @param id カードID。
-   * @param patch 更新内容。
-   */
-  updateCard: (id: string, patch: CardPatch) => {
-    set((state) => ({
-      cards: state.cards.map((card) => {
-        if (card.id !== id) {
+
+  closeTab: (leafId, tabId) => {
+    set((state) => {
+      const leaf = state.leafs[leafId];
+      const tab = state.tabs[tabId];
+      if (!leaf || !leaf.tabIds.includes(tabId)) {
+        return state;
+      }
+
+      const nextTabIds = leaf.tabIds.filter((id) => id !== tabId);
+      let nextActive = leaf.activeTabId;
+
+      if (leaf.activeTabId === tabId) {
+        if (nextTabIds.length === 0) {
+          nextActive = null;
+        } else {
+          const removedIndex = leaf.tabIds.indexOf(tabId);
+          const fallbackIndex = removedIndex >= nextTabIds.length ? nextTabIds.length - 1 : removedIndex;
+          nextActive = nextTabIds[fallbackIndex];
+        }
+      }
+
+      const nextTabs = { ...state.tabs };
+      delete nextTabs[tabId];
+
+      const nextFileToLeaf = { ...state.fileToLeaf };
+      if (tab) {
+        delete nextFileToLeaf[tab.fileName];
+      }
+
+      return {
+        tabs: nextTabs,
+        leafs: {
+          ...state.leafs,
+          [leafId]: { ...leaf, tabIds: nextTabIds, activeTabId: nextActive },
+        },
+        fileToLeaf: nextFileToLeaf,
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
+    });
+  },
+
+  closeLeaf: (leafId) => {
+    set((state) => {
+      const leaf = state.leafs[leafId];
+      if (!leaf) {
+        return state;
+      }
+
+      const nextTabs = { ...state.tabs };
+      const nextFileToLeaf = { ...state.fileToLeaf };
+
+      leaf.tabIds.forEach((tabId) => {
+        const tab = state.tabs[tabId];
+        if (tab) {
+          delete nextFileToLeaf[tab.fileName];
+        }
+        delete nextTabs[tabId];
+      });
+
+      const nextLeafs = { ...state.leafs };
+      delete nextLeafs[leafId];
+
+      return {
+        tabs: nextTabs,
+        leafs: nextLeafs,
+        fileToLeaf: nextFileToLeaf,
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
+    });
+  },
+
+  setActiveTab: (leafId, tabId) => {
+    set((state) => {
+      const leaf = state.leafs[leafId];
+      if (!leaf || !leaf.tabIds.includes(tabId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        leafs: { ...state.leafs, [leafId]: { ...leaf, activeTabId: tabId } },
+      };
+    });
+  },
+
+  selectCard: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      if (!tab.cards.some((card) => card.id === cardId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, selectedCardId: cardId },
+        },
+      };
+    });
+  },
+
+  updateCard: (leafId, tabId, cardId, patch) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const nextCards = tab.cards.map((card) => {
+        if (card.id !== cardId) {
           return card;
         }
-        //! 更新日時のパッチが指定されない場合は現在時刻を設定する
         const nextUpdatedAt = patch.updatedAt ?? new Date().toISOString();
         return { ...card, ...patch, updatedAt: nextUpdatedAt } satisfies Card;
-      }),
-    }));
+      });
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, cards: nextCards, isDirty: true },
+        },
+      };
+    });
   },
-  /**
-   * @brief ステータスを次段へ遷移。
-   * @details
-   * getNextCardStatusで次の状態を決定し、updatedAtを更新。
-   * @param id カードID。
-   * @return 遷移後のステータス、またはnull。
-   */
-  cycleCardStatus: (id: string) => {
+
+  cycleCardStatus: (leafId, tabId, cardId) => {
     let nextStatus: CardStatus | null = null;
-    set((state) => ({
-      cards: state.cards.map((card) => {
-        if (card.id !== id) {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const nextCards = tab.cards.map((card) => {
+        if (card.id !== cardId) {
           return card;
         }
         nextStatus = getNextCardStatus(card.status);
@@ -140,38 +306,71 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           status: nextStatus,
           updatedAt: new Date().toISOString(),
         } satisfies Card;
-      }),
-    }));
+      });
+
+      if (!nextStatus) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, cards: nextCards, isDirty: true },
+        },
+      };
+    });
+
     return nextStatus;
   },
-  /**
-   * @brief 外部スナップショットから状態を復元。
-   * @param cards カード配列。
-   */
-  hydrate: (cards: Card[]) => {
-    set({
-      cards,
-      selectedCardId: cards[0]?.id ?? null,
+
+  hydrateTab: (leafId, tabId, cards, options) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards: [...cards],
+            selectedCardId: cards[0]?.id ?? null,
+            isDirty: false,
+            lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
+          },
+        },
+      };
     });
   },
-  /**
-   * @brief ストアを初期状態へリセット。
-   * @details
-   * テスト用ユーティリティ。
-   */
+
+  markSaved: (tabId, savedAt) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, isDirty: false, lastSavedAt: savedAt },
+        },
+      };
+    });
+  },
+
   reset: () => {
-    const base = createBaseState();
-    set((state) => ({
-      ...state,
-      ...base,
-    }));
+    set(() => ({ ...initialState }));
   },
 }));
 
 /**
- * @brief ストアを初期状態へリセットするユーティリティ。
- * @details
- * テストで副作用を残さないために使用する。
+ * @brief ストアの状態を初期値へ戻すヘルパ。
  */
 export const resetWorkspaceStore = (): void => {
   useWorkspaceStore.getState().reset();

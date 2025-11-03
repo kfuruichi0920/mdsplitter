@@ -195,12 +195,40 @@
     @apply flex items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
   }
 
+  .tab-bar__tab-container {
+    @apply flex items-center gap-1;
+  }
+
   .tab-bar__tab {
     @apply rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
   }
 
   .tab-bar__tab--active {
     @apply bg-blue-500 text-white shadow-sm dark:bg-blue-500;
+  }
+
+  .tab-bar__tab--add {
+    @apply cursor-not-allowed opacity-40; /* まだ未実装のため無効扱い */
+  }
+
+  .tab-bar__tab-title {
+    @apply max-w-[10rem] truncate;
+  }
+
+  .tab-bar__tab-dirty {
+    @apply ml-1 text-amber-500 dark:text-amber-300;
+  }
+
+  .tab-bar__tab-close {
+    @apply rounded-md px-1.5 py-1 text-xs text-slate-500 transition-colors hover:bg-rose-100 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 dark:text-slate-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200;
+  }
+
+  .tab-bar__spacer {
+    @apply flex-1;
+  }
+
+  .tab-bar__empty {
+    @apply px-2 text-slate-500 dark:text-slate-400;
   }
 
   .tab-bar__close {
@@ -237,6 +265,10 @@
 
   .panel-cards {
     @apply flex flex-col gap-2.5 overflow-auto bg-slate-50 p-3 dark:bg-slate-950;
+  }
+
+  .panel-cards__empty {
+    @apply rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400;
   }
 
   .card {

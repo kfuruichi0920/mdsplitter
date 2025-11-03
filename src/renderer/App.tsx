@@ -25,8 +25,9 @@ import {
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import { useSplitStore } from './store/splitStore';
+import type { SplitNode } from './store/splitStore';
 import type { LogLevel } from '@/shared/settings';
-import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
+import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE, WORKSPACE_SNAPSHOT_FILENAME } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
@@ -91,6 +92,21 @@ const clamp = (value: number, minimum: number, maximum: number): number => {
 };
 
 /**
+ * @brief 分割ノードツリーの最初の葉を取得する。
+ * @param node 分割ノード。
+ * @return 最初に見つかる葉ノードID、存在しなければ null。
+ */
+const findFirstLeafId = (node: SplitNode | null): string | null => {
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'leaf') {
+    return node.id;
+  }
+  return findFirstLeafId(node.first) ?? findFirstLeafId(node.second);
+};
+
+/**
  * @brief React レンダラーメインコンポーネント。
  * @details
  * 起動時にメインプロセスへ ping を送信し、レイアウト骨格とログビューを初期化する。
@@ -115,15 +131,11 @@ export const App = () => {
     },
   ]);
 
-  const [isDirty, setDirty] = useState<boolean>(false); ///< 未保存状態フラグ。
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null); ///< 最終保存時刻。
-  const cards = useWorkspaceStore((state) => state.cards);
-  const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
-  const selectCard = useWorkspaceStore((state) => state.selectCard);
+  const openTab = useWorkspaceStore((state) => state.openTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
-  const hydrateWorkspace = useWorkspaceStore((state) => state.hydrate);
-  const resetWorkspace = useWorkspaceStore((state) => state.reset);
+  const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
+  const markSaved = useWorkspaceStore((state) => state.markSaved);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -138,6 +150,32 @@ export const App = () => {
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
+
+  const fallbackLeafId = useMemo(() => findFirstLeafId(splitRoot), [splitRoot]);
+  const effectiveLeafId = activeLeafId ?? fallbackLeafId;
+  const activeTab = useWorkspaceStore(
+    useCallback((state) => {
+      if (!effectiveLeafId) {
+        return null;
+      }
+      const leaf = state.leafs[effectiveLeafId];
+      if (!leaf?.activeTabId) {
+        return null;
+      }
+      return state.tabs[leaf.activeTabId] ?? null;
+    }, [effectiveLeafId]),
+  );
+  const activeTabId = activeTab?.id ?? null;
+  const cards = activeTab?.cards ?? [];
+  const selectedCardId = activeTab?.selectedCardId ?? null;
+  const isDirty = activeTab?.isDirty ?? false;
+  const lastSavedAt = useMemo(() => {
+    if (!activeTab?.lastSavedAt) {
+      return null;
+    }
+    const parsed = new Date(activeTab.lastSavedAt);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [activeTab?.lastSavedAt]);
 
   const sanitizeSnapshotCards = useCallback(
     (input: Card[]) => {
@@ -198,14 +236,6 @@ export const App = () => {
   const selectedCard = useMemo<Card | null>(() => {
     return cards.find((card) => card.id === selectedCardId) ?? null;
   }, [cards, selectedCardId]);
-
-  useEffect(() => {
-    if (!hasInitializedCards.current) {
-      hasInitializedCards.current = true;
-      return;
-    }
-    setDirty(true);
-  }, [cards]);
 
   /**
    * @brief ログエントリを追加する。
@@ -312,42 +342,42 @@ export const App = () => {
         pushLog({
           id: `workspace-load-missing-${Date.now()}`,
           level: 'WARN',
-          message: 'workspace.load API が未定義のため、ダミーカードを表示します。',
+          message: 'workspace.load API が未定義のため、既定レイアウトで起動します。',
           timestamp: new Date(),
         });
         return;
       }
 
       try {
+        const targetLeafId = activeLeafId ?? fallbackLeafId;
+        if (!targetLeafId) {
+          pushLog({
+            id: `workspace-load-no-leaf-${Date.now()}`,
+            level: 'WARN',
+            message: '保存済みワークスペースの読み込み先パネルを特定できませんでした。',
+            timestamp: new Date(),
+          });
+          return;
+        }
+
         const snapshot = await loadApi();
         if (!snapshot || !Array.isArray(snapshot.cards)) {
           pushLog({
             id: `workspace-load-empty-${Date.now()}`,
             level: 'INFO',
-            message: '保存済みスナップショットが見つからないため、ダミーカードを表示します。',
+            message: '保存済みスナップショットが見つからないため、既定レイアウトで起動します。',
             timestamp: new Date(),
           });
           return;
         }
 
         const { validCards, invalidMessages } = sanitizeSnapshotCards(snapshot.cards);
-        const savedAtDate =
-          snapshot.savedAt && !Number.isNaN(Date.parse(snapshot.savedAt))
-            ? new Date(snapshot.savedAt)
-            : null;
-        const savedAtIssue = Boolean(snapshot.savedAt && !savedAtDate);
-
         if (validCards.length === 0) {
-          hasInitializedCards.current = false;
-          resetWorkspace();
-          setDirty(false);
-          setSaving(false);
-          setLastSavedAt(null);
-          notify('error', '保存済みデータに有効なカードが存在しなかったため、初期状態に戻しました。');
+          notify('error', '保存済みデータに有効なカードが存在しなかったため、読み込みを中断しました。');
           pushLog({
             id: `workspace-load-invalid-${Date.now()}`,
             level: 'ERROR',
-            message: '保存済みスナップショットに有効なカードが存在しなかったため、初期状態を維持しました。',
+            message: '保存済みスナップショットに有効なカードが存在しませんでした。',
             timestamp: new Date(),
           });
           if (invalidMessages.length > 0) {
@@ -361,12 +391,28 @@ export const App = () => {
           return;
         }
 
-        hasInitializedCards.current = false;
-        hydrateWorkspace(validCards);
-        setDirty(false);
-        setSaving(false);
-        setLastSavedAt(savedAtDate);
+        const result = openTab(targetLeafId, WORKSPACE_SNAPSHOT_FILENAME, validCards, {
+          savedAt: snapshot.savedAt,
+          title: WORKSPACE_SNAPSHOT_FILENAME,
+        });
 
+        if (result.status === 'denied') {
+          notify('warning', result.reason);
+          pushLog({
+            id: `workspace-load-denied-${Date.now()}`,
+            level: 'WARN',
+            message: result.reason,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        const savedAtIssue = Boolean(snapshot.savedAt && Number.isNaN(Date.parse(snapshot.savedAt)));
+        if (snapshot.savedAt && !savedAtIssue) {
+          markSaved(result.tabId, snapshot.savedAt);
+        }
+
+        hasInitializedCards.current = true;
         const issues: string[] = [];
         if (invalidMessages.length > 0) {
           issues.push(`無効カード ${invalidMessages.length} 件`);
@@ -376,15 +422,14 @@ export const App = () => {
         }
 
         const notifyLevel = issues.length > 0 ? 'warning' : 'success';
-        let notifyMessage = issues.length > 0
-          ? `保存済みワークスペースを読み込みました (${issues.join(' / ')})。`
-          : '保存済みワークスペースを読み込みました。';
+        const notifyMessage =
+          issues.length > 0
+            ? `保存済みワークスペースを読み込みました (${issues.join(' / ')})。`
+            : '保存済みワークスペースを読み込みました。';
         notify(notifyLevel, notifyMessage);
-
-        const logLevel = issues.length > 0 ? 'WARN' : 'INFO';
         pushLog({
           id: `workspace-loaded-${Date.now()}`,
-          level: logLevel,
+          level: issues.length > 0 ? 'WARN' : 'INFO',
           message: notifyMessage,
           timestamp: new Date(),
         });
@@ -410,7 +455,7 @@ export const App = () => {
     };
 
     void loadWorkspace();
-  }, [hydrateWorkspace, notify, pushLog, resetWorkspace, sanitizeSnapshotCards]);
+  }, [activeLeafId, fallbackLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards]);
 
   useEffect(() => {
     //! Tailwind ダークモード切替のため、html 要素へ `dark` クラスを付与する
@@ -486,6 +531,7 @@ export const App = () => {
    */
   const handlePanelClose = useCallback(
     (leafId: string) => {
+      closeLeafWorkspace(leafId);
       const removeLeaf = useSplitStore.getState().removeLeaf;
       removeLeaf(leafId);
       const now = new Date();
@@ -497,7 +543,7 @@ export const App = () => {
         timestamp: now,
       });
     },
-    [notify, pushLog],
+    [closeLeafWorkspace, notify, pushLog],
   );
 
   /**
@@ -518,6 +564,18 @@ export const App = () => {
           message: `カードファイルを読み込んでいます: ${fileName}`,
           timestamp: new Date(),
         });
+
+        const targetLeafId = activeLeafId ?? (splitRoot.type === 'leaf' ? splitRoot.id : null);
+        if (!targetLeafId) {
+          notify('warning', 'カードファイルを表示できるパネルがありません。対象パネルを選択してください。');
+          pushLog({
+            id: `load-card-no-leaf-${Date.now()}`,
+            level: 'WARN',
+            message: `カードファイル ${fileName} を割り当てるパネルがありません。`,
+            timestamp: new Date(),
+          });
+          return;
+        }
 
         const snapshot = await window.app.workspace.loadCardFile(fileName);
         if (!snapshot) {
@@ -543,7 +601,27 @@ export const App = () => {
           });
         }
 
-        hydrateWorkspace(validCards);
+        const result = openTab(targetLeafId, fileName, validCards, {
+          savedAt: snapshot.savedAt,
+          title: fileName,
+        });
+
+        if (result.status === 'denied') {
+          notify('warning', result.reason);
+          pushLog({
+            id: `load-card-denied-${Date.now()}`,
+            level: 'WARN',
+            message: result.reason,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        if (snapshot.savedAt && !Number.isNaN(Date.parse(snapshot.savedAt))) {
+          markSaved(result.tabId, snapshot.savedAt);
+        }
+
+        hasInitializedCards.current = true;
         notify('success', `カードファイルを読み込みました: ${fileName} (${validCards.length}枚)`);
         pushLog({
           id: `load-card-success-${Date.now()}`,
@@ -562,7 +640,7 @@ export const App = () => {
         });
       }
     },
-    [hydrateWorkspace, notify, pushLog, sanitizeSnapshotCards],
+    [activeLeafId, fallbackLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards],
   );
 
   useEffect(() => {
@@ -581,7 +659,8 @@ export const App = () => {
    * @brief 選択カードのステータスを次段へ遷移させる。
    */
   const handleCycleStatus = useCallback(() => {
-    if (!selectedCard) {
+    const targetLeafId = effectiveLeafId;
+    if (!selectedCard || !targetLeafId || !activeTabId) {
       pushLog({
         id: `cycle-missing-${Date.now()}`,
         level: 'WARN',
@@ -591,15 +670,24 @@ export const App = () => {
       return;
     }
 
-    const nextStatus = getNextCardStatus(selectedCard.status);
-    cycleCardStatus(selectedCard.id);
+    const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
+    if (!nextStatus) {
+      pushLog({
+        id: `cycle-missing-${Date.now()}`,
+        level: 'WARN',
+        message: 'ステータス更新対象のカードが見つかりませんでした。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
     pushLog({
       id: `cycle-${selectedCard.id}-${Date.now()}`,
       level: 'INFO',
       message: `カード「${selectedCard.title}」のステータスを ${nextStatus} に変更しました。`,
       timestamp: new Date(),
     });
-  }, [cycleCardStatus, pushLog, selectedCard]);
+  }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard]);
 
   /**
    * @brief テーマを切り替える。
@@ -636,6 +724,18 @@ export const App = () => {
    * @brief ワークスペースを保存する。
    */
   const handleSave = useCallback(async () => {
+    const targetLeafId = effectiveLeafId;
+    if (!activeTabId || !targetLeafId) {
+      notify('warning', '保存対象のパネルが選択されていません。');
+      pushLog({
+        id: `save-no-target-${Date.now()}`,
+        level: 'WARN',
+        message: '保存対象のタブが存在しないため、保存をスキップしました。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
     if (isSaving) {
       notify('info', '保存処理が進行中です。');
       return;
@@ -675,8 +775,7 @@ export const App = () => {
       };
 
       const result = await saveApi(snapshot);
-      setDirty(false);
-      setLastSavedAt(startedAt);
+      markSaved(activeTabId, startedAt.toISOString());
       notify('success', 'ワークスペースを保存しました。');
       pushLog({
         id: `save-${startedAt.valueOf()}`,
@@ -697,7 +796,7 @@ export const App = () => {
     } finally {
       setSaving(false);
     }
-  }, [cards, isDirty, isSaving, notify, pushLog]);
+  }, [activeTabId, cards, effectiveLeafId, isDirty, isSaving, markSaved, notify, pushLog]);
 
   /**
    * @brief パネル分割を実行する。

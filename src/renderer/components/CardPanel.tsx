@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useMemo, type KeyboardEvent } from 'react';
-import type { Card, CardKind, CardStatus } from '../store/workspaceStore';
+import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 
 /** ステータスラベル表示用マッピング。 */
@@ -77,12 +77,64 @@ export interface CardPanelProps {
  * タブバー、ツールバー、カード一覧を含むカードパネルを描画する。
  */
 export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
-  //! カード一覧・選択ID・選択関数を取得
-  const cards = useWorkspaceStore((state) => state.cards);
-  const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
+  const leafTabs = useWorkspaceStore(
+    useCallback((state) => {
+      const leaf = state.leafs[leafId];
+      if (!leaf) {
+        return [] as PanelTabState[];
+      }
+      return leaf.tabIds
+        .map((tabId) => state.tabs[tabId])
+        .filter((tab): tab is PanelTabState => Boolean(tab));
+    }, [leafId]),
+  );
+  const activeTabId = useWorkspaceStore(
+    useCallback((state) => state.leafs[leafId]?.activeTabId ?? null, [leafId]),
+  );
   const selectCard = useWorkspaceStore((state) => state.selectCard);
+  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
+  const closeTab = useWorkspaceStore((state) => state.closeTab);
 
+  const activeTab = useMemo<PanelTabState | null>(() => {
+    if (!activeTabId) {
+      return null;
+    }
+    return leafTabs.find((tab) => tab.id === activeTabId) ?? null;
+  }, [activeTabId, leafTabs]);
+
+  const cards = activeTab?.cards ?? [];
+  const selectedCardId = activeTab?.selectedCardId ?? null;
   const cardCount = cards.length;
+
+  /**
+   * @brief アクティブタブを変更する。
+   * @param tabId タブID。
+   */
+  const handleTabActivate = useCallback(
+    (tabId: string) => {
+      setActiveTab(leafId, tabId);
+      const target = leafTabs.find((tab) => tab.id === tabId);
+      if (target) {
+        onLog?.('INFO', `タブ「${target.title}」を表示しました。`);
+      }
+    },
+    [leafId, leafTabs, onLog, setActiveTab],
+  );
+
+  /**
+   * @brief タブを閉じる。
+   * @param tabId タブID。
+   */
+  const handleTabClose = useCallback(
+    (tabId: string) => {
+      const target = leafTabs.find((tab) => tab.id === tabId);
+      closeTab(leafId, tabId);
+      if (target) {
+        onLog?.('INFO', `タブ「${target.title}」を閉じました。`);
+      }
+    },
+    [closeTab, leafId, leafTabs, onLog],
+  );
 
   /**
    * @brief パネルクリック時の処理。
@@ -118,10 +170,13 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       if (card.id === selectedCardId) {
         return; //! 既に選択済みなら何もしない
       }
-      selectCard(card.id);
+      if (!activeTabId) {
+        return;
+      }
+      selectCard(leafId, activeTabId, card.id);
       onLog?.('INFO', `カード「${card.title}」を選択しました。`);
     },
-    [onLog, selectCard, selectedCardId],
+    [activeTabId, leafId, onLog, selectCard, selectedCardId],
   );
 
   /**
@@ -145,21 +200,55 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー: 各カードファイルのタブを表示 */}
-      <div className="tab-bar">
-        <button type="button" className="tab-bar__tab tab-bar__tab--active">
-          📄 overview.md
-        </button>
-        <button type="button" className="tab-bar__tab">
-          📄 detail.md ●
-        </button>
-        <button type="button" className="tab-bar__tab">
+      <div className="tab-bar" role="tablist" aria-label="カードファイルタブ">
+        {leafTabs.length === 0 ? (
+          <span className="tab-bar__empty">カードファイルが開かれていません</span>
+        ) : (
+          leafTabs.map((tab) => {
+            const isActive = tab.id === activeTabId;
+            const tabClass = `tab-bar__tab${isActive ? ' tab-bar__tab--active' : ''}`;
+            const dirtyMark = tab.isDirty ? ' ●' : '';
+            return (
+              <div key={tab.id} className="tab-bar__tab-container" data-tab-id={tab.id}>
+                <button
+                  type="button"
+                  className={tabClass}
+                  onClick={() => handleTabActivate(tab.id)}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`panel-${leafId}-${tab.id}`}
+                  title={tab.title}
+                >
+                  <span aria-hidden="true">📄 </span>
+                  <span className="tab-bar__tab-title">{tab.title}</span>
+                  {tab.isDirty ? <span className="tab-bar__tab-dirty">●</span> : null}
+                </button>
+                <button
+                  type="button"
+                  className="tab-bar__tab-close"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleTabClose(tab.id);
+                  }}
+                  aria-label={`${tab.title} を閉じる`}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })
+        )}
+        <button type="button" className="tab-bar__tab tab-bar__tab--add" disabled>
           ➕
         </button>
-        <div style={{ flex: 1 }} />
+        <div className="tab-bar__spacer" />
         <button
           type="button"
           className="tab-bar__close"
-          onClick={handlePanelClose}
+          onClick={(event) => {
+            event.stopPropagation();
+            onPanelClose?.(leafId);
+          }}
           aria-label="パネルを閉じる"
           title="パネルを閉じる"
         >
@@ -196,7 +285,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       </div>
 
       {/* カード一覧: 各カードをリスト表示 */}
-      <div className="panel-cards" role="list">
+      <div className="panel-cards" role="list" id={activeTab ? `panel-${leafId}-${activeTab.id}` : undefined}>
         {cards.map((card) => {
           const isActive = card.id === selectedCardId;
           const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
@@ -223,6 +312,11 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             </article>
           );
         })}
+        {cards.length === 0 && (
+          <div className="panel-cards__empty" role="note">
+            表示するカードがありません。
+          </div>
+        )}
       </div>
     </div>
   );
