@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "header": {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "fileName": "sample-cards-left.json",
+    "orgInputFilePath": "/home/user/mdsplitter/_input/sample-spec.md",
+    "inputFilePath": "/home/user/mdsplitter/_input/sample-spec_20251103_120000.md",
+    "createdAt": "2025-11-03T03:00:00.000Z",
+    "updatedAt": "2025-11-03T03:00:00.000Z",
+    "memo": "左パネル用サンプルカードファイル（要求仕様書）"
+  },
+  "body": [
+    {
+      "id": "card-req-001",
+      "type": "heading",
+      "status": "approved",
+      "content": {
+        "text": "1. システム概要",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-req-002", "card-req-003"],
+      "prev_id": null,
+      "next_id": "card-req-004"
+    },
+    {
+      "id": "card-req-002",
+      "type": "paragraph",
+      "status": "approved",
+      "content": {
+        "text": "本システムは、大規模プロジェクトにおける非構造化データの構造化とトレーサビリティ管理を実現する。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-001",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-req-003"
+    },
+    {
+      "id": "card-req-003",
+      "type": "bullet",
+      "status": "approved",
+      "content": {
+        "text": "主要機能: カード変換、カード編集、トレーサビリティ管理",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-001",
+      "child_ids": [],
+      "prev_id": "card-req-002",
+      "next_id": null
+    },
+    {
+      "id": "card-req-004",
+      "type": "heading",
+      "status": "approved",
+      "content": {
+        "text": "2. 機能要件",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-req-005", "card-req-006", "card-req-007"],
+      "prev_id": "card-req-001",
+      "next_id": "card-req-008"
+    },
+    {
+      "id": "card-req-005",
+      "type": "heading",
+      "status": "review",
+      "content": {
+        "text": "2.1. ファイル入出力",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-004",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-req-006"
+    },
+    {
+      "id": "card-req-006",
+      "type": "paragraph",
+      "status": "review",
+      "content": {
+        "text": "入力: テキストファイル（.txt, .md）。UTF-8を既定。SJIS/CP932は自動変換。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-004",
+      "child_ids": [],
+      "prev_id": "card-req-005",
+      "next_id": "card-req-007"
+    },
+    {
+      "id": "card-req-007",
+      "type": "paragraph",
+      "status": "review",
+      "content": {
+        "text": "出力: カードファイル（JSON）、トレーサビリティ情報ファイル（JSON）。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-004",
+      "child_ids": [],
+      "prev_id": "card-req-006",
+      "next_id": null
+    },
+    {
+      "id": "card-req-008",
+      "type": "heading",
+      "status": "draft",
+      "content": {
+        "text": "3. 性能要件",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-req-009", "card-req-010"],
+      "prev_id": "card-req-004",
+      "next_id": null
+    },
+    {
+      "id": "card-req-009",
+      "type": "paragraph",
+      "status": "draft",
+      "content": {
+        "text": "最大カード数: 10,000件を快適に操作可能。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-008",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-req-010"
+    },
+    {
+      "id": "card-req-010",
+      "type": "paragraph",
+      "status": "draft",
+      "content": {
+        "text": "表示応答性: 全てのUI要素を表示させた場合の編集操作や画面分割、スクロール等の操作がスムーズであること。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-req-008",
+      "child_ids": [],
+      "prev_id": "card-req-009",
+      "next_id": null
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "header": {
+    "id": "trace-12345678-abcd-ef01-2345-6789abcdef01",
+    "fileName": "trace-sample-left-right.json",
+    "leftFilePath": "/home/user/mdsplitter/sample-data/sample-cards-left.json",
+    "rightFilePath": "/home/user/mdsplitter/sample-data/sample-cards-right.json",
+    "createdAt": "2025-11-03T03:00:00.000Z",
+    "updatedAt": "2025-11-03T03:00:00.000Z",
+    "memo": "要求仕様書と設計書のトレーサビリティ情報"
+  },
+  "body": [
+    {
+      "id": "trace-rel-001",
+      "left_ids": ["card-req-001"],
+      "right_ids": ["card-des-001"],
+      "type": "refines",
+      "directed": "left_to_right",
+      "memo": "システム概要からアーキテクチャ設計への詳細化"
+    },
+    {
+      "id": "trace-rel-002",
+      "left_ids": ["card-req-002"],
+      "right_ids": ["card-des-002", "card-des-003"],
+      "type": "satisfy",
+      "directed": "right_to_left",
+      "memo": "システム概要説明をElectron+Reactで実現"
+    },
+    {
+      "id": "trace-rel-003",
+      "left_ids": ["card-req-005", "card-req-006", "card-req-007"],
+      "right_ids": ["card-des-004", "card-des-005", "card-des-006"],
+      "type": "refines",
+      "directed": "left_to_right",
+      "memo": "ファイル入出力要件からモジュール設計への詳細化"
+    },
+    {
+      "id": "trace-rel-004",
+      "left_ids": ["card-req-009", "card-req-010"],
+      "right_ids": ["card-des-008", "card-des-009"],
+      "type": "refines",
+      "directed": "left_to_right",
+      "memo": "性能要件からパフォーマンス最適化への詳細化"
+    },
+    {
+      "id": "trace-rel-005",
+      "left_ids": ["card-req-009"],
+      "right_ids": ["card-des-010"],
+      "type": "tests",
+      "directed": "right_to_left",
+      "memo": "性能要件をTEST-001でテスト"
+    }
+  ]
+}

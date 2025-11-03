@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "header": {
+    "id": "a67bc20c-68dd-5483-b678-1f13c3d4e580",
+    "fileName": "sample-cards-right.json",
+    "orgInputFilePath": "/home/user/mdsplitter/_input/sample-design.md",
+    "inputFilePath": "/home/user/mdsplitter/_input/sample-design_20251103_120000.md",
+    "createdAt": "2025-11-03T03:00:00.000Z",
+    "updatedAt": "2025-11-03T03:00:00.000Z",
+    "memo": "右パネル用サンプルカードファイル（設計書）"
+  },
+  "body": [
+    {
+      "id": "card-des-001",
+      "type": "heading",
+      "status": "approved",
+      "content": {
+        "text": "1. アーキテクチャ設計",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-des-002", "card-des-003"],
+      "prev_id": null,
+      "next_id": "card-des-004"
+    },
+    {
+      "id": "card-des-002",
+      "type": "paragraph",
+      "status": "approved",
+      "content": {
+        "text": "Electron + React + TypeScript によるデスクトップアプリとして実装する。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-001",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-des-003"
+    },
+    {
+      "id": "card-des-003",
+      "type": "bullet",
+      "status": "approved",
+      "content": {
+        "text": "状態管理: Zustand を使用してグローバル状態を管理",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-001",
+      "child_ids": [],
+      "prev_id": "card-des-002",
+      "next_id": null
+    },
+    {
+      "id": "card-des-004",
+      "type": "heading",
+      "status": "review",
+      "content": {
+        "text": "2. ファイル入出力モジュール",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-des-005", "card-des-006"],
+      "prev_id": "card-des-001",
+      "next_id": "card-des-007"
+    },
+    {
+      "id": "card-des-005",
+      "type": "paragraph",
+      "status": "review",
+      "content": {
+        "text": "文字コード自動判別機能を実装し、CP932/SJISをUTF-8に変換する。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-004",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-des-006"
+    },
+    {
+      "id": "card-des-006",
+      "type": "figure",
+      "status": "review",
+      "content": {
+        "text": "ファイル読み込みフローチャート",
+        "number": "図2.1"
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-004",
+      "child_ids": [],
+      "prev_id": "card-des-005",
+      "next_id": null
+    },
+    {
+      "id": "card-des-007",
+      "type": "heading",
+      "status": "draft",
+      "content": {
+        "text": "3. パフォーマンス最適化",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": null,
+      "child_ids": ["card-des-008", "card-des-009", "card-des-010"],
+      "prev_id": "card-des-004",
+      "next_id": null
+    },
+    {
+      "id": "card-des-008",
+      "type": "paragraph",
+      "status": "draft",
+      "content": {
+        "text": "仮想スクロールを実装し、10,000カードでも快適な操作を実現する。",
+        "number": ""
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-007",
+      "child_ids": [],
+      "prev_id": null,
+      "next_id": "card-des-009"
+    },
+    {
+      "id": "card-des-009",
+      "type": "table",
+      "status": "draft",
+      "content": {
+        "text": "パフォーマンス目標一覧: カード数別の目標応答時間",
+        "number": "表3.1"
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-007",
+      "child_ids": [],
+      "prev_id": "card-des-008",
+      "next_id": "card-des-010"
+    },
+    {
+      "id": "card-des-010",
+      "type": "test",
+      "status": "draft",
+      "content": {
+        "text": "テスト手順: 10,000カードでのスクロール性能測定",
+        "number": "TEST-001"
+      },
+      "updatedAt": "2025-11-03T03:00:00.000Z",
+      "parent_id": "card-des-007",
+      "child_ids": [],
+      "prev_id": "card-des-009",
+      "next_id": null
+    }
+  ]
+}
