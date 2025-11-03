@@ -63,3 +63,6 @@
 - `package.json` に `perf:trace` スクリプト、`doc/software_detail_design.md` にコネクタセクションの進捗・ベンチマーク記載を追記。
 - `npm test -- connectorLayoutStore`, `npm test -- TraceConnectorLayer`, `npm test -- App` を実行し、コネクタ関連の回帰を確認。
 - `_input/sample_cards_spec.json` と `_input/sample_cards_design.json` を追加し、左右パネルで動作確認できる要求・設計カードセットを用意。対応するトレーサファイル `_input/trace_sample_cards_spec_design.json` を作成し、関係種別（trace/tests/duplicates）と directed 属性の差分を確認可能にした。
+## P2-10d
+- メインプロセスに `loadTraceFile` API を追加 (`src/main/workspace.ts` / `src/main/main.ts` / `src/main/preload.ts` / `src/renderer/global.d.ts`) し、左右カードファイル名から対応するトレーサビリティファイルを検索・ロードできるようにした (P2-10d)。
+- `src/renderer/store/traceStore.ts` を新設し、ロード結果をキャッシュする仕組みを追加。`TraceConnectorLayer` はアクティブタブのペアを検出して API を呼び出し、結果のリンクコレクションを参照するよう更新。

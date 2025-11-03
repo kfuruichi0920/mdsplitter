@@ -11,6 +11,7 @@
  */
 import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
+import type { LoadedTraceabilityFile } from '@/shared/traceability';
 
 export {};
 
@@ -28,6 +29,7 @@ declare global {
         load: () => Promise<WorkspaceSnapshot | null>;
         listCardFiles: () => Promise<string[]>;
         loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
+        loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
       };
     };
   }

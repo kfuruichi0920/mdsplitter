@@ -24,6 +24,7 @@ import {
   initializeWorkspace,
   listCardFiles,
   loadCardFile,
+  loadTraceFile,
   loadSettings,
   loadWorkspaceSnapshot,
   saveWorkspaceSnapshot,
@@ -153,6 +154,18 @@ ipcMain.handle('workspace:loadCardFile', async (_event, fileName: string) => {
     logMessage('warn', `カードファイルの読み込みに失敗しました: ${fileName}`);
   }
   return snapshot;
+});
+
+ipcMain.handle('workspace:loadTraceFile', async (_event, args: { leftFile: string; rightFile: string }) => {
+  const { leftFile, rightFile } = args;
+  logMessage('debug', `トレーサビリティファイルを探索します: left=${leftFile}, right=${rightFile}`);
+  const trace = await loadTraceFile(leftFile, rightFile);
+  if (trace) {
+    logMessage('info', `トレーサビリティファイルを読み込みました: ${trace.fileName}`);
+  } else {
+    logMessage('debug', '対応するトレーサビリティファイルが見つかりませんでした');
+  }
+  return trace;
 });
 
 

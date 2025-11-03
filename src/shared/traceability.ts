@@ -3,7 +3,14 @@
  * @brief トレーサビリティコネクタのスタブデータと型定義。
  */
 
-export type TraceRelationKind = 'trace' | 'refines' | 'tests' | 'duplicates';
+export type TraceRelationKind =
+  | 'trace'
+  | 'refines'
+  | 'tests'
+  | 'duplicates'
+  | 'satisfy'
+  | 'relate'
+  | 'specialize';
 export type TraceDirection = 'forward' | 'backward' | 'bidirectional';
 
 export interface TraceabilityLink {
@@ -13,6 +20,65 @@ export interface TraceabilityLink {
   relation: TraceRelationKind;
   direction: TraceDirection;
 }
+
+export interface TraceabilityRelation {
+  left_ids: string[];
+  right_ids: string[];
+  type: TraceRelationKind;
+  directed: 'left_to_right' | 'right_to_left' | 'bidirectional';
+  memo?: string;
+}
+
+export interface TraceabilityFile {
+  schemaVersion: number;
+  updatedAt?: string;
+  left_file: string;
+  right_file: string;
+  relations: TraceabilityRelation[];
+}
+
+export interface LoadedTraceabilityFile {
+  fileName: string;
+  payload: TraceabilityFile;
+}
+
+export const normalizeDirection = (directed: TraceabilityRelation['directed']): TraceDirection => {
+  switch (directed) {
+    case 'left_to_right':
+      return 'forward';
+    case 'right_to_left':
+      return 'backward';
+    default:
+      return 'bidirectional';
+  }
+};
+
+export const isTraceabilityFile = (value: unknown): value is TraceabilityFile => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<TraceabilityFile>;
+  if (
+    typeof candidate.schemaVersion !== 'number' ||
+    typeof candidate.left_file !== 'string' ||
+    typeof candidate.right_file !== 'string' ||
+    !Array.isArray(candidate.relations)
+  ) {
+    return false;
+  }
+  return candidate.relations.every((relation) => {
+    if (!relation || typeof relation !== 'object') {
+      return false;
+    }
+    const r = relation as TraceabilityRelation;
+    return (
+      Array.isArray(r.left_ids) &&
+      Array.isArray(r.right_ids) &&
+      typeof r.type === 'string' &&
+      typeof r.directed === 'string'
+    );
+  });
+};
 
 const TRACEABILITY_STUBS: TraceabilityLink[] = [
   {

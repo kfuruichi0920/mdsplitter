@@ -25,6 +25,13 @@ import {
   isWorkspaceSnapshot,
   type WorkspaceSnapshot,
 } from '../shared/workspace';
+import {
+  isTraceabilityFile,
+  normalizeDirection,
+  type LoadedTraceabilityFile,
+  type TraceabilityFile,
+  type TraceabilityLink,
+} from '../shared/traceability';
 
 export interface WorkspacePaths {
   root: string;
@@ -360,4 +367,64 @@ export const loadCardFile = async (fileName: string): Promise<WorkspaceSnapshot 
     console.error('[workspace] failed to load card file:', fileName, error);
     throw error;
   }
+};
+
+const isSafeFileToken = (token: string): boolean => {
+  return !token.includes('/') && !token.includes('\\') && !token.includes('..');
+};
+
+/**
+ * @brief 指定されたカードファイルペアに対応するトレーサビリティファイルを読み込む。
+ * @param leftFile 左側カードファイル名。
+ * @param rightFile 右側カードファイル名。
+ * @return 一致するファイルがあれば内容、なければ null。
+ */
+export const loadTraceFile = async (
+  leftFile: string,
+  rightFile: string,
+): Promise<LoadedTraceabilityFile | null> => {
+  if (!isSafeFileToken(leftFile) || !isSafeFileToken(rightFile)) {
+    console.warn('[workspace] invalid trace file request tokens');
+    return null;
+  }
+
+  const paths = resolveWorkspacePaths();
+  let candidates: string[] = [];
+  try {
+    const entries = await fs.readdir(paths.inputDir, { withFileTypes: true });
+    candidates = entries
+      .filter((entry) => entry.isFile() && entry.name.startsWith('trace_') && entry.name.endsWith('.json'))
+      .map((entry) => entry.name);
+  } catch (error) {
+    console.error('[workspace] failed to enumerate trace files', error);
+    return null;
+  }
+
+  for (const candidate of candidates) {
+    const filePath = path.join(paths.inputDir, candidate);
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      const parsed = JSON.parse(raw) as TraceabilityFile;
+      if (!isTraceabilityFile(parsed)) {
+        console.warn('[workspace] invalid traceability file structure:', candidate);
+        continue;
+      }
+
+      const matches =
+        (parsed.left_file === leftFile && parsed.right_file === rightFile) ||
+        (parsed.left_file === rightFile && parsed.right_file === leftFile);
+      if (!matches) {
+        continue;
+      }
+
+      return {
+        fileName: candidate,
+        payload: parsed,
+      } satisfies LoadedTraceabilityFile;
+    } catch (error) {
+      console.error('[workspace] failed to load trace file:', candidate, error);
+    }
+  }
+
+  return null;
 };

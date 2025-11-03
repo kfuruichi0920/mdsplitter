@@ -1,8 +1,8 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
-import { getTraceabilityStubs } from '@/shared/traceability';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
+import { useTraceStore } from '../store/traceStore';
 
 interface TraceConnectorLayerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -24,12 +24,6 @@ interface ConnectorPathEntry {
   path: string;
   className: string;
 }
-
-const directionSwap = (direction: 'forward' | 'backward' | 'bidirectional'): 'forward' | 'backward' | 'bidirectional' => {
-  if (direction === 'forward') return 'backward';
-  if (direction === 'backward') return 'forward';
-  return 'bidirectional';
-};
 
 export const TraceConnectorLayer = ({
   containerRef,
@@ -57,7 +51,36 @@ export const TraceConnectorLayer = ({
   );
   const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
 
-  const traceLinks = useMemo(() => getTraceabilityStubs(), []);
+  const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
+  const getCachedTrace = useTraceStore((state) => state.getCached);
+
+  const activeFiles = useWorkspaceStore(
+    (state) => {
+      const getActiveFile = (leafId: string): string | null => {
+        const leaf = state.leafs[leafId];
+        if (!leaf?.activeTabId) {
+          return null;
+        }
+        const tab = state.tabs[leaf.activeTabId];
+        return tab?.fileName ?? null;
+      };
+
+      const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
+      const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
+      return { left, right };
+    },
+    shallow,
+  );
+
+  useEffect(() => {
+    if (direction !== 'vertical') {
+      return;
+    }
+    if (!activeFiles.left || !activeFiles.right) {
+      return;
+    }
+    void loadTraceForPair(activeFiles.left, activeFiles.right);
+  }, [activeFiles.left, activeFiles.right, direction, loadTraceForPair]);
 
   useLayoutEffect(() => {
     if (direction !== 'vertical') {
@@ -116,6 +139,25 @@ export const TraceConnectorLayer = ({
     };
   }, [containerRef, direction]);
 
+  const pairKey = activeFiles.left && activeFiles.right ? `${activeFiles.left}|||${activeFiles.right}` : null;
+
+  const traceEntry = useTraceStore(
+    (state) => (pairKey ? state.cache[pairKey] : undefined),
+    shallow,
+  );
+
+  useEffect(() => {
+    if (direction !== 'vertical') {
+      return;
+    }
+    if (!activeFiles.left || !activeFiles.right) {
+      return;
+    }
+    void loadTraceForPair(activeFiles.left, activeFiles.right);
+  }, [activeFiles.left, activeFiles.right, direction, loadTraceForPair]);
+
+  const traceLinks = traceEntry?.links ?? [];
+
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical' || !viewBox) {
       return [];
@@ -134,20 +176,12 @@ export const TraceConnectorLayer = ({
     };
 
     return traceLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
-      let source = findEntry(link.sourceCardId, leftLeafIds);
-      let target = findEntry(link.targetCardId, rightLeafIds);
-      let effectiveDirection = link.direction;
+      const source = findEntry(link.sourceCardId, leftLeafIds);
+      const target = findEntry(link.targetCardId, rightLeafIds);
+      const effectiveDirection = link.direction;
 
       if (!source || !target) {
-        // 左右が逆の場合を考慮
-        const altSource = findEntry(link.sourceCardId, rightLeafIds);
-        const altTarget = findEntry(link.targetCardId, leftLeafIds);
-        if (!altSource || !altTarget) {
-          return acc;
-        }
-        source = altTarget;
-        target = altSource;
-        effectiveDirection = directionSwap(link.direction);
+        return acc;
       }
 
       const start = toLocalPoint(source, 'right');

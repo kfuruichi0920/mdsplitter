@@ -256,3 +256,4 @@ Deprecated --> Draft : 再利用
 ### 8.5 ベンチマーク・スタブシナリオ
 - `scripts/trace-benchmark.js` を追加し、100/500/1000/2000 本のコネクタ生成時間を計測する CLI (`npm run perf:trace`) を整備。
 - `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx` で DOMRect モックを用いた描画確認テストを追加し、P2-11a のスタブシナリオを最小構成で実現。
+- メイン/プリロードへ `workspace.loadTraceFile` API を追加し、`traceStore` 経由で左右アクティブタブのペアが切り替わる度にトレーサファイルを読み込み・キャッシュするルートを構築 (P2-10d)。

@@ -18,6 +18,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
+import type { LoadedTraceabilityFile } from '../shared/traceability';
 
 
 /**
@@ -51,6 +52,8 @@ type AppAPI = {
     listCardFiles: () => Promise<string[]>;
     /** 指定されたカードファイルを読み込む。 */
     loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
+    /** 左右カードファイルに対応するトレーサビリティファイルを読み込む。 */
+    loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
   };
 };
 
@@ -72,6 +75,8 @@ const api: AppAPI = {
     load: async () => ipcRenderer.invoke('workspace:load'),
     listCardFiles: async () => ipcRenderer.invoke('workspace:listCardFiles'),
     loadCardFile: async (fileName: string) => ipcRenderer.invoke('workspace:loadCardFile', fileName),
+    loadTraceFile: async (leftFile: string, rightFile: string) =>
+      ipcRenderer.invoke('workspace:loadTraceFile', { leftFile, rightFile }),
   },
 };
 
