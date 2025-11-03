@@ -7,3 +7,13 @@
 - `doc/software_detail_design.md:170-179` の P2-05 節を更新し、保存API導入と関連モジュールへの参照を追記。
 - `npm run test:unit` を実行し、全 8 スイート成功を確認。
 - `vite.config.ts:1-16` のエイリアスを `src` 直下に変更し、`npm run build` 時の `@/shared` 解決エラーを解消。`npm run build` が成功することを確認。
+
+## P2-05a～P2-05b 残件対応（再帰的分割・パネルクローズ）
+- `src/renderer/components/CardPanel.tsx:70-71` に `onPanelClick`/`onPanelClose` プロパティを追加。`handlePanelClick`（89-91行）と `handlePanelClose`（96-102行）コールバックを実装し、パネルクリックで親へ通知、クローズボタンクリック時にイベント伝播を防止。
+- `src/renderer/components/CardPanel.tsx:129-138` のタブバー右端に「✕」ボタンを追加。`className="tab-bar__close"` で `handlePanelClose` を呼び出し、`aria-label`/`title` でアクセシビリティ対応。
+- `src/renderer/App.tsx:484-495` に `handlePanelClick` を実装し、`setActiveLeaf(leafId)` を呼び出してアクティブ葉ノードを設定、DEBUG ログを出力。
+- `src/renderer/App.tsx:501-515` に `handlePanelClose` を実装し、`useSplitStore.getState().removeLeaf(leafId)` でパネル削除、INFO 通知とログを出力。
+- `src/renderer/App.tsx:1026-1031` で `SplitContainer` の `renderLeaf` に `onPanelClick`/`onPanelClose` コールバックを渡し、`CardPanel` へ連携。
+- `src/renderer/App.tsx:625-652` の `handleSplit` で `activeLeafId ?? splitRoot.id` により、アクティブな葉ノードがあればそれを分割、なければルートを分割する処理に変更。ルート分割済みで未選択時は警告通知・ログ出力。
+- `src/renderer/styles.css:198-200` に `.tab-bar__close` スタイルを追加。`hover:bg-rose-100`/`hover:text-rose-700` でホバー時に赤系の背景・文字色を設定、`focus-visible:outline-rose-500` でフォーカス可視化。
+- `npm run typecheck`、`npm run build`、`npm run test:unit` を実行し、全 37 テスト成功を確認。再帰的分割とパネルクローズ操作が正常に動作することを検証。

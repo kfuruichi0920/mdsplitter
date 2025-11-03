@@ -67,6 +67,8 @@ const formatUpdatedAt = (value: string): string => {
 export interface CardPanelProps {
   leafId: string; ///< 葉ノードID。
   onLog?: (level: 'INFO' | 'WARN' | 'ERROR', message: string) => void; ///< ログ出力コールバック。
+  onPanelClick?: (leafId: string) => void; ///< パネルクリック時のコールバック。
+  onPanelClose?: (leafId: string) => void; ///< パネルクローズ時のコールバック。
 }
 
 /**
@@ -74,12 +76,30 @@ export interface CardPanelProps {
  * @details
  * タブバー、ツールバー、カード一覧を含むカードパネルを描画する。
  */
-export const CardPanel = ({ leafId, onLog }: CardPanelProps) => {
+export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
   const cards = useWorkspaceStore((state) => state.cards);
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
 
   const cardCount = cards.length;
+
+  /**
+   * @brief パネルクリック時の処理。
+   */
+  const handlePanelClick = useCallback(() => {
+    onPanelClick?.(leafId);
+  }, [leafId, onPanelClick]);
+
+  /**
+   * @brief パネルクローズ時の処理。
+   */
+  const handlePanelClose = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation(); //! パネルクリックイベントの伝播を防ぐ
+      onPanelClose?.(leafId);
+    },
+    [leafId, onPanelClose],
+  );
 
   /**
    * @brief カードを選択する。
@@ -113,7 +133,7 @@ export const CardPanel = ({ leafId, onLog }: CardPanelProps) => {
   );
 
   return (
-    <div className="split-node" data-leaf-id={leafId}>
+    <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー */}
       <div className="tab-bar">
         <button type="button" className="tab-bar__tab tab-bar__tab--active">
@@ -124,6 +144,16 @@ export const CardPanel = ({ leafId, onLog }: CardPanelProps) => {
         </button>
         <button type="button" className="tab-bar__tab">
           ➕
+        </button>
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="tab-bar__close"
+          onClick={handlePanelClose}
+          aria-label="パネルを閉じる"
+          title="パネルを閉じる"
+        >
+          ✕
         </button>
       </div>
 

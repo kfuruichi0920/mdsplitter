@@ -434,6 +434,43 @@ export const App = () => {
   );
 
   /**
+   * @brief パネルクリック時にアクティブ葉ノードを設定する。
+   * @param leafId 葉ノードID。
+   */
+  const handlePanelClick = useCallback(
+    (leafId: string) => {
+      setActiveLeaf(leafId);
+      pushLog({
+        id: `panel-activate-${Date.now()}`,
+        level: 'DEBUG',
+        message: `パネル ${leafId} をアクティブにしました。`,
+        timestamp: new Date(),
+      });
+    },
+    [pushLog, setActiveLeaf],
+  );
+
+  /**
+   * @brief パネルクローズ時に葉ノードを削除する。
+   * @param leafId 葉ノードID。
+   */
+  const handlePanelClose = useCallback(
+    (leafId: string) => {
+      const removeLeaf = useSplitStore.getState().removeLeaf;
+      removeLeaf(leafId);
+      const now = new Date();
+      notify('info', 'パネルを閉じました。');
+      pushLog({
+        id: `panel-close-${now.valueOf()}`,
+        level: 'INFO',
+        message: `パネル ${leafId} を閉じました。`,
+        timestamp: now,
+      });
+    },
+    [notify, pushLog],
+  );
+
+  /**
    * @brief 選択カードのステータスを次段へ遷移させる。
    */
   const handleCycleStatus = useCallback(() => {
@@ -942,7 +979,14 @@ export const App = () => {
           <section className="panels" aria-label="カードパネル領域">
             <SplitContainer
               node={splitRoot}
-              renderLeaf={(leafId) => <CardPanel leafId={leafId} onLog={handleLog} />}
+              renderLeaf={(leafId) => (
+                <CardPanel
+                  leafId={leafId}
+                  onLog={handleLog}
+                  onPanelClick={handlePanelClick}
+                  onPanelClose={handlePanelClose}
+                />
+              )}
             />
           </section>
         </div>
