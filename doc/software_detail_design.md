@@ -61,6 +61,14 @@
 | `src/sum.ts` | ルート直下のサンプル `sum` 関数。 | テスト: `src/sum.test.ts` が正整数と負数の正常系を検証。 | ✅ (サンプル) |
 | (未実装) | メインレイアウト/状態管理/ファイル I/O 等の本機能コード | `task/task_all.md` のフェーズ 1 以降で実装予定。 | ⛔ |
 
+#### 2.3.1 コネクタ描画関連コンポーネント（計画）
+| パス | 主な内容 | 備考 | 状況 |
+| --- | --- | --- | --- |
+| `src/renderer/components/TraceConnectorLayer.tsx` | 隣接する左右パネル間のコネクタを SVG で描画するレイヤ。 | SVG `<path>` ベース、パネルごとの仮想化・インタラクション対応。 | ⛔ |
+| `src/renderer/store/connectorLayoutStore.ts` | カード要素の位置情報と可視状態を保持するストア。 | ResizeObserver/MutationObserver を用いて DOM 位置をトラッキング。 | ⛔ |
+| `src/renderer/hooks/useConnectorLayout.ts` | カードコンポーネントから位置情報を登録/更新するフック。 | `CardPanel` 内のカード要素に適用し、アンカー座標を測定。 | ⛔ |
+| `src/shared/traceability.ts` | コネクタ定義（方向・種類・スタイル）の共通型。 | 後続フェーズでメイン/レンダラ間共有。 | ⛔ |
+
 ## 3. ユースケース一覧
 全ユースケースは仕様段階であり、現行コードには未実装。ステータスを明示する。
 
@@ -208,3 +216,39 @@ Deprecated --> Draft : 再利用
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。
 - テスト基盤は Jest/Playwright の設定が存在するが、網羅的なテストケースは未作成。機能実装に伴いユニット・統合・E2E テストを拡充する。
 - ドキュメント更新は仕様変更と連動させる必要があり、本ファイルも実装進捗に合わせてステータスを更新すること。
+
+
+## 8. トレーサビリティコネクタ設計方針
+本節では P2-10 以降で実装予定のコネクタ描画基盤について、技術選定書（`spec/traceability_connector_tech_decision.md`）を踏まえた具体的な構成を整理する。
+
+### 8.1 採用方針概要
+- **描画方式**: SVG `<path>` を用いたベクタ描画。Canvas へ切り替える判断基準は 1,000 本超のコネクタで FPS < 24 が継続した場合とする。
+- **レンダリングレイヤ**: `TraceConnectorLayer` をパネル領域最上位に重ね、左右に隣接するスプリットペア単位で SVG を生成する。
+- **データ取得**: Zustand ベースの `connectorLayoutStore` にカード要素のアンカー座標と可視領域をキャッシュし、スクロール/リサイズ時は requestAnimationFrame でバッチ更新する。
+- **スタブデータ**: P2-11 まではローカルスタブ (`traceability.stubs.ts`) を使用し、将来的にメインプロセスのトレーサビリティ API と連携する。
+
+### 8.2 コンポーネント構成
+1. `TraceConnectorLayer`
+   - `SplitContainer` の下層に配置し、対象の左右ペアを検出。
+   - ペアごとに `<svg>` 要素を生成し、可視カード間の Connector パスを描画。
+2. `ConnectorPath`
+   - 1 本のコネクタを担当する純粋コンポーネント。
+   - 曲線制御点は `bezierControlPoints(from, to)` で算出、種別に応じたクラス名を付与。
+3. `useConnectorLayout`
+   - `CardPanel` 内の `article.card` 要素に `data-card-id` を付与して DOMRect を測定。
+   - ResizeObserver/MutationObserver で変化を捕捉し、store へ反映。
+4. `connectorLayoutStore`
+   - `cards: Record<CardId, AnchorRect>`、`panels: Record<LeafId, PanelRect>` を保持。
+   - `updateCardAnchor`, `removeCard`, `setPanelScroll` などのアクションを提供。
+
+### 8.3 フェーズ別タスク細分化案
+- **P2-10a**: `TraceConnectorLayer` の土台を実装し、左右ペア判定と SVG コンテナの表示を行う。ダミー座標を用いた単一コネクタ描画でレンダリング経路を検証する。
+- **P2-10b**: `useConnectorLayout`/`connectorLayoutStore` を導入し、カード DOM からアンカー座標を収集。スクロール・リサイズに追従するよう更新処理を整備する。
+- **P2-10c**: スタブトレースデータとカード ID を紐付け、左右パネル双方で存在するカードのみコネクタ化。方向性・種別に応じたスタイル付与、ハイライト状態の受け口を設置。
+- **P2-11**: コネクタ描画の統合テスト（React Testing Library + DOMRect モック）と Storybook/Playwright 用のスタブシナリオを追加し、負荷検証の取っ掛かりを用意。
+- **先行検討 (P2-12 以降)**: カード折畳みとの連動、トグル表示、ホバー/選択インタラクション、ライン編集 UI を順次追加。
+
+### 8.4 将来拡張ポイント
+- コネクタ本数が閾値を超えた場合、SVG 内で `visibility` 切替と仮想化を行う。
+- トレーサビリティ編集機能（ドラッグ、新規作成）は専用 Interaction Layer を追加し、命令はストア経由でメインプロセスと同期する。
+- WebGL / Canvas へのスイッチを想定し、コネクタ描画ロジックはアダプタパターンで分離する。

@@ -377,7 +377,7 @@
 
   /* 分割コンテナ関連スタイル */
   .split-container {
-    @apply h-full w-full;
+    @apply relative h-full w-full;
   }
 
   .split-container--horizontal {
@@ -412,5 +412,24 @@
 
   .splitter--vertical {
     @apply w-1 cursor-col-resize;
+  }
+
+  .trace-connector-layer {
+    @apply absolute inset-0 z-10 pointer-events-none;
+  }
+
+  .trace-connector-layer__svg {
+    @apply h-full w-full;
+  }
+
+  .trace-connector-path {
+    fill: none;
+    stroke: rgba(96, 165, 250, 0.7); /* tailwind blue-400 */
+    stroke-width: 2;
+    transition: stroke 0.2s ease;
+  }
+
+  .trace-connector-path--placeholder {
+    stroke-dasharray: 8 6;
   }
 }

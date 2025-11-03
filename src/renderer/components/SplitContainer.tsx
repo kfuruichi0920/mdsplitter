@@ -11,9 +11,10 @@
  */
 
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { SplitNode } from '../store/splitStore';
 import { useSplitStore } from '../store/splitStore';
+import { TraceConnectorLayer } from './TraceConnectorLayer';
 
 /**
  * @brief 分割コンテナコンポーネントのプロパティ。
@@ -59,6 +60,7 @@ const SplitContainerNode = ({
   }
 
   const updateSplitRatio = useSplitStore((state) => state.updateSplitRatio);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * @brief 分割比率を更新するコールバック。
@@ -103,7 +105,12 @@ const SplitContainerNode = ({
   }, [gridTemplate, isHorizontal]);
 
   return (
-    <div className={containerClass} style={containerStyle} data-split-id={node.id}>
+    <div
+      className={containerClass}
+      style={containerStyle}
+      data-split-id={node.id}
+      ref={containerRef}
+    >
       <SplitContainer node={node.first} renderLeaf={renderLeaf} />
       <Splitter
         direction={node.direction}
@@ -111,6 +118,12 @@ const SplitContainerNode = ({
         onRatioChange={handleRatioChange}
       />
       <SplitContainer node={node.second} renderLeaf={renderLeaf} />
+      <TraceConnectorLayer
+        containerRef={containerRef}
+        direction={node.direction}
+        splitRatio={node.splitRatio}
+        nodeId={node.id}
+      />
     </div>
   );
 };
