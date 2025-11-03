@@ -301,6 +301,13 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
   historyIndex: 0,
   activeLeafId: null,
 
+  /**
+   * @brief 指定した葉ノードを分割。
+   * @details
+   * 対象ノードが見つからなければ警告。履歴を更新。
+   * @param leafId 分割対象の葉ノードID。
+   * @param direction 分割方向。
+   */
   splitLeaf: (leafId, direction) =>
     set((state) => {
       const leaf = findLeafNode(state.root, leafId);
@@ -326,6 +333,13 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       };
     }),
 
+  /**
+   * @brief 分割ノードの比率を更新。
+   * @details
+   * 指定IDの分割ノードがなければ警告。
+   * @param nodeId 分割ノードID。
+   * @param ratio 新しい分割比率。
+   */
   updateSplitRatio: (nodeId, ratio) =>
     set((state) => {
       const splitNode = findSplitNode(state.root, nodeId);
@@ -338,6 +352,12 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       return { root: newRoot };
     }),
 
+  /**
+   * @brief 指定した葉ノードを削除。
+   * @details
+   * 最後の葉は削除不可。履歴を更新。
+   * @param leafId 削除対象の葉ノードID。
+   */
   removeLeaf: (leafId) =>
     set((state) => {
       const leaf = findLeafNode(state.root, leafId);
@@ -364,6 +384,12 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       };
     }),
 
+  /**
+   * @brief アクティブな葉ノードを設定。
+   * @details
+   * 指定IDが存在しなければ警告。
+   * @param leafId 葉ノードID。
+   */
   setActiveLeaf: (leafId) =>
     set((state) => {
       const leaf = findLeafNode(state.root, leafId);
@@ -375,6 +401,11 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       return { activeLeafId: leafId };
     }),
 
+  /**
+   * @brief Undo操作。
+   * @details
+   * 履歴がなければ警告。
+   */
   undo: () =>
     set((state) => {
       if (state.historyIndex <= 0) {
@@ -389,6 +420,11 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       };
     }),
 
+  /**
+   * @brief Redo操作。
+   * @details
+   * 履歴がなければ警告。
+   */
   redo: () =>
     set((state) => {
       if (state.historyIndex >= state.history.length - 1) {
@@ -403,6 +439,11 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       };
     }),
 
+  /**
+   * @brief 分割状態をリセット。
+   * @details
+   * ルート・履歴・アクティブIDを初期化。
+   */
   reset: () =>
     set(() => {
       const initialRoot = createInitialRoot();

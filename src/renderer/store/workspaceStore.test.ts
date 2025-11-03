@@ -1,3 +1,13 @@
+/**
+ * @file workspaceStore.test.ts
+ * @brief ワークスペースストアの単体テスト。
+ * @details
+ * useWorkspaceStoreの初期化・カード選択・更新・ステータス遷移を検証。
+ * @author K.Furuichi
+ * @date 2025-11-03
+ * @version 0.1
+ * @copyright MIT
+ */
 import { act } from '@testing-library/react';
 
 import {
@@ -18,6 +28,9 @@ describe('workspaceStore', () => {
     resetWorkspaceStore();
   });
 
+  /**
+   * @brief workspaceStoreのテストスイート。
+   */
   it('initializes cards and selected ID', () => {
     const state = useWorkspaceStore.getState();
     expect(state.cards).toHaveLength(3);
@@ -39,6 +52,9 @@ describe('workspaceStore', () => {
     expect(updated?.updatedAt).toBe(fixed.toISOString());
   });
 
+  /**
+   * @brief 初期カード配列と選択IDの初期値を検証。
+   */
   it('updates card body content via updateCard', () => {
     const fixed = new Date('2025-11-02T13:00:00.000Z');
     jest.useFakeTimers().setSystemTime(fixed);

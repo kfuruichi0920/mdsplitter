@@ -30,12 +30,24 @@ const DEFAULT_THEME: ThemeMode = 'dark';
 /** Zustand ストア定義。 */
 export const useUiStore = create<UiStoreState>()((set) => ({
   theme: DEFAULT_THEME,
+  /**
+   * @brief テーマをトグルする。
+   * @details
+   * 現在のテーマがdarkならlight、lightならdarkに切り替え。
+   */
   toggleTheme: () => {
     set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' }));
   },
+  /**
+   * @brief テーマを明示的に設定。
+   * @param mode 新しいテーマモード。
+   */
   setTheme: (mode: ThemeMode) => {
     set({ theme: mode });
   },
+  /**
+   * @brief テーマ状態を初期値にリセット。
+   */
   reset: () => {
     set({ theme: DEFAULT_THEME });
   },

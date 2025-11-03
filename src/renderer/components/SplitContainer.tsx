@@ -30,7 +30,7 @@ export interface SplitContainerProps {
  * 分割ノードの場合は Splitter で区切られた2つの SplitContainer を描画する。
  */
 export const SplitContainer = ({ node, renderLeaf }: SplitContainerProps) => {
-  //! 葉ノードの場合、renderLeaf を呼び出して描画
+  //! 葉ノードの場合は renderLeaf で描画
   if (node.type === 'leaf') {
     return (
       <div className="split-leaf" data-leaf-id={node.id} data-testid={`split-leaf-${node.id}`}>
@@ -39,7 +39,7 @@ export const SplitContainer = ({ node, renderLeaf }: SplitContainerProps) => {
     );
   }
 
-  //! 分割ノードの場合、Splitter で区切られた2つの子コンテナを描画
+  //! 分割ノードの場合は SplitContainerNode で再帰描画
   return <SplitContainerNode node={node} renderLeaf={renderLeaf} />;
 };
 
@@ -53,8 +53,8 @@ const SplitContainerNode = ({
   node: SplitNode;
   renderLeaf: (leafId: string) => ReactNode;
 }) => {
+  //! 葉ノードは型チェック用（実際は通らない）
   if (node.type === 'leaf') {
-    //! このパスは通らないが、型チェックのために残す
     return null;
   }
 
@@ -62,6 +62,8 @@ const SplitContainerNode = ({
 
   /**
    * @brief 分割比率を更新するコールバック。
+   * @details
+   * Splitterコンポーネントから呼ばれ、指定IDの分割ノードの比率を更新。
    * @param ratio 新しい分割比率（0.0 〜 1.0）。
    */
   const handleRatioChange = useCallback(
@@ -74,13 +76,14 @@ const SplitContainerNode = ({
   const isHorizontal = node.direction === 'horizontal';
   const containerClass = `split-container split-container--${node.direction}`;
 
-  //! 分割比率に基づいてグリッドテンプレートを計算
+  //! 分割比率からグリッドテンプレート（行/列幅）を計算
   const gridTemplate = useMemo<string>(() => {
     const firstPercent = node.splitRatio * 100;
     const secondPercent = (1 - node.splitRatio) * 100;
     return `${firstPercent}% 4px ${secondPercent}%`;
   }, [node.splitRatio]);
 
+  //! directionに応じてCSSグリッドの設定を切り替え
   const containerStyle = useMemo<CSSProperties>(() => {
     if (isHorizontal) {
       return {
@@ -132,6 +135,8 @@ const Splitter = ({ direction, splitRatio, onRatioChange }: SplitterProps) => {
 
   /**
    * @brief ドラッグ開始処理。
+   * @details
+   * PointerDownでドラッグ開始。親コンテナのrect取得し、pointermoveで分割比率計算。
    * @param event PointerDown イベント。
    */
   const handlePointerDown = useCallback(
@@ -141,13 +146,15 @@ const Splitter = ({ direction, splitRatio, onRatioChange }: SplitterProps) => {
 
       const container = event.currentTarget.parentElement;
       if (!container) {
-        return;
+        return; //! 親コンテナがなければ何もしない
       }
 
       const rect = container.getBoundingClientRect();
 
       /**
        * @brief ドラッグ中の処理。
+       * @details
+       * pointermoveで分割比率を計算し、onRatioChangeを呼ぶ。
        * @param moveEvent PointerMove イベント。
        */
       const handlePointerMove = (moveEvent: PointerEvent) => {
@@ -164,6 +171,8 @@ const Splitter = ({ direction, splitRatio, onRatioChange }: SplitterProps) => {
 
       /**
        * @brief ドラッグ終了処理。
+       * @details
+       * pointermove/pointerupリスナーを解除。
        */
       const handlePointerUp = () => {
         document.removeEventListener('pointermove', handlePointerMove);

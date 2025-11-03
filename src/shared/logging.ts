@@ -1,6 +1,13 @@
 /**
  * @file logging.ts
  * @brief ログレベルに関する共通ユーティリティ。
+ * @details
+ * ログレベルの優先度判定・フォーマット・サイズ変換を提供。
+ * 制約: LogLevel型の値のみ対応。@todo ログレベル拡張時は優先度定義も更新。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
+ * @copyright MIT
  */
 
 import type { LogLevel } from './settings';

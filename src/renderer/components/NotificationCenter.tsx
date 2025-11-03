@@ -7,10 +7,17 @@ const levelClassNames: Record<string, string> = {
   error: 'border-rose-400 bg-rose-500/20 text-rose-100',
 };
 
+/**
+ * @brief 通知センターコンポーネント。
+ * @details
+ * 状態管理ストアから通知一覧を取得し、各通知を表示。閉じるボタンで個別削除。
+ */
 export const NotificationCenter = () => {
+  //! 通知一覧・削除関数を取得
   const items = useNotificationStore((state) => state.items);
   const remove = useNotificationStore((state) => state.remove);
 
+  //! 通知がなければ何も表示しない
   if (items.length === 0) {
     return null;
   }

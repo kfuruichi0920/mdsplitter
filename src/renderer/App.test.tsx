@@ -1,11 +1,24 @@
+
+/**
+ * @file App.test.tsx
+ * @brief Appコンポーネントの統合テスト。
+ * @details
+ * ワークスペースのカード表示、ステータス切替、テーマ切替、保存・分割・検索パネル等の主要機能を網羅的に検証します。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
+ * @copyright MIT
+ */
+
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-
 import { defaultSettings, mergeSettings } from '@/shared/settings';
-
 import { App } from './App';
 import { resetWorkspaceStore } from './store/workspaceStore';
 import { resetUiStore } from './store/uiStore';
 
+/**
+ * @brief Appコンポーネントの統合テストケース群。
+ */
 describe('App', () => {
   const cloneSettings = () => JSON.parse(JSON.stringify(defaultSettings)) as typeof defaultSettings;
   const snapshotCards = [
@@ -44,6 +57,11 @@ describe('App', () => {
   let saveWorkspaceMock: jest.Mock;
   let loadWorkspaceMock: jest.Mock;
 
+  /**
+   * @brief 各テスト前の初期化処理。
+   * @details
+   * モック関数のリセット、window.appのセットアップ、ストア初期化を行います。
+   */
   beforeEach(() => {
     currentSettings = cloneSettings();
     saveWorkspaceMock = jest.fn().mockResolvedValue({ path: '/tmp/workspace.snapshot.json' });
@@ -74,6 +92,11 @@ describe('App', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * @brief 各テスト後のクリーンアップ処理。
+   * @details
+   * window.appの削除、モックリセット、ストア初期化を行います。
+   */
   afterEach(() => {
     jest.useRealTimers();
     act(() => {
@@ -85,6 +108,9 @@ describe('App', () => {
     loadWorkspaceMock.mockReset?.();
   });
 
+  /**
+   * @brief ワークスペースストアからカードを描画するテスト。
+   */
   it('renders cards from the workspace store', async () => {
     render(<App />);
     await act(async () => {});
@@ -93,6 +119,9 @@ describe('App', () => {
     expect(screen.getByText(/カード総数: 3/)).toBeInTheDocument();
   });
 
+  /**
+   * @brief ツールバーでカードステータスを切り替えるテスト。
+   */
   it('cycles the selected card status via toolbar button', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2025-11-02T09:00:00.000Z'));
     render(<App />);
@@ -109,6 +138,9 @@ describe('App', () => {
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
   });
 
+  /**
+   * @brief ツールバーでテーマを切り替えるテスト。
+   */
   it('toggles theme via toolbar button', async () => {
     render(<App />);
     await act(async () => {});
@@ -124,6 +156,9 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /ダークモード/ })).toBeInTheDocument();
   });
 
+  /**
+   * @brief Ctrl+Sショートカットでワークスペース保存を検証。
+   */
   it('saves workspace via Ctrl+S shortcut', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2025-11-03T09:00:00.000Z'));
 
@@ -152,6 +187,9 @@ describe('App', () => {
     expect(screen.getByText(/保存状態: ✓ 保存済み/)).toBeInTheDocument();
   });
 
+  /**
+   * @brief キーボードショートカットで分割レイアウトを変更するテスト。
+   */
   it('changes split layout via keyboard shortcuts', async () => {
     render(<App />);
     await act(async () => {});
@@ -180,6 +218,9 @@ describe('App', () => {
 
   });
 
+  /**
+   * @brief スナップショットロード時に無効カードが除去される警告を検証。
+   */
   it('warns when invalid cards are removed during snapshot load', async () => {
     loadWorkspaceMock.mockResolvedValueOnce({
       cards: [
@@ -207,6 +248,9 @@ describe('App', () => {
     expect(screen.queryByText('invalid-card')).not.toBeInTheDocument();
   });
 
+  /**
+   * @brief Ctrl+Fショートカットで検索パネルを開き、入力欄にフォーカスするテスト。
+   */
   it('opens search panel and focuses input via Ctrl+F shortcut', async () => {
     render(<App />);
     await act(async () => {});

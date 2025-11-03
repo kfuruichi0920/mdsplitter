@@ -3,6 +3,11 @@
  * @brief アプリ設定の型定義と既定値を提供するユーティリティ。
  * @details
  * メイン/レンダラ双方から参照され、`settings.json` の読み書きに利用する。
+ * 制約: 型定義のみ、バリデーションは未実装。@todo バリデーション関数追加。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
+ * @copyright MIT
  */
 
 export const SETTINGS_VERSION = 1;

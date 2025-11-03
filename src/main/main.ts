@@ -8,7 +8,7 @@
  * @code
  * npm run start
  * @endcode
- * @author kfuruichi0920
+ * @author K.Furuichi
  * @date 2025-11-02
  * @version 0.1
  * @copyright MIT

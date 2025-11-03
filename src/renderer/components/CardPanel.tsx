@@ -77,6 +77,7 @@ export interface CardPanelProps {
  * タブバー、ツールバー、カード一覧を含むカードパネルを描画する。
  */
 export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
+  //! カード一覧・選択ID・選択関数を取得
   const cards = useWorkspaceStore((state) => state.cards);
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
@@ -85,6 +86,8 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   /**
    * @brief パネルクリック時の処理。
+   * @details
+   * パネル全体のクリックで onPanelClick コールバックを呼び出す。
    */
   const handlePanelClick = useCallback(() => {
     onPanelClick?.(leafId);
@@ -92,6 +95,9 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   /**
    * @brief パネルクローズ時の処理。
+   * @details
+   * クリックイベントの伝播を防ぎ、onPanelClose コールバックを呼び出す。
+   * @param event マウスイベント。
    */
   const handlePanelClose = useCallback(
     (event: React.MouseEvent) => {
@@ -103,12 +109,14 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   /**
    * @brief カードを選択する。
+   * @details
+   * 既に選択済みの場合は何もしない。選択時は selectCard と onLog を呼ぶ。
    * @param card 対象カード。
    */
   const handleCardSelect = useCallback(
     (card: Card) => {
       if (card.id === selectedCardId) {
-        return;
+        return; //! 既に選択済みなら何もしない
       }
       selectCard(card.id);
       onLog?.('INFO', `カード「${card.title}」を選択しました。`);
@@ -118,13 +126,15 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   /**
    * @brief キーボード操作でカードを選択する。
+   * @details
+   * Enter/Spaceキーでカード選択。その他キーは無視。
    * @param event キーイベント。
    * @param card 対象カード。
    */
   const handleCardKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>, card: Card) => {
       if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
+        return; //! 対象キー以外は無視
       }
       event.preventDefault();
       handleCardSelect(card);
@@ -134,7 +144,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
-      {/* タブバー */}
+      {/* タブバー: 各カードファイルのタブを表示 */}
       <div className="tab-bar">
         <button type="button" className="tab-bar__tab tab-bar__tab--active">
           📄 overview.md
@@ -157,7 +167,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
         </button>
       </div>
 
-      {/* パネルツールバー */}
+      {/* パネルツールバー: 各種操作ボタン・フィルタ・メタ情報 */}
       <div className="panel-toolbar">
         <div className="panel-toolbar__group">
           <button type="button" className="panel-toolbar__button">
@@ -168,12 +178,12 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
           </button>
         </div>
         <div className="panel-toolbar__group">
-          <input className="panel-toolbar__input" placeholder="👓 文字列フィルタ" />
+          <input className="panel-toolbar__input" placeholder="� 文字列フィルタ" />
           <button type="button" className="panel-toolbar__button">
             📚 カード種別
           </button>
           <button type="button" className="panel-toolbar__button">
-            🧐 トレースのみ
+            � トレースのみ
           </button>
         </div>
         <div className="panel-toolbar__group">
@@ -185,7 +195,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
         <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
       </div>
 
-      {/* カード一覧 */}
+      {/* カード一覧: 各カードをリスト表示 */}
       <div className="panel-cards" role="list">
         {cards.map((card) => {
           const isActive = card.id === selectedCardId;

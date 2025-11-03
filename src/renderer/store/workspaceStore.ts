@@ -88,6 +88,12 @@ const createBaseState = () => {
 /** Zustand ストア本体。 */
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   ...createBaseState(),
+  /**
+   * @brief カードを選択。
+   * @details
+   * 指定IDが存在しなければ何もしない。
+   * @param id カードID。
+   */
   selectCard: (id: string) => {
     const exists = get().cards.some((card) => card.id === id);
     if (!exists) {
@@ -95,6 +101,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     }
     set({ selectedCardId: id });
   },
+  /**
+   * @brief カード内容を更新。
+   * @details
+   * 指定IDのカードをpatchで上書き。updatedAt未指定時は現在時刻。
+   * @param id カードID。
+   * @param patch 更新内容。
+   */
   updateCard: (id: string, patch: CardPatch) => {
     set((state) => ({
       cards: state.cards.map((card) => {
@@ -107,6 +120,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       }),
     }));
   },
+  /**
+   * @brief ステータスを次段へ遷移。
+   * @details
+   * getNextCardStatusで次の状態を決定し、updatedAtを更新。
+   * @param id カードID。
+   * @return 遷移後のステータス、またはnull。
+   */
   cycleCardStatus: (id: string) => {
     let nextStatus: CardStatus | null = null;
     set((state) => ({
@@ -124,12 +144,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     }));
     return nextStatus;
   },
+  /**
+   * @brief 外部スナップショットから状態を復元。
+   * @param cards カード配列。
+   */
   hydrate: (cards: Card[]) => {
     set({
       cards,
       selectedCardId: cards[0]?.id ?? null,
     });
   },
+  /**
+   * @brief ストアを初期状態へリセット。
+   * @details
+   * テスト用ユーティリティ。
+   */
   reset: () => {
     const base = createBaseState();
     set((state) => ({

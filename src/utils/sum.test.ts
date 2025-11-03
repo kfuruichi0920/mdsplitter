@@ -9,6 +9,18 @@
  * @copyright MIT
  */
 
+
+/**
+ * @file sum.test.ts
+ * @brief sum関数の単体テスト。
+ * @details
+ * sum.ts の加算処理について、代表的な正常系シナリオを検証します。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
+ * @copyright MIT
+ */
+
 import { sum } from './sum';
 
 /**

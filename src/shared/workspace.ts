@@ -1,17 +1,42 @@
 /**
  * @file workspace.ts
  * @brief ワークスペース共有データモデルとユーティリティ。
+ * @details
+ * カード情報・スナップショット・ステータス遷移等の型定義と判定関数を提供。
+ * 制約: 型定義のみ、バリデーションは簡易。@todo 厳密な型検査・エラー処理追加。
+ * @author K.Furuichi
+ * @date 2025-11-02
+ * @version 0.1
+ * @copyright MIT
  */
 
+/**
+ * @brief ワークスペーススナップショットのファイル名定数。
+ * @details
+ * outputDir配下に保存されるJSONファイル名。
+ * @since 0.1
+ */
 export const WORKSPACE_SNAPSHOT_FILENAME = 'workspace.snapshot.json';
 
-/** カードの表示種別。 */
+/**
+ * @brief カードの表示種別。
+ * @details
+ * Markdown構造やテスト・QAなどの分類。
+ */
 export type CardKind = 'heading' | 'paragraph' | 'bullet' | 'figure' | 'table' | 'test' | 'qa';
 
-/** カードのステータス。 */
+/**
+ * @brief カードのステータス。
+ * @details
+ * ドラフト・レビュー・承認・廃止の4段階。
+ */
 export type CardStatus = 'draft' | 'review' | 'approved' | 'deprecated';
 
-/** カード種別の列挙。 */
+/**
+ * @brief カード種別の列挙。
+ * @details
+ * CardKind型の全値を配列で保持。
+ */
 export const CARD_KIND_VALUES: readonly CardKind[] = [
   'heading',
   'paragraph',
@@ -22,45 +47,70 @@ export const CARD_KIND_VALUES: readonly CardKind[] = [
   'qa',
 ] as const;
 
-/** カード情報を表す構造体。 */
+/**
+ * @brief カード情報を表す構造体。
+ * @details
+ * 1枚のカードの全属性を保持。
+ * @ingroup workspace
+ */
 export interface Card {
-  id: string;
-  title: string;
-  body: string;
-  status: CardStatus;
-  kind: CardKind;
-  hasLeftTrace: boolean;
-  hasRightTrace: boolean;
-  updatedAt: string;
+  id: string;              ///< 一意ID
+  title: string;           ///< タイトル
+  body: string;            ///< 本文
+  status: CardStatus;      ///< ステータス
+  kind: CardKind;          ///< 種別
+  hasLeftTrace: boolean;   ///< 左トレース有無
+  hasRightTrace: boolean;  ///< 右トレース有無
+  updatedAt: string;       ///< 最終更新日時（ISO8601）
 }
 
-/** カード更新用パッチ。 */
+/**
+ * @brief カード更新用パッチ型。
+ * @details
+ * id以外の部分更新に利用。
+ */
 export type CardPatch = Partial<Omit<Card, 'id'>>;
 
-/** ステータス遷移順序。 */
+/**
+ * @brief ステータス遷移順序。
+ * @details
+ * draft→review→approved→deprecatedの順。
+ */
 export const CARD_STATUS_SEQUENCE: CardStatus[] = ['draft', 'review', 'approved', 'deprecated'];
 
 /**
  * @brief カードステータスを次段に遷移させる。
+ * @details
+ * 現在値が見つからない場合は先頭に戻る。
  * @param current 現在のステータス。
  * @return 遷移後のステータス。
+ * @throws なし
  */
 export const getNextCardStatus = (current: CardStatus): CardStatus => {
   const index = CARD_STATUS_SEQUENCE.indexOf(current);
+  //! index==-1なら先頭に戻る
   const nextIndex = index === -1 ? 0 : (index + 1) % CARD_STATUS_SEQUENCE.length;
   return CARD_STATUS_SEQUENCE[nextIndex];
 };
 
-/** ワークスペース全体のスナップショット。 */
+/**
+ * @brief ワークスペース全体のスナップショット。
+ * @details
+ * カード配列と保存日時を保持。
+ * @ingroup workspace
+ */
 export interface WorkspaceSnapshot {
-  cards: Card[];
-  savedAt: string;
+  cards: Card[];      ///< 全カード
+  savedAt: string;    ///< 保存日時（ISO8601）
 }
 
 /**
  * @brief 値が WorkspaceSnapshot として妥当かを判定する。
+ * @details
+ * cards/savedAtの型・構造を検証。@todo 厳密な型検査・エラー詳細返却。
  * @param value チェック対象。
- * @return 判定結果。
+ * @return 判定結果（true:妥当, false:不正）。
+ * @throws なし
  */
 export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot => {
   if (!value || typeof value !== 'object') {
@@ -70,6 +120,7 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
   if (!Array.isArray(maybe.cards) || typeof maybe.savedAt !== 'string') {
     return false;
   }
+  //! 各カードの型検証
   return maybe.cards.every((card) => {
     if (!card || typeof card !== 'object') {
       return false;
