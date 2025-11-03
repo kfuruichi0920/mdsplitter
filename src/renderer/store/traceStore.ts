@@ -96,20 +96,30 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
           links: [],
         };
         set((state) => ({ cache: { ...state.cache, [key]: entry } }));
+        if (window.app?.log) {
+          void window.app.log('info', `Trace file not found for pair: ${leftFile} / ${rightFile}`);
+        }
         return entry;
       }
       const entry = convertLoadedFile(leftFile, rightFile, result);
       set((state) => ({ cache: { ...state.cache, [key]: entry } }));
+      if (window.app?.log) {
+        void window.app.log('info', `Trace file loaded: ${result.fileName}`);
+      }
       return entry;
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
       const entry: TraceCacheEntry = {
         key,
         status: 'error',
         timestamp: Date.now(),
         links: [],
-        error: error instanceof Error ? error.message : 'unknown error',
+        error: message,
       };
       set((state) => ({ cache: { ...state.cache, [key]: entry } }));
+      if (window.app?.log) {
+        void window.app.log('error', `Trace file load failed for pair ${leftFile} / ${rightFile}: ${message}`);
+      }
       return entry;
     }
   },

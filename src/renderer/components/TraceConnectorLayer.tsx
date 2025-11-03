@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
@@ -13,17 +13,45 @@ interface TraceConnectorLayerProps {
   rightLeafIds: string[];
 }
 
-interface ViewBox {
-  width: number;
-  height: number;
-  rect: DOMRectReadOnly;
-}
-
 interface ConnectorPathEntry {
   id: string;
   path: string;
   className: string;
 }
+
+const directionSwap = (direction: 'forward' | 'backward' | 'bidirectional'): 'forward' | 'backward' | 'bidirectional' => {
+  if (direction === 'forward') return 'backward';
+  if (direction === 'backward') return 'forward';
+  return 'bidirectional';
+};
+
+const toLocalPoint = (anchor: CardAnchorEntry, rect: DOMRectReadOnly, side: 'left' | 'right') => {
+  const x = side === 'left' ? anchor.rect.left : anchor.rect.right;
+  return {
+    x: x - rect.left,
+    y: anchor.rect.midY - rect.top,
+  };
+};
+
+const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
+  return useWorkspaceStore(
+    (state) => {
+      const getActiveFile = (leafId: string): string | null => {
+        const leaf = state.leafs[leafId];
+        if (!leaf?.activeTabId) {
+          return null;
+        }
+        const tab = state.tabs[leaf.activeTabId];
+        return tab?.fileName ?? null;
+      };
+
+      const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
+      const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
+      return { left, right };
+    },
+    shallow,
+  );
+};
 
 export const TraceConnectorLayer = ({
   containerRef,
@@ -33,9 +61,51 @@ export const TraceConnectorLayer = ({
   leftLeafIds,
   rightLeafIds,
 }: TraceConnectorLayerProps) => {
-  const [viewBox, setViewBox] = useState<ViewBox | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const [containerRect, setContainerRect] = useState<DOMRectReadOnly | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(() => {
+    if (direction !== 'vertical') {
+      setContainerRect(null);
+      return () => {};
+    }
+
+    const element = containerRef.current;
+    if (!element) {
+      setContainerRect(null);
+      return () => {};
+    }
+
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        return;
+      }
+      setContainerRect(rect);
+    };
+
+    measure();
+    let observer: ResizeObserver | null = null;
+    const handleWindowResize = () => measure();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure);
+      observer.observe(element);
+      resizeObserverRef.current = observer;
+    } else {
+      // jsdom 環境などで ResizeObserver が未定義の場合のフォールバック
+      resizeObserverRef.current = null;
+    }
+
+    window.addEventListener('resize', handleWindowResize);
+
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+      observer?.disconnect();
+      resizeObserverRef.current = null;
+    };
+  }, [containerRef, direction]);
+
   const cards = useConnectorLayoutStore((state) => state.cards);
   const highlightedCardIds = useWorkspaceStore(
     (state) => {
@@ -54,23 +124,7 @@ export const TraceConnectorLayer = ({
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
   const getCachedTrace = useTraceStore((state) => state.getCached);
 
-  const activeFiles = useWorkspaceStore(
-    (state) => {
-      const getActiveFile = (leafId: string): string | null => {
-        const leaf = state.leafs[leafId];
-        if (!leaf?.activeTabId) {
-          return null;
-        }
-        const tab = state.tabs[leaf.activeTabId];
-        return tab?.fileName ?? null;
-      };
-
-      const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
-      const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
-      return { left, right };
-    },
-    shallow,
-  );
+  const activeFiles = useActiveFiles(leftLeafIds, rightLeafIds);
 
   useEffect(() => {
     if (direction !== 'vertical') {
@@ -82,117 +136,52 @@ export const TraceConnectorLayer = ({
     void loadTraceForPair(activeFiles.left, activeFiles.right);
   }, [activeFiles.left, activeFiles.right, direction, loadTraceForPair]);
 
-  useLayoutEffect(() => {
-    if (direction !== 'vertical') {
-      setViewBox(null);
-      return () => {};
-    }
-
-    const element = containerRef.current;
-    if (!element) {
-      setViewBox(null);
-      return () => {};
-    }
-
-    const updateViewBox = () => {
-      if (!containerRef.current) {
-        return;
-      }
-      const rect = containerRef.current.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        setViewBox(null);
-        return;
-      }
-      setViewBox({
-        width: rect.width,
-        height: rect.height,
-        rect,
-      });
-    };
-
-    const scheduleUpdate = () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
-        updateViewBox();
-      });
-    };
-
-    updateViewBox();
-
-    window.addEventListener('resize', scheduleUpdate);
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserverRef.current = new ResizeObserver(scheduleUpdate);
-      resizeObserverRef.current.observe(element);
-    }
-
-    return () => {
-      window.removeEventListener('resize', scheduleUpdate);
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      resizeObserverRef.current?.disconnect();
-      resizeObserverRef.current = null;
-    };
-  }, [containerRef, direction]);
-
   const pairKey = activeFiles.left && activeFiles.right ? `${activeFiles.left}|||${activeFiles.right}` : null;
-
   const traceEntry = useTraceStore(
     (state) => (pairKey ? state.cache[pairKey] : undefined),
     shallow,
   );
-
-  useEffect(() => {
-    if (direction !== 'vertical') {
-      return;
-    }
-    if (!activeFiles.left || !activeFiles.right) {
-      return;
-    }
-    void loadTraceForPair(activeFiles.left, activeFiles.right);
-  }, [activeFiles.left, activeFiles.right, direction, loadTraceForPair]);
-
   const traceLinks = traceEntry?.links ?? [];
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
-    if (direction !== 'vertical' || !viewBox) {
+    if (direction !== 'vertical') {
       return [];
     }
-    const containerRect = viewBox.rect;
+
+    const rect = containerRect;
+    if (!rect) {
+      return [];
+    }
+
     const entries = Object.values(cards);
     const findEntry = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
       entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
 
-    const toLocalPoint = (anchor: CardAnchorEntry, side: 'left' | 'right') => {
-      const x = side === 'left' ? anchor.rect.left : anchor.rect.right;
-      return {
-        x: x - containerRect.left,
-        y: anchor.rect.midY - containerRect.top,
-      };
-    };
-
     return traceLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
-      const source = findEntry(link.sourceCardId, leftLeafIds);
-      const target = findEntry(link.targetCardId, rightLeafIds);
-      const effectiveDirection = link.direction;
+      let source = findEntry(link.sourceCardId, leftLeafIds);
+      let target = findEntry(link.targetCardId, rightLeafIds);
+      let effectiveDirection = link.direction;
 
       if (!source || !target) {
-        return acc;
+        const altSource = findEntry(link.sourceCardId, rightLeafIds);
+        const altTarget = findEntry(link.targetCardId, leftLeafIds);
+        if (!altSource || !altTarget) {
+          return acc;
+        }
+        source = altTarget;
+        target = altSource;
+        effectiveDirection = directionSwap(link.direction);
       }
 
-      const start = toLocalPoint(source, 'right');
-      const end = toLocalPoint(target, 'left');
+      const start = toLocalPoint(source, rect, 'right');
+      const end = toLocalPoint(target, rect, 'left');
       const deltaX = end.x - start.x;
       if (deltaX <= 0) {
         return acc;
       }
+
       const curvature = Math.max(deltaX * 0.35, 24);
       const path = `M ${start.x} ${start.y} C ${start.x + curvature} ${start.y}, ${end.x - curvature} ${end.y}, ${end.x} ${end.y}`;
-
       const className = [
         'trace-connector-path',
         `trace-connector-path--${link.relation}`,
@@ -204,17 +193,16 @@ export const TraceConnectorLayer = ({
         .filter(Boolean)
         .join(' ');
 
-      acc.push({
-        id: link.id,
-        path,
-        className,
-      });
-
+      acc.push({ id: link.id, path, className });
       return acc;
     }, []);
-  }, [cards, direction, highlightedSet, leftLeafIds, rightLeafIds, traceLinks, viewBox]);
+  }, [cards, containerRect, direction, highlightedSet, leftLeafIds, rightLeafIds, traceLinks]);
 
-  if (direction !== 'vertical' || !viewBox) {
+  if (direction !== 'vertical') {
+    return null;
+  }
+
+  if (!containerRect) {
     return null;
   }
 
@@ -227,7 +215,7 @@ export const TraceConnectorLayer = ({
     >
       <svg
         className="trace-connector-layer__svg"
-        viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
+        viewBox={`0 0 ${containerRect.width} ${containerRect.height}`}
         preserveAspectRatio="none"
       >
         <defs>
@@ -246,10 +234,10 @@ export const TraceConnectorLayer = ({
         {connectorPaths.length === 0 ? (
           <path
             className="trace-connector-path trace-connector-path--placeholder"
-            d={`M ${(viewBox.width * splitRatio) / 2} ${viewBox.height / 2} C ${(viewBox.width * splitRatio) / 2 + 48} ${
-              viewBox.height / 2
-            }, ${(viewBox.width * (1 + splitRatio)) / 2 - 48} ${viewBox.height / 2}, ${(viewBox.width * (1 + splitRatio)) / 2} ${
-              viewBox.height / 2
+            d={`M ${(containerRect.width * splitRatio) / 2} ${containerRect.height / 2} C ${(containerRect.width * splitRatio) / 2 + 48} ${
+              containerRect.height / 2
+            }, ${(containerRect.width * (1 + splitRatio)) / 2 - 48} ${containerRect.height / 2}, ${(containerRect.width * (1 + splitRatio)) / 2} ${
+              containerRect.height / 2
             }`}
           />
         ) : (

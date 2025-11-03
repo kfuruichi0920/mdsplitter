@@ -65,7 +65,6 @@ const SplitContainerNode = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const leftLeafIds = useMemo(() => collectLeafIds(node.first), [node.first]);
   const rightLeafIds = useMemo(() => collectLeafIds(node.second), [node.second]);
-
   /**
    * @brief 分割比率を更新するコールバック。
    * @details

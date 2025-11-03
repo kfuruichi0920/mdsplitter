@@ -56,6 +56,30 @@
 - `src/renderer/components/TraceConnectorLayer.tsx` を新規追加。左右ペア検出のため `containerRef` を受け取り、P2-10a 向けダミーコネクタ（中央同士を結ぶベジェ曲線）を描画。
 - `src/renderer/components/SplitContainer.tsx:11-122` に `TraceConnectorLayer` を組み込み、垂直分割ノードに対して overlay を付与。`containerRef` を付与し、ノード方向・分割比率を渡す。
 - `src/renderer/styles.css:188-218` にコネクタレイヤ用のスタイル（`position:absolute`、`stroke-dasharray` 等）を追加し、`split-container` を `relative` に変更。
+- 左右パネルでトレーサビリティコネクタが表示されない問題を調査。`TraceConnectorLayer` の `viewBox` 計測が初期レンダリングで 0 サイズのまま固定されていたため描画が常にスキップされていたことを特定。コンポーネントを再実装し、`ResizeObserver` を再描画トリガーに用いつつ `getBoundingClientRect()` を都度取得する方式へ変更。調査用に追加したデバッグログ（console 出力）はすべて除去し、本番用のログのみ残すよう整理。
+
+## P2-10 トレーサビリティコネクタ対応まとめ
+
+### 背景・課題
+- 左右パネルで `sample_cards_spec.json` と `sample_cards_design.json` を開いてもコネクタが生成されない。
+- `TraceConnectorLayer` が `viewBox` `null` のままで描画をスキップしていた（ResizeObserver に依存した初期計測が 0 サイズで終了し、その後も更新されず）。
+- デバッグのために大量の `console.log` を挿入していたが、本番利用時に冗長なログが出力される状態になっていた。
+
+### 対応内容
+1. **TraceConnectorLayer の再実装**
+   - `viewBox` 状態を廃止し、描画直前に `containerRef.current.getBoundingClientRect()` を取得する方式へ変更。
+   - `ResizeObserver` は再計測トリガー（state `measureVersion` 更新）のみに使用し、`getBoundingClientRect()` は毎回実行。
+   - `ResizeObserver` が存在しない（JSDOM）環境では安全にフォールバック。
+   - 方向が逆のとき（左/右が入れ替わっている場合）も描画できるよう、既存の `directionSwap` ロジックを維持。
+
+2. **冗長ログの除去**
+   - `useCardConnectorAnchor`, `traceStore`, `SplitContainer`, `TraceConnectorLayer` に散在していた調査用の `console.log` を削除。
+   - `traceStore` では従来どおり `window.app.log`（動作ログ）への出力のみ維持。
+
+3. **ドキュメント/タスク更新**
+   - 本調査結果を本ファイルに記録、トレーサビリティ描画が期待通り動作することを確認。既存タスク P2-10 の後続作業（P2-10e 以降）へ引き継ぎ。
+
+
 ## P2-10b
 - `src/renderer/store/connectorLayoutStore.ts` と `src/renderer/hooks/useConnectorLayout.ts` を実装し、ResizeObserver と scroll イベントでカード DOMRect を追跡 (P2-10b)。`CardPanel` のカード要素は `CardListItem` サブコンポーネントへ分離し、アンカー登録フックを適用。
 - `src/shared/traceability.ts` にスタブリンク 3 件を定義し、`TraceConnectorLayer.tsx` で左右パネルのカードアンカーからベジェパスを生成。方向・種別クラス、選択カード連動ハイライトを追加 (P2-10c)。
@@ -66,3 +90,10 @@
 ## P2-10d
 - メインプロセスに `loadTraceFile` API を追加 (`src/main/workspace.ts` / `src/main/main.ts` / `src/main/preload.ts` / `src/renderer/global.d.ts`) し、左右カードファイル名から対応するトレーサビリティファイルを検索・ロードできるようにした (P2-10d)。
 - `src/renderer/store/traceStore.ts` を新設し、ロード結果をキャッシュする仕組みを追加。`TraceConnectorLayer` はアクティブタブのペアを検出して API を呼び出し、結果のリンクコレクションを参照するよう更新。
+
+
+### 今後の課題
+- 複数ペアが同時に存在するケースや上下分割構成での表示確認（現状は左右 1 ペアでの動作確認のみ）。
+- コネクタ本数が増えた場合のパフォーマンス検証（仮想化、非表示最適化）。
+- UI 上のハイライト／トレーサフィルタとの連携、未検出時のトースト表示など UX 改善は P2-10e/P2-10f で対応予定。
+- E2E テストや Storybook シナリオ等、実描画を確認できる自動化の追加。
