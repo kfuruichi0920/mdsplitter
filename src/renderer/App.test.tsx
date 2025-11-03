@@ -156,29 +156,29 @@ describe('App', () => {
     render(<App />);
     await act(async () => {});
 
-    const grid = screen.getByTestId('panel-grid');
-    expect(grid).toHaveAttribute('data-split-mode', 'single');
-    expect(screen.queryByText('トレーサビリティコネクタのプレビュー領域')).not.toBeInTheDocument();
+    const getLeaves = () => screen.getAllByTestId('panel-leaf');
+    expect(getLeaves()).toHaveLength(1);
 
     await act(async () => {
       fireEvent.keyDown(window, { key: '\\', ctrlKey: true });
     });
 
-    expect(grid).toHaveAttribute('data-split-mode', 'vertical');
-    expect(screen.getByText('トレーサビリティコネクタのプレビュー領域')).toBeInTheDocument();
+    await waitFor(() => expect(getLeaves()).toHaveLength(2));
+    expect(document.querySelector('[data-split-direction="vertical"]')).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.keyDown(window, { key: '\\', ctrlKey: true, shiftKey: true });
     });
 
-    expect(grid).toHaveAttribute('data-split-mode', 'horizontal');
+    await waitFor(() => expect(getLeaves()).toHaveLength(3));
+    expect(document.querySelector('[data-split-direction="horizontal"]')).toBeInTheDocument();
 
-    await act(async () => {
-      fireEvent.keyDown(window, { key: '\\', ctrlKey: true, shiftKey: true });
+    const closeButtons = screen.getAllByRole('button', { name: 'パネルを閉じる' });
+    act(() => {
+      closeButtons[closeButtons.length - 1].click();
     });
 
-    expect(grid).toHaveAttribute('data-split-mode', 'single');
-    expect(screen.queryByText('トレーサビリティコネクタのプレビュー領域')).not.toBeInTheDocument();
+    await waitFor(() => expect(getLeaves()).toHaveLength(2));
   });
 
   it('warns when invalid cards are removed during snapshot load', async () => {
@@ -204,7 +204,7 @@ describe('App', () => {
     await waitFor(() =>
       expect(screen.getByText('保存済みワークスペースを読み込みました (無効カード 1 件)。')).toBeInTheDocument(),
     );
-    expect(screen.getByText(/カード総数: 1/)).toBeInTheDocument();
+    expect(screen.getAllByText(/カード総数: 1/).length).toBeGreaterThan(0);
     expect(screen.queryByText('invalid-card')).not.toBeInTheDocument();
   });
 

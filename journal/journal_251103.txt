@@ -7,3 +7,11 @@
 - `doc/software_detail_design.md:170-179` の P2-05 節を更新し、保存API導入と関連モジュールへの参照を追記。
 - `npm run test:unit` を実行し、全 8 スイート成功を確認。
 - `vite.config.ts:1-16` のエイリアスを `src` 直下に変更し、`npm run build` 時の `@/shared` 解決エラーを解消。`npm run build` が成功することを確認。
+- `task/task_all.md:22-24` に P2-05a/P2-05b を追加完了扱いとし、分割レイアウト再設計タスクを明示。
+- `src/renderer/store/panelLayoutStore.ts:1-200` で分割ノードツリー・アクティブパネル・閉じ処理・リサイズ更新を管理するストアを新規実装し、`SplitDirection` 毎にノードを増殖可能とした。
+- `src/renderer/components/SplitView.tsx:1-176` を追加し、再帰的に分割ノードを描画。ドラッグリサイズ用のセパレータ、パネルクローズボタン、アクティブハイライトを実装。
+- `src/renderer/App.tsx:30-1140` を大幅に整理し、`SplitView` にカードパネル描画を委譲。水平/垂直分割ボタンとショートカットは `handleSplitPanel` でストアに委譲し、旧 `splitMode` ロジックを撤廃。
+- `src/renderer/styles.css:157-206` にパネル分割/セパレータ/クローズボタン向けのスタイルを定義し、ドラッグ操作時のカーソルやアクティブリングを調整。
+- `src/renderer/App.test.tsx:87-204` を更新し、レイアウト分割の挙動（パネル数、分割方向、クローズ操作）と無効カード除外時の警告表示を検証するテストケースを追加。
+- `npm run test:unit` を実行し、23 テストすべてが成功することを確認。
+- `src/renderer/styles.css:157-186` の分割グリッドを Flex 配列で再調整し、`split-grid--horizontal` を左右並び (`flex-direction: row`)、`split-grid--vertical` を上下並び (`flex-direction: column`) として再定義。各パネルに `flex: 1 1 0%` を付与し、水平/垂直ボタンの挙動が期待通りになることを確認。

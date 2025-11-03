@@ -24,12 +24,19 @@ import {
 } from './store/workspaceStore';
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
+import {
+  collectLeafIds,
+  usePanelLayoutStore,
+  type PanelLeafNode,
+  type SplitDirection,
+} from './store/panelLayoutStore';
 import type { LogLevel } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
+import { SplitView, type LeafRenderHelpers } from './components/SplitView';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -120,9 +127,6 @@ type LogEntry = {
   timestamp: Date; ///< 記録時刻。
 };
 
-/** パネル分割モード。 */
-type SplitMode = 'single' | 'vertical' | 'horizontal';
-
 const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
 
 /**
@@ -165,13 +169,13 @@ export const App = () => {
   const [isDirty, setDirty] = useState<boolean>(false); ///< 未保存状態フラグ。
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null); ///< 最終保存時刻。
-  const [splitMode, setSplitMode] = useState<SplitMode>('single'); ///< 現在のパネル分割モード。
   const cards = useWorkspaceStore((state) => state.cards);
   const selectedCardId = useWorkspaceStore((state) => state.selectedCardId);
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const hydrateWorkspace = useWorkspaceStore((state) => state.hydrate);
   const resetWorkspace = useWorkspaceStore((state) => state.reset);
+  const splitActiveLeaf = usePanelLayoutStore((state) => state.splitActiveLeaf);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -619,40 +623,28 @@ export const App = () => {
   }, [cards, isDirty, isSaving, notify, pushLog]);
 
   /**
-   * @brief パネル分割モードを切り替える。
-   * @param mode 適用する分割モード。
+   * @brief アクティブパネルを分割する。
+   * @param direction 分割方向。
    */
-  const handleSplit = useCallback(
-    (mode: Exclude<SplitMode, 'single'>) => {
-      const nextMode: SplitMode = splitMode === mode ? 'single' : mode;
-      if (nextMode === splitMode) {
+  const handleSplitPanel = useCallback(
+    (direction: SplitDirection) => {
+      const before = collectLeafIds(usePanelLayoutStore.getState().root).length;
+      splitActiveLeaf(direction);
+      const after = collectLeafIds(usePanelLayoutStore.getState().root).length;
+      if (after === before) {
         return;
       }
-
-      setSplitMode(nextMode);
+      const label = direction === 'vertical' ? '垂直' : '水平';
       const now = new Date();
-
-      if (nextMode === 'single') {
-        notify('info', 'パネル分割を解除しました。');
-        pushLog({
-          id: `split-reset-${now.valueOf()}`,
-          level: 'INFO',
-          message: 'パネル分割を解除しました。',
-          timestamp: now,
-        });
-        return;
-      }
-
-      const modeLabel = nextMode === 'vertical' ? '垂直' : '水平';
-      notify('info', `パネルを${modeLabel}分割しました。`);
+      notify('info', `パネルを${label}分割しました。`);
       pushLog({
-        id: `split-${nextMode}-${now.valueOf()}`,
+        id: `split-${direction}-${now.valueOf()}`,
         level: 'INFO',
-        message: `パネルを${modeLabel}分割しました。`,
+        message: `パネルを${label}分割しました。`,
         timestamp: now,
       });
     },
-    [notify, pushLog, splitMode],
+    [notify, pushLog, splitActiveLeaf],
   );
 
   /**
@@ -811,9 +803,6 @@ export const App = () => {
     : isDirty
       ? '保存状態: ● 未保存'
       : `保存状態: ✓ 保存済み${lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString()})` : ''}`;
-  const splitGridClass = `split-grid split-grid--${splitMode}`;
-  const isVerticalSplit = splitMode === 'vertical';
-  const isHorizontalSplit = splitMode === 'horizontal';
 
   const handleExplorerToggle = useCallback(() => {
     setExplorerOpen((prev) => !prev);
@@ -834,6 +823,68 @@ export const App = () => {
     }
     openSearchPanel();
   }, [isSearchOpen, notify, openSearchPanel, pushLog]);
+
+  const renderPanelLeaf = useCallback(
+    (_leaf: PanelLeafNode, { isActive }: LeafRenderHelpers) => {
+      const nodeClass = `split-node${isActive ? ' split-node--active' : ''}`;
+      return (
+        <div className={nodeClass} role="group" aria-label="カードパネル">
+          <div className="tab-bar">
+            <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 overview.md</button>
+            <button type="button" className="tab-bar__tab">📄 detail.md ●</button>
+            <button type="button" className="tab-bar__tab">➕</button>
+          </div>
+
+          <div className="panel-toolbar">
+            <div className="panel-toolbar__group">
+              <button type="button" className="panel-toolbar__button">⏬ 展開</button>
+              <button type="button" className="panel-toolbar__button">⏫ 折畳</button>
+            </div>
+            <div className="panel-toolbar__group">
+              <input className="panel-toolbar__input" placeholder="👓 文字列フィルタ" />
+              <button type="button" className="panel-toolbar__button">📚 カード種別</button>
+              <button type="button" className="panel-toolbar__button">🧐 トレースのみ</button>
+            </div>
+            <div className="panel-toolbar__group">
+              <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
+            </div>
+            <div className="panel-toolbar__spacer" />
+            <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
+          </div>
+
+          <div className="panel-cards" role="list">
+            {cards.map((card) => {
+              const isActiveCard = card.id === selectedCardId;
+              const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
+              const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+              return (
+                <article
+                  key={card.id}
+                  className={`card${isActiveCard ? ' card--active' : ''}`}
+                  aria-selected={isActiveCard}
+                  role="listitem"
+                  tabIndex={0}
+                  onClick={() => handleCardSelect(card)}
+                  onKeyDown={(event) => handleCardKeyDown(event, card)}
+                >
+                  <header className="card__header">
+                    <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+                    <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+                    <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+                    <span className="card__title">{card.title}</span>
+                    <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+                  </header>
+                  <p className="card__body">{card.body}</p>
+                  <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [cardCount, cards, handleCardKeyDown, handleCardSelect, selectedCardId],
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -865,19 +916,19 @@ export const App = () => {
 
       if (event.key === '\\' && !event.shiftKey) {
         event.preventDefault();
-        handleSplit('vertical');
+        handleSplitPanel('vertical');
         return;
       }
 
       if ((event.key === '\\' && event.shiftKey) || event.key === '|') {
         event.preventDefault();
-        handleSplit('horizontal');
+        handleSplitPanel('horizontal');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSplit, openSearchPanel]);
+  }, [handleSave, handleSplitPanel, openSearchPanel]);
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
@@ -917,16 +968,14 @@ export const App = () => {
           <button
             type="button"
             className="toolbar-button"
-            onClick={() => handleSplit('horizontal')}
-            aria-pressed={isHorizontalSplit}
+            onClick={() => handleSplitPanel('horizontal')}
           >
             ⇅ 水平分割
           </button>
           <button
             type="button"
             className="toolbar-button"
-            onClick={() => handleSplit('vertical')}
-            aria-pressed={isVerticalSplit}
+            onClick={() => handleSplitPanel('vertical')}
           >
             ⇆ 垂直分割
           </button>
@@ -1020,82 +1069,7 @@ export const App = () => {
           />
 
           <section className="panels" aria-label="カードパネル領域">
-            <div className={splitGridClass} data-split-mode={splitMode} data-testid="panel-grid">
-              <div className="split-node">
-                <div className="tab-bar">
-                  <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 overview.md</button>
-                  <button type="button" className="tab-bar__tab">📄 detail.md ●</button>
-                  <button type="button" className="tab-bar__tab">➕</button>
-                </div>
-
-                <div className="panel-toolbar">
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">⏬ 展開</button>
-                    <button type="button" className="panel-toolbar__button">⏫ 折畳</button>
-                  </div>
-                  <div className="panel-toolbar__group">
-                    <input className="panel-toolbar__input" placeholder="👓 文字列フィルタ" />
-                    <button type="button" className="panel-toolbar__button">📚 カード種別</button>
-                    <button type="button" className="panel-toolbar__button">🧐 トレースのみ</button>
-                  </div>
-                  <div className="panel-toolbar__group">
-                    <button type="button" className="panel-toolbar__button">☰ コンパクト</button>
-                  </div>
-                  <div className="panel-toolbar__spacer" />
-                  <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
-                </div>
-
-                <div className="panel-cards" role="list">
-                  {cards.map((card) => {
-                    const isActive = card.id === selectedCardId;
-                    const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
-                    const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
-                    return (
-                      <article
-                        key={card.id}
-                        className={`card${isActive ? ' card--active' : ''}`}
-                        aria-selected={isActive}
-                        role="listitem"
-                        tabIndex={0}
-                        onClick={() => handleCardSelect(card)}
-                        onKeyDown={(event) => handleCardKeyDown(event, card)}
-                      >
-                        <header className="card__header">
-                          <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
-                          <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
-                          <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-                          <span className="card__title">{card.title}</span>
-                          <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
-                        </header>
-                        <p className="card__body">{card.body}</p>
-                        <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-              {splitMode !== 'single' && (
-                <div className="split-node">
-                  <div className="tab-bar">
-                    <button type="button" className="tab-bar__tab tab-bar__tab--active">📄 trace.json</button>
-                    <button type="button" className="tab-bar__tab">➕</button>
-                  </div>
-                  <div className="panel-toolbar">
-                    <div className="panel-toolbar__group">
-                      <button type="button" className="panel-toolbar__button">⏭️ 展開</button>
-                      <button type="button" className="panel-toolbar__button">⏮️ 折畳</button>
-                    </div>
-                    <div className="panel-toolbar__group">
-                      <button type="button" className="panel-toolbar__button">トレーサ種別</button>
-                      <button type="button" className="panel-toolbar__button">☰ 表示</button>
-                    </div>
-                    <div className="panel-toolbar__spacer" />
-                    <div className="panel-toolbar__meta">カード総数: --</div>
-                  </div>
-                  <div className="panel-placeholder">トレーサビリティコネクタのプレビュー領域</div>
-                </div>
-              )}
-            </div>
+            <SplitView renderLeaf={renderPanelLeaf} />
           </section>
         </div>
 
