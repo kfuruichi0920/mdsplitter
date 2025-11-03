@@ -62,3 +62,4 @@
 - `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx` と `src/renderer/store/__tests__/connectorLayoutStore.test.ts` を追加し、Jest で描画/ストア挙動を検証。`scripts/trace-benchmark.js` と npm スクリプト `perf:trace` を用意し、100〜2000 本のコネクタ生成時間をログ出力できるようにした (P2-11a/b)。
 - `package.json` に `perf:trace` スクリプト、`doc/software_detail_design.md` にコネクタセクションの進捗・ベンチマーク記載を追記。
 - `npm test -- connectorLayoutStore`, `npm test -- TraceConnectorLayer`, `npm test -- App` を実行し、コネクタ関連の回帰を確認。
+- `_input/sample_cards_spec.json` と `_input/sample_cards_design.json` を追加し、左右パネルで動作確認できる要求・設計カードセットを用意。対応するトレーサファイル `_input/trace_sample_cards_spec_design.json` を作成し、関係種別（trace/tests/duplicates）と directed 属性の差分を確認可能にした。
