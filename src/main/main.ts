@@ -22,6 +22,8 @@ import type { LogLevel } from '../shared/settings';
 
 import {
   initializeWorkspace,
+  listCardFiles,
+  loadCardFile,
   loadSettings,
   loadWorkspaceSnapshot,
   saveWorkspaceSnapshot,
@@ -132,6 +134,23 @@ ipcMain.handle('workspace:load', async () => {
   const snapshot = await loadWorkspaceSnapshot();
   if (snapshot) {
     logMessage('info', 'ワークスペーススナップショットを読み込みました');
+  }
+  return snapshot;
+});
+
+ipcMain.handle('workspace:listCardFiles', async () => {
+  const files = await listCardFiles();
+  logMessage('info', `カードファイル一覧を取得しました: ${files.length}件`);
+  return files;
+});
+
+ipcMain.handle('workspace:loadCardFile', async (_event, fileName: string) => {
+  logMessage('info', `カードファイルを読み込みます: ${fileName}`);
+  const snapshot = await loadCardFile(fileName);
+  if (snapshot) {
+    logMessage('info', `カードファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
+  } else {
+    logMessage('warn', `カードファイルの読み込みに失敗しました: ${fileName}`);
   }
   return snapshot;
 });

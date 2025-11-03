@@ -123,6 +123,14 @@
     @apply cursor-pointer rounded-md px-2 py-1 text-xs text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
   }
 
+  .sidebar__tree-file {
+    @apply cursor-pointer rounded-md px-2 py-1 text-xs text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+  }
+
+  .sidebar__tree-empty {
+    @apply px-2 py-1 text-xs italic text-slate-400 dark:text-slate-500;
+  }
+
   .sidebar__label {
     @apply text-[0.65rem] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500;
   }

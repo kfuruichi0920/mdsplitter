@@ -134,6 +134,7 @@ export const App = () => {
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const hasInitializedCards = useRef<boolean>(false); ///< 初期カードロード判定。
+  const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧。
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
@@ -416,6 +417,35 @@ export const App = () => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  useEffect(() => {
+    //! カードファイル一覧を初期化
+    const loadCardFiles = async () => {
+      if (!window.app?.workspace?.listCardFiles) {
+        return;
+      }
+      try {
+        const files = await window.app.workspace.listCardFiles();
+        setCardFiles(files);
+        pushLog({
+          id: `card-files-loaded-${Date.now()}`,
+          level: 'INFO',
+          message: `カードファイル一覧を読み込みました: ${files.length}件`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error('[App] failed to load card files', error);
+        pushLog({
+          id: `card-files-error-${Date.now()}`,
+          level: 'ERROR',
+          message: 'カードファイル一覧の読み込みに失敗しました',
+          timestamp: new Date(),
+        });
+      }
+    };
+
+    void loadCardFiles();
+  }, [pushLog]);
+
   /**
    * @brief ログエントリをプッシュするラッパー（CardPanel に渡す用）。
    * @param level ログレベル。
@@ -469,6 +499,83 @@ export const App = () => {
     },
     [notify, pushLog],
   );
+
+  /**
+   * @brief カードファイルを読み込んでワークスペースに反映する。
+   * @param fileName ファイル名。
+   */
+  const handleLoadCardFile = useCallback(
+    async (fileName: string) => {
+      if (!window.app?.workspace?.loadCardFile) {
+        notify('error', 'カードファイル読み込み機能が利用できません。');
+        return;
+      }
+
+      try {
+        pushLog({
+          id: `load-card-start-${Date.now()}`,
+          level: 'INFO',
+          message: `カードファイルを読み込んでいます: ${fileName}`,
+          timestamp: new Date(),
+        });
+
+        const snapshot = await window.app.workspace.loadCardFile(fileName);
+        if (!snapshot) {
+          notify('error', `カードファイルの読み込みに失敗しました: ${fileName}`);
+          pushLog({
+            id: `load-card-failed-${Date.now()}`,
+            level: 'ERROR',
+            message: `カードファイルの読み込みに失敗しました: ${fileName}`,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        const { validCards, invalidMessages } = sanitizeSnapshotCards(snapshot.cards);
+
+        if (invalidMessages.length > 0) {
+          notify('warning', `一部のカードデータが不正です (${invalidMessages.length}件)`);
+          pushLog({
+            id: `load-card-invalid-${Date.now()}`,
+            level: 'WARN',
+            message: `無効なカードを除外しました: ${invalidMessages.join(', ')}`,
+            timestamp: new Date(),
+          });
+        }
+
+        hydrateWorkspace(validCards);
+        notify('success', `カードファイルを読み込みました: ${fileName} (${validCards.length}枚)`);
+        pushLog({
+          id: `load-card-success-${Date.now()}`,
+          level: 'INFO',
+          message: `カードファイルを読み込みました: ${fileName} (${validCards.length}枚)`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error('[App] failed to load card file', error);
+        notify('error', 'カードファイルの読み込み中にエラーが発生しました。');
+        pushLog({
+          id: `load-card-error-${Date.now()}`,
+          level: 'ERROR',
+          message: `カードファイル読み込みエラー: ${fileName}`,
+          timestamp: new Date(),
+        });
+      }
+    },
+    [hydrateWorkspace, notify, pushLog, sanitizeSnapshotCards],
+  );
+
+  useEffect(() => {
+    //! 初期状態でsample_cards_overview.jsonを自動読み込み
+    const loadInitialFile = async () => {
+      if (cardFiles.includes('sample_cards_overview.json') && !hasInitializedCards.current) {
+        hasInitializedCards.current = true;
+        await handleLoadCardFile('sample_cards_overview.json');
+      }
+    };
+
+    void loadInitialFile();
+  }, [cardFiles, handleLoadCardFile]);
 
   /**
    * @brief 選択カードのステータスを次段へ遷移させる。
@@ -923,13 +1030,34 @@ export const App = () => {
               >
                 <ul className="sidebar__tree" role="tree">
                   <li role="treeitem" aria-expanded="true">
-                    📁 requirements
+                    📁 _input
                     <ul role="group">
-                      <li role="treeitem">📄 system.md</li>
-                      <li role="treeitem">📄 ui.md</li>
+                      {cardFiles.length === 0 ? (
+                        <li role="treeitem" className="sidebar__tree-empty">
+                          カードファイルがありません
+                        </li>
+                      ) : (
+                        cardFiles.map((file) => (
+                          <li
+                            key={file}
+                            role="treeitem"
+                            className="sidebar__tree-file"
+                            onDoubleClick={() => handleLoadCardFile(file)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                void handleLoadCardFile(file);
+                              }
+                            }}
+                            tabIndex={0}
+                            title={`ダブルクリックして ${file} を読み込む`}
+                          >
+                            📄 {file}
+                          </li>
+                        ))
+                      )}
                     </ul>
                   </li>
-                  <li role="treeitem">📁 outputs</li>
                 </ul>
               </div>
             </div>

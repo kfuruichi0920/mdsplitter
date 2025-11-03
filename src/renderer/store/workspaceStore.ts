@@ -49,7 +49,7 @@ const createInitialCards = (): Card[] => [
     kind: 'heading',
     hasLeftTrace: true,
     hasRightTrace: true,
-    updatedAt: '2025-10-19T05:30:00.000Z',
+    updatedAt: '2021-10-19T05:30:00.000Z',
   },
   {
     id: 'card-002',

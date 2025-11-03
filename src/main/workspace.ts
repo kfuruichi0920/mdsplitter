@@ -180,3 +180,59 @@ export const loadWorkspaceSnapshot = async (): Promise<WorkspaceSnapshot | null>
     return null;
   }
 };
+
+/**
+ * @brief _inputディレクトリ内のカードファイル一覧を取得する。
+ * @return カードファイル名の配列。
+ */
+export const listCardFiles = async (): Promise<string[]> => {
+  const paths = resolveWorkspacePaths();
+  try {
+    const entries = await fs.readdir(paths.inputDir, { withFileTypes: true });
+    const jsonFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map((entry) => entry.name)
+      .sort();
+    return jsonFiles;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      return [];
+    }
+    console.error('[workspace] failed to list card files', error);
+    throw error;
+  }
+};
+
+/**
+ * @brief 指定されたカードファイルを読み込む。
+ * @param fileName ファイル名（_inputディレクトリ内の相対パス）。
+ * @return カードスナップショット、または null（無効な構造の場合）。
+ */
+export const loadCardFile = async (fileName: string): Promise<WorkspaceSnapshot | null> => {
+  const paths = resolveWorkspacePaths();
+  //! パストラバーサル対策: ファイル名にディレクトリ区切り文字が含まれていないことを確認
+  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('..')) {
+    console.warn('[workspace] invalid file name, rejecting:', fileName);
+    return null;
+  }
+
+  const filePath = path.join(paths.inputDir, fileName);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (isWorkspaceSnapshot(parsed)) {
+      return parsed;
+    }
+    console.warn('[workspace] invalid card file structure:', fileName);
+    return null;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      console.warn('[workspace] card file not found:', fileName);
+      return null;
+    }
+    console.error('[workspace] failed to load card file:', fileName, error);
+    throw error;
+  }
+};

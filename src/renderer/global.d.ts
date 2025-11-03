@@ -15,6 +15,8 @@ declare global {
       workspace: {
         save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
         load: () => Promise<WorkspaceSnapshot | null>;
+        listCardFiles: () => Promise<string[]>;
+        loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
       };
     };
   }
