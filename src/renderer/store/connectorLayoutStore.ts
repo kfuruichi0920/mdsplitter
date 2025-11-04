@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 
-const toKey = (leafId: string, cardId: string): string => `${leafId}::${cardId}`;
+const toKey = (leafId: string, fileName: string, cardId: string): string => `${leafId}::${fileName}::${cardId}`;
 
 /**
  * @brief カードアンカー位置情報。
@@ -14,6 +14,7 @@ export interface CardAnchorEntry {
   key: string;
   cardId: string;
   leafId: string;
+  fileName: string; ///< カードが属するファイル名（同一cardIdの識別に使用）。
   rect: AnchorMetrics;
   updatedAt: number;
 }
@@ -36,8 +37,8 @@ export interface AnchorMetrics {
  */
 interface ConnectorLayoutState {
   cards: Record<string, CardAnchorEntry>;
-  registerCardAnchor: (cardId: string, leafId: string, rect: DOMRectReadOnly) => void;
-  removeCardAnchor: (cardId: string, leafId: string) => void;
+  registerCardAnchor: (cardId: string, leafId: string, fileName: string, rect: DOMRectReadOnly) => void;
+  removeCardAnchor: (cardId: string, leafId: string, fileName: string) => void;
   clearLeafAnchors: (leafId: string) => void;
 }
 
@@ -59,9 +60,9 @@ const rectToMetrics = (rect: DOMRectReadOnly): AnchorMetrics => ({
  */
 export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => ({
   cards: {},
-  registerCardAnchor: (cardId, leafId, rect) => {
+  registerCardAnchor: (cardId, leafId, fileName, rect) => {
     set((state) => {
-      const key = toKey(leafId, cardId);
+      const key = toKey(leafId, fileName, cardId);
       const metrics = rectToMetrics(rect);
       return {
         cards: {
@@ -70,6 +71,7 @@ export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => (
             key,
             cardId,
             leafId,
+            fileName,
             rect: metrics,
             updatedAt: Date.now(),
           },
@@ -77,9 +79,9 @@ export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => (
       } satisfies Pick<ConnectorLayoutState, 'cards'>;
     });
   },
-  removeCardAnchor: (cardId, leafId) => {
+  removeCardAnchor: (cardId, leafId, fileName) => {
     set((state) => {
-      const key = toKey(leafId, cardId);
+      const key = toKey(leafId, fileName, cardId);
       if (!(key in state.cards)) {
         return state;
       }

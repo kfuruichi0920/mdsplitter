@@ -1,0 +1,635 @@
+# 作業記録 2025-11-05
+
+## タスク: P2-10d-2 複数分割パターンとファイル識別対応
+
+### 作業概要
+1対多分割（左1分割、右は上下に2分割）や水平方向3分割におけるコネクタ表示に対応。
+異なるカードファイルで同じカードIDを使用していても別物として識別できるよう実装。
+
+### 実装内容
+
+#### 1. カードID識別子の設計（cardId + fileName）
+**根拠**: 異なるファイルで同じcardIdが使用される可能性があるため、ファイル名を含めて一意性を保証する必要がある。
+
+**変更箇所**:
+- `src/renderer/store/connectorLayoutStore.ts:8`
+  - `toKey` 関数を `(leafId, fileName, cardId)` の3引数に変更
+  - キー形式: `${leafId}::${fileName}::${cardId}`
+
+- `src/renderer/store/connectorLayoutStore.ts:13-20`
+  - `CardAnchorEntry` インターフェースに `fileName: string` フィールドを追加
+  - コメント: "カードが属するファイル名（同一cardIdの識別に使用）"
+
+- `src/renderer/store/connectorLayoutStore.ts:38-42`
+  - `ConnectorLayoutState` インターフェースの関数シグネチャを更新
+  - `registerCardAnchor`: `(cardId, leafId, fileName, rect)` に変更
+  - `removeCardAnchor`: `(cardId, leafId, fileName)` に変更
+
+#### 2. connectorLayoutStoreの実装更新
+**変更箇所**:
+- `src/renderer/store/connectorLayoutStore.ts:62-80`
+  - `registerCardAnchor` 実装でfileNameを引数に追加
+  - `toKey(leafId, fileName, cardId)` で3引数呼び出し
+  - エントリ作成時に `fileName` フィールドを設定
+
+- `src/renderer/store/connectorLayoutStore.ts:82-91`
+  - `removeCardAnchor` 実装でfileNameを引数に追加
+  - `toKey(leafId, fileName, cardId)` で3引数呼び出し
+
+#### 3. useConnectorLayoutフックの更新
+**変更箇所**:
+- `src/renderer/hooks/useConnectorLayout.ts:9-14`
+  - `CardAnchorOptions` に `fileName: string` フィールドを追加
+
+- `src/renderer/hooks/useConnectorLayout.ts:21-40`
+  - `useCardConnectorAnchor` でfileNameを引数に追加
+  - `measure` コールバックで `registerCardAnchor(cardId, leafId, fileName, rect)` 呼び出し
+  - 依存配列に `fileName` を追加
+
+- `src/renderer/hooks/useConnectorLayout.ts:63-84, 115-120`
+  - `setRef` コールバックと cleanup 処理で `removeCardAnchor(cardId, leafId, fileName)` 呼び出し
+  - 依存配列に `fileName` を追加
+
+#### 4. CardPanelコンポーネントの更新
+**変更箇所**:
+- `src/renderer/components/CardPanel.tsx:317-328`
+  - `CardListItemProps` に `fileName: string` フィールドを追加
+  - `CardListItem` コンポーネントでfileNameをpropsとして受け取り
+  - `useCardConnectorAnchor({ cardId, leafId, fileName, scrollContainerRef })` 呼び出し
+
+- `src/renderer/components/CardPanel.tsx:296-307`
+  - `CardListItem` 呼び出し時に `fileName={activeTab?.fileName ?? ''}` を渡す
+  - **根拠**: `PanelTabState` には `fileName: string` フィールドが存在（`src/renderer/store/workspaceStore.ts:30`）
+
+#### 5. TraceConnectorLayerの更新
+**変更箇所**:
+- `src/renderer/components/TraceConnectorLayer.tsx:157-158`
+  - `findEntry` 関数のシグネチャを `(cardId, fileName, leafIds)` に変更
+  - フィルタ条件に `entry.fileName === fileName` を追加
+
+- `src/renderer/components/TraceConnectorLayer.tsx:160-178`
+  - `connectorPaths` のreduce処理でactiveFilesのチェックを追加
+  - `findEntry` 呼び出し時に `activeFiles.left` / `activeFiles.right` を渡す
+  - **根拠**: トレーサビリティリンクは特定のファイルペア間でのみ有効
+
+- `src/renderer/components/TraceConnectorLayer.tsx:203`
+  - `useMemo` の依存配列に `activeFiles` を追加
+
+#### 6. テストの更新
+**変更箇所**:
+- `src/renderer/store/__tests__/connectorLayoutStore.test.ts:21-32`
+  - `registerCardAnchor` / `removeCardAnchor` 呼び出しに `fileName` 引数を追加
+  - アサーションに `expect(entry.fileName).toBe('test-file.json')` を追加
+
+- `src/renderer/store/__tests__/connectorLayoutStore.test.ts:50-59`
+  - 複数カード登録時に異なる `fileName` を指定
+
+- `src/renderer/store/__tests__/connectorLayoutStore.test.ts:61-86`
+  - **新規テストケース追加**: "distinguishes same cardId with different fileNames"
+  - 同じcardId、同じleafIdで異なるfileNameを登録し、2つのエントリが作成されることを確認
+
+- `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx:73-74`
+  - `registerCardAnchor` 呼び出しに `fileName` 引数を追加
+
+### テスト結果
+- `npm run typecheck`: エラーなし
+- `npm test -- connectorLayoutStore.test.ts`: 3テスト全てパス
+- `npm test -- TraceConnectorLayer.test.tsx`: 1テスト全てパス
+
+### 設計上の決定事項
+
+#### 1. 3分割以上のレイアウトについて
+**決定**: 現在のアーキテクチャは二分木構造のため、3分割は2段階の分割として表現される。
+- 例: 左中右の3分割 = 垂直分割(左, (垂直分割(中, 右)))
+- `TraceConnectorLayer` は各分割ノードに配置されるため、コネクタは隣接するペアごとに描画される
+- **根拠**: `src/renderer/components/SplitContainer.tsx:124-131` で各分割ノードに `TraceConnectorLayer` が配置される
+
+#### 2. ファイル名の伝播経路
+**決定**: activeTab.fileName → CardListItem → useCardConnectorAnchor → connectorLayoutStore
+- **根拠**: `PanelTabState.fileName` (workspaceStore.ts:30) はタブごとに管理されており、アクティブタブから取得可能
+
+#### 3. トレーサビリティリンクのファイル対応
+**決定**: `TraceConnectorLayer` でactiveFiles（左右のファイル名）を用いてfindEntryを呼び出す
+- **根拠**: トレーサビリティファイルは特定のファイルペア間の関連を定義（`traceability.ts:32-38`）
+- 異なるファイルペアのカードは接続しない
+
+### 今後の課題（task_all.mdより）
+- P2-10d-3: カードの位置移動（スクロール・リサイズ）への追従と再描画最適化
+- P2-10d-4: コネクタ本数増加時のパフォーマンス検証と仮想化検討
+- P2-10e: トレーサデータのコネクタ描画反映とタブ切替追従
+- P2-10f: 未検出時のフォールバック/エラーハンドリング
+
+### 参照
+- AGENT.md: 作業プロトコル、詳細設計更新要件
+- task/task_all.md: P2-10d-2タスク定義
+- trace_sample_cards_spec_design.json: 1対多ケースのサンプルデータ
+
+---
+
+## 追加修正: 右下パネルへのコネクタ非表示問題
+
+### 問題発見
+画像から、左1枚・右上下2枚の分割で、右上パネルへはコネクタが表示されるが、右下パネルへのコネクタが表示されない問題を発見。
+
+### 原因調査
+
+#### 1. 分割構造の確認
+- ルート分割ノード (vertical): 左 vs 右
+  - 左: leaf (sample_cards_spec.json)
+  - 右: 分割ノード (horizontal): 右上 vs 右下
+    - 右上: leaf (sample_cards_design.json)
+    - 右下: leaf (sample_cards_design2.json)
+
+#### 2. トレースファイルの確認
+- `_input/trace_sample_cards_spec_design.json` (spec → design)
+- `_input/trace_sample_cards_spec_design2.json` (spec → design2)
+両方のトレースファイルが存在することを確認。
+
+#### 3. 根本原因の特定
+**問題箇所**: `src/renderer/components/TraceConnectorLayer.tsx:36-54` の `useActiveFiles`
+
+```typescript
+const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
+const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
+```
+
+- `find`で**最初に見つかったファイルのみ**を返している
+- 右側に複数leafがある場合（design.json, design2.json）、最初の一つ（design.json）しか処理されない
+- そのため、design2.jsonへのコネクタが描画されない
+
+### 修正内容
+
+#### 1. useActiveFilesの複数ペア対応
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:36-70`
+
+**修正前**:
+```typescript
+const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
+const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
+return { left, right };
+```
+
+**修正後**:
+```typescript
+interface FilePair {
+  left: string;
+  right: string;
+}
+
+// 左側の全ファイルを取得
+const leftFiles = leftLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+// 右側の全ファイルを取得  
+const rightFiles = rightLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+
+// 全ての組み合わせのペアを生成
+const pairs: FilePair[] = [];
+for (const left of leftFiles) {
+  for (const right of rightFiles) {
+    pairs.push({ left, right });
+  }
+}
+return pairs;
+```
+
+**根拠**: 左右に複数のleafがある場合、全ての組み合わせに対してトレースファイルを検索・読み込む必要がある。
+
+#### 2. 複数トレースファイルの読み込み
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:140-168`
+
+```typescript
+const activeFilePairs = useActiveFiles(leftLeafIds, rightLeafIds);
+
+useEffect(() => {
+  if (direction !== 'vertical') {
+    return;
+  }
+  // 全てのペアに対してトレースファイルを読み込む
+  for (const pair of activeFilePairs) {
+    void loadTraceForPair(pair.left, pair.right);
+  }
+}, [activeFilePairs, direction, loadTraceForPair]);
+
+// 全てのペアからトレースリンクを収集
+const traceLinks = useTraceStore(
+  (state) => {
+    const allLinks: TraceabilityLink[] = [];
+    for (const pair of activeFilePairs) {
+      const pairKey = `${pair.left}|||${pair.right}`;
+      const entry = state.cache[pairKey];
+      if (entry?.links) {
+        allLinks.push(...entry.links);
+      }
+    }
+    return allLinks;
+  },
+  shallow,
+);
+```
+
+**根拠**: 
+- 各ファイルペアごとにトレースファイルを読み込む
+- 全てのトレースリンクをマージして描画に使用
+
+#### 3. ファイル名判定の除去
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:180-203`
+
+**修正前**:
+```typescript
+const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>
+  entries.find((entry) => entry.cardId === cardId && entry.fileName === fileName && leafIds.includes(entry.leafId));
+
+let source = findEntry(link.sourceCardId, activeFiles.left, leftLeafIds);
+let target = findEntry(link.targetCardId, activeFiles.right, rightLeafIds);
+```
+
+**修正後**:
+```typescript
+// ファイル名を指定せずに、leafIdsのみでエントリを検索するヘルパー
+const findEntryByLeafs = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
+  entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
+
+let source = findEntryByLeafs(link.sourceCardId, leftLeafIds);
+let target = findEntryByLeafs(link.targetCardId, rightLeafIds);
+```
+
+**根拠**: 
+- トレースリンクには既にファイルペア情報が含まれている（traceStoreから取得時にペアごとに分離されている）
+- leafIds内で一致するエントリを検索すれば、正しいカードが見つかる
+- fileNameによる追加フィルタは不要（むしろ誤動作の原因）
+
+#### 4. import文の追加
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:6`
+
+```typescript
+import type { TraceabilityLink } from '@/shared/traceability';
+```
+
+### テスト結果
+- `npm run typecheck`: エラーなし
+- `npm test -- TraceConnectorLayer.test.tsx`: 1テスト全てパス
+
+### 設計上の決定事項
+
+#### 1. 複数ファイルペアの処理方針
+**決定**: 左右のleafIdsから全ての組み合わせを生成し、各ペアに対してトレースファイルを読み込む
+
+**理由**:
+- 1対多分割（左1、右2+）では、左ファイルと右の各ファイル間にそれぞれトレースファイルが存在する可能性がある
+- 全ペアを処理することで、全てのコネクタを表示できる
+
+#### 2. ファイル名フィルタリングの削除
+**決定**: connectorPaths生成時にfileNameによるフィルタリングを行わない
+
+**理由**:
+- traceLinksは既にファイルペアごとに分離されたリンクの集合
+- leafIds内でカードが見つかれば、それが正しいカードである
+- P2-10d-2で追加したfileNameフィルタは、単一ペアを前提とした実装だったため、複数ペア対応で不要になった
+
+### 今後の課題
+- P2-10d-3: カードの位置移動（スクロール・リサイズ）への追従と再描画最適化
+- P2-10d-4: コネクタ本数増加時のパフォーマンス検証（複数ペア対応により本数が増加）
+
+### 参照
+- 問題画像: 左1枚、右上下2枚の分割で右下へのコネクタが非表示
+- `_input/trace_sample_cards_spec_design.json`: spec → design のトレース
+- `_input/trace_sample_cards_spec_design2.json`: spec → design2 のトレース
+
+---
+
+## 再修正: findEntryByLeafsの問題（同一cardIdの誤検索）
+
+### 問題の再発見
+前回の修正後も、右下パネルへのコネクタが表示されない問題が残っていた。
+
+### 根本原因の再特定
+**問題箇所**: `src/renderer/components/TraceConnectorLayer.tsx:184-185` (修正前)
+
+```typescript
+const findEntryByLeafs = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
+  entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
+```
+
+**問題点**:
+- `find`は**最初に見つかったエントリのみ**を返す
+- 同じcardIdが複数のファイル（例: design.json と design2.json）に存在する場合、最初に見つかったファイルのエントリしか返さない
+- 例: 右上leaf（design.json）と右下leaf（design2.json）の両方に`card-design-001`が存在する場合、常に右上のエントリが返される
+- そのため、design2.json へのコネクタは描画されない
+
+### シナリオ例
+1. 左leaf: `sample_cards_spec.json` に `card-spec-001`
+2. 右上leaf: `sample_cards_design.json` に `card-design-001`  
+3. 右下leaf: `sample_cards_design2.json` に `card-design-001`（同じID）
+
+トレースファイル:
+- `trace_sample_cards_spec_design.json`: `card-spec-001` → `card-design-001`
+- `trace_sample_cards_spec_design2.json`: `card-spec-001` → `card-design-001`
+
+`findEntryByLeafs('card-design-001', [右上leafId, 右下leafId])` は常に右上のエントリを返すため、右下へのコネクタは描画されない。
+
+### 修正内容
+
+#### 1. ExtendedLink型の追加
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:155-159`
+
+```typescript
+// ファイルペア情報を含む拡張リンク型
+interface ExtendedLink extends TraceabilityLink {
+  sourceFileName: string;
+  targetFileName: string;
+}
+```
+
+**根拠**: トレースリンクにどのファイルペアから来たかの情報を保持する必要がある。
+
+#### 2. traceLinks収集時にファイル情報を付加
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:161-182`
+
+```typescript
+const traceLinks = useTraceStore(
+  (state) => {
+    const allLinks: ExtendedLink[] = [];
+    for (const pair of activeFilePairs) {
+      const pairKey = `${pair.left}|||${pair.right}`;
+      const entry = state.cache[pairKey];
+      if (entry?.links) {
+        // 各リンクにファイル情報を付加
+        entry.links.forEach((link) => {
+          allLinks.push({
+            ...link,
+            sourceFileName: pair.left,
+            targetFileName: pair.right,
+          });
+        });
+      }
+    }
+    return allLinks;
+  },
+  shallow,
+);
+```
+
+**根拠**: 
+- 各トレースリンクがどのファイルペア（例: spec.json → design2.json）から来たかを明示的に保持
+- これにより、同じcardIdでも正しいファイルのエントリを検索できる
+
+#### 3. findEntryの修正（fileName追加）
+**変更箇所**: `src/renderer/components/TraceConnectorLayer.tsx:196-217`
+
+**修正前**:
+```typescript
+const findEntryByLeafs = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
+  entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
+
+let source = findEntryByLeafs(link.sourceCardId, leftLeafIds);
+let target = findEntryByLeafs(link.targetCardId, rightLeafIds);
+```
+
+**修正後**:
+```typescript
+const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>
+  entries.find((entry) => entry.cardId === cardId && entry.fileName === fileName && leafIds.includes(entry.leafId));
+
+let source = findEntry(link.sourceCardId, link.sourceFileName, leftLeafIds);
+let target = findEntry(link.targetCardId, link.targetFileName, rightLeafIds);
+```
+
+**根拠**:
+- P2-10d-2で追加した`fileName`フィールドを活用
+- `cardId` + `fileName` + `leafId` の組み合わせで一意にエントリを特定
+- これにより、同じcardIdでも正しいファイルのエントリが見つかる
+
+### テスト結果
+- `npm run typecheck`: エラーなし
+- `npm test -- TraceConnectorLayer.test.tsx`: 1テスト全てパス
+
+### 設計上の重要な決定
+
+#### 修正の経緯
+1. **第1回修正（P2-10d-2）**: `fileName`をキーに追加し、異なるファイルの同じcardIdを識別可能にした
+2. **第2回修正（複数ペア対応）**: 複数ファイルペアのトレースを読み込むようにしたが、`findEntryByLeafs`で`fileName`を使わなかった
+3. **第3回修正（本修正）**: トレースリンクに`sourceFileName`/`targetFileName`を付加し、`findEntry`で`fileName`を使用
+
+#### なぜ2段階の修正が必要だったか
+- 第1回修正: 単一ペア前提で`activeFiles.left/right`から直接fileNameを取得
+- 第2回修正: 複数ペア対応で`activeFiles`を削除したが、fileNameの取得方法を変更し忘れた
+- 第3回修正: トレースリンク生成時にfileNameを埋め込むことで、複数ペアでも正しく動作
+
+#### 最終的なデータフロー
+1. `useActiveFiles`: 全ファイルペア`[{left, right}, ...]`を生成
+2. `useEffect`: 各ペアのトレースファイルを読み込み
+3. `traceLinks`: 各リンクに`sourceFileName`/`targetFileName`を付加
+4. `connectorPaths`: `findEntry(cardId, fileName, leafIds)`で正確にエントリを検索
+
+### 今後の課題
+- P2-10d-3: カードの位置移動（スクロール・リサイズ）への追従と再描画最適化
+- P2-10d-4: コネクタ本数増加時のパフォーマンス検証（複数ペア × 複数リンク）
+
+### 参照
+- connectorLayoutStore.ts:8, 17: fileName を含むキー設計
+- TraceConnectorLayer.tsx:155-217: ExtendedLink 型と findEntry 修正
+- journal 前半: P2-10d-2 での fileName 追加の経緯
+
+---
+
+## 第4回修正: 画面フリーズ問題の解決
+
+### 問題の発生
+第3回修正後、右上パネルのコネクタ表示は成功したが、右下パネルにファイルを読み込むと画面全体がフリーズする問題が発生。
+
+### 根本原因の特定
+
+#### 無限レンダリングループ
+`TraceConnectorLayer.tsx:42-89` の `useActiveFiles` フックが、**毎レンダリング時に新しい配列を返していた**。
+
+**問題のコード**:
+```typescript
+const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
+  return useWorkspaceStore(
+    (state) => {
+      // ...
+      const pairs: FilePair[] = [];
+      for (const left of leftFiles) {
+        for (const right of rightFiles) {
+          pairs.push({ left, right });  // 毎回新しいオブジェクトを生成
+        }
+      }
+      return pairs;  // 毎回新しい配列を返す
+    },
+    shallow,  // 配列の参照のみチェック（中身は見ない）
+  );
+};
+```
+
+#### 無限ループのメカニズム
+1. `useActiveFiles` が毎レンダリング時に新しい `FilePair[]` を返す
+2. `activeFilePairs` が変わったと認識される（参照が異なるため）
+3. 145-153行目の `useEffect` が再実行される
+```typescript
+useEffect(() => {
+  if (direction !== 'vertical') return;
+  for (const pair of activeFilePairs) {
+    void loadTraceForPair(pair.left, pair.right);  // ストア更新
+  }
+}, [activeFilePairs, direction, loadTraceForPair]);
+```
+4. `loadTraceForPair` がストアを更新
+5. ストア更新がコンポーネントの再レンダリングをトリガー
+6. 1に戻る → **無限ループ**
+
+#### なぜ右下パネル読み込み時にフリーズしたか
+- 右上パネルのみ: 1ペア (`spec.json → design.json`)
+- 右上+右下: 2ペア (`spec.json → design.json`, `spec.json → design2.json`)
+- ペア数が増えると、各ループでのストア更新回数も増加
+- 無限ループの影響が顕著になり、UIがフリーズ
+
+### 解決策の実装
+
+#### 修正方針
+`useActiveFiles` の戻り値を**参照安定化**し、実際にファイルが変わった時のみ再計算されるようにする。
+
+#### 修正内容
+
+**ファイル**: `src/renderer/components/TraceConnectorLayer.tsx:42-89`
+
+**修正前の問題**:
+- `useWorkspaceStore` のセレクタ内で配列を生成 → 毎回新しい参照
+- `shallow` 比較では配列の参照しか見ないため、常に変更と判定される
+
+**修正後**:
+```typescript
+const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
+  // ファイル名をソート済み文字列として取得（参照の安定性のため）
+  const leftFilesStr = useWorkspaceStore(
+    (state) => {
+      const getActiveFile = (leafId: string): string | null => {
+        const leaf = state.leafs[leafId];
+        if (!leaf?.activeTabId) return null;
+        const tab = state.tabs[leaf.activeTabId];
+        return tab?.fileName ?? null;
+      };
+
+      const leftFiles = leftLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+      return leftFiles.sort().join('|||');  // 文字列に変換
+    },
+  );
+
+  const rightFilesStr = useWorkspaceStore(
+    (state) => {
+      const getActiveFile = (leafId: string): string | null => {
+        const leaf = state.leafs[leafId];
+        if (!leaf?.activeTabId) return null;
+        const tab = state.tabs[leaf.activeTabId];
+        return tab?.fileName ?? null;
+      };
+
+      const rightFiles = rightLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+      return rightFiles.sort().join('|||');  // 文字列に変換
+    },
+  );
+
+  // ペアの生成をuseMemoで安定化（文字列が変わった時のみ再計算）
+  return useMemo(() => {
+    const leftFiles = leftFilesStr ? leftFilesStr.split('|||') : [];
+    const rightFiles = rightFilesStr ? rightFilesStr.split('|||') : [];
+
+    const pairs: FilePair[] = [];
+    for (const left of leftFiles) {
+      for (const right of rightFiles) {
+        pairs.push({ left, right });
+      }
+    }
+    return pairs;
+  }, [leftFilesStr, rightFilesStr]);
+};
+```
+
+#### 修正のポイント
+
+1. **文字列化による参照安定化**
+   - ファイル名配列を `join('|||')` で文字列に変換
+   - プリミティブ値（文字列）なら、内容が同じなら同じ参照
+   - `useWorkspaceStore` のデフォルト比較（`Object.is`）で正しく動作
+
+2. **useMemoによる配列生成の最適化**
+   - `leftFilesStr`/`rightFilesStr` が変わった時のみ `FilePair[]` を再生成
+   - 不要な再計算を防ぐ
+
+3. **ソートによる順序の正規化**
+   - `leftFiles.sort()` で常に同じ順序に
+   - leafId の順序が変わっても同じ文字列になる
+
+### テスト結果
+```bash
+npm test -- TraceConnectorLayer.test.tsx
+# PASS src/renderer/components/__tests__/TraceConnectorLayer.test.tsx
+#   ✓ renders connector paths when anchors exist on both sides (54 ms)
+
+npm test -- connectorLayoutStore.test.ts
+# PASS src/renderer/store/__tests__/connectorLayoutStore.test.ts
+#   ✓ registers and removes card anchors (2 ms)
+#   ✓ clears anchors by leaf
+#   ✓ distinguishes same cardId with different fileNames
+```
+
+全てのテストがパス。
+
+### 技術的な学び
+
+#### React の参照安定性の重要性
+- **配列・オブジェクトは毎回新しい参照**: `[]` や `{}` はレンダリング毎に異なる参照
+- **useEffect の依存配列**: 参照が変わると必ず再実行される
+- **無限ループのリスク**: useEffect → ストア更新 → 再レンダリング → useEffect → ...
+
+#### Zustand の shallow 比較の限界
+```typescript
+useWorkspaceStore(
+  (state) => {
+    return [file1, file2];  // 毎回新しい配列
+  },
+  shallow  // 配列の参照のみチェック → 常に変更と判定
+);
+```
+
+`shallow` は**浅い比較**（第1レベルの要素を比較）だが、配列自体が毎回新しい参照なら無意味。
+
+#### 解決パターン
+
+1. **プリミティブ値を返す**: 文字列、数値など
+   ```typescript
+   useStore((state) => state.fileNames.join(','))  // OK
+   ```
+
+2. **useMemo で安定化**: セレクタの外で配列を生成
+   ```typescript
+   const str = useStore((state) => state.files.join(','));
+   const arr = useMemo(() => str.split(','), [str]);
+   ```
+
+3. **useStore の外でメモ化**: React の標準フックを活用
+   ```typescript
+   const files = useStore((state) => state.files.join(','));
+   return useMemo(() => computePairs(files), [files]);
+   ```
+
+### 設計の改善点
+
+#### Before（第3回修正まで）
+- ストアセレクタ内で配列を直接返す
+- 参照安定性を考慮していない
+- 無限ループのリスク
+
+#### After（第4回修正）
+- ストアセレクタは文字列を返す（参照安定）
+- useMemo で配列生成を最適化
+- 実際にファイルが変わった時のみ再計算
+
+### 今後の課題
+- P2-10d-3: カードの位置移動（スクロール・リサイズ）への追従と再描画最適化
+- P2-10d-4: コネクタ本数増加時のパフォーマンス検証（複数ペア × 複数リンク）
+- P2-10e: トレースデータ連携のタブ切り替え対応
+- P2-10f: トレースファイル不在時のフォールバック・エラーハンドリング
+
+### 参照
+- TraceConnectorLayer.tsx:42-89: useActiveFiles フックの修正
+- React Hooks 依存配列と参照安定性のベストプラクティス
+- Zustand shallow 比較の挙動と限界

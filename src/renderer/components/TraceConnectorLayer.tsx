@@ -3,6 +3,7 @@ import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connecto
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
 import { useTraceStore } from '../store/traceStore';
+import type { TraceabilityLink } from '@/shared/traceability';
 
 interface TraceConnectorLayerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -33,8 +34,14 @@ const toLocalPoint = (anchor: CardAnchorEntry, rect: DOMRectReadOnly, side: 'lef
   };
 };
 
+interface FilePair {
+  left: string;
+  right: string;
+}
+
 const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
-  return useWorkspaceStore(
+  // ファイル名をソート済み文字列として取得（参照の安定性のため）
+  const leftFilesStr = useWorkspaceStore(
     (state) => {
       const getActiveFile = (leafId: string): string | null => {
         const leaf = state.leafs[leafId];
@@ -45,12 +52,40 @@ const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
         return tab?.fileName ?? null;
       };
 
-      const left = leftLeafIds.map(getActiveFile).find((file) => file) ?? null;
-      const right = rightLeafIds.map(getActiveFile).find((file) => file) ?? null;
-      return { left, right };
+      const leftFiles = leftLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+      return leftFiles.sort().join('|||');
     },
-    shallow,
   );
+
+  const rightFilesStr = useWorkspaceStore(
+    (state) => {
+      const getActiveFile = (leafId: string): string | null => {
+        const leaf = state.leafs[leafId];
+        if (!leaf?.activeTabId) {
+          return null;
+        }
+        const tab = state.tabs[leaf.activeTabId];
+        return tab?.fileName ?? null;
+      };
+
+      const rightFiles = rightLeafIds.map(getActiveFile).filter((file): file is string => file !== null);
+      return rightFiles.sort().join('|||');
+    },
+  );
+
+  // ペアの生成をuseMemoで安定化（文字列が変わった時のみ再計算）
+  return useMemo(() => {
+    const leftFiles = leftFilesStr ? leftFilesStr.split('|||') : [];
+    const rightFiles = rightFilesStr ? rightFilesStr.split('|||') : [];
+
+    const pairs: FilePair[] = [];
+    for (const left of leftFiles) {
+      for (const right of rightFiles) {
+        pairs.push({ left, right });
+      }
+    }
+    return pairs;
+  }, [leftFilesStr, rightFilesStr]);
 };
 
 export const TraceConnectorLayer = ({
@@ -122,26 +157,47 @@ export const TraceConnectorLayer = ({
   const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
 
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
-  const getCachedTrace = useTraceStore((state) => state.getCached);
 
-  const activeFiles = useActiveFiles(leftLeafIds, rightLeafIds);
+  const activeFilePairs = useActiveFiles(leftLeafIds, rightLeafIds);
 
   useEffect(() => {
     if (direction !== 'vertical') {
       return;
     }
-    if (!activeFiles.left || !activeFiles.right) {
-      return;
+    // 全てのペアに対してトレースファイルを読み込む
+    for (const pair of activeFilePairs) {
+      void loadTraceForPair(pair.left, pair.right);
     }
-    void loadTraceForPair(activeFiles.left, activeFiles.right);
-  }, [activeFiles.left, activeFiles.right, direction, loadTraceForPair]);
+  }, [activeFilePairs, direction, loadTraceForPair]);
 
-  const pairKey = activeFiles.left && activeFiles.right ? `${activeFiles.left}|||${activeFiles.right}` : null;
-  const traceEntry = useTraceStore(
-    (state) => (pairKey ? state.cache[pairKey] : undefined),
+  // ファイルペア情報を含む拡張リンク型
+  interface ExtendedLink extends TraceabilityLink {
+    sourceFileName: string;
+    targetFileName: string;
+  }
+
+  // 全てのペアからトレースリンクを収集（ファイル情報を付加）
+  const traceLinks = useTraceStore(
+    (state) => {
+      const allLinks: ExtendedLink[] = [];
+      for (const pair of activeFilePairs) {
+        const pairKey = `${pair.left}|||${pair.right}`;
+        const entry = state.cache[pairKey];
+        if (entry?.links) {
+          // 各リンクにファイル情報を付加
+          entry.links.forEach((link) => {
+            allLinks.push({
+              ...link,
+              sourceFileName: pair.left,
+              targetFileName: pair.right,
+            });
+          });
+        }
+      }
+      return allLinks;
+    },
     shallow,
   );
-  const traceLinks = traceEntry?.links ?? [];
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {
@@ -154,17 +210,22 @@ export const TraceConnectorLayer = ({
     }
 
     const entries = Object.values(cards);
-    const findEntry = (cardId: string, leafIds: string[]): CardAnchorEntry | undefined =>
-      entries.find((entry) => entry.cardId === cardId && leafIds.includes(entry.leafId));
+
+    // ファイル名とleafIdsでエントリを検索するヘルパー
+    const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>
+      entries.find((entry) => entry.cardId === cardId && entry.fileName === fileName && leafIds.includes(entry.leafId));
 
     return traceLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
-      let source = findEntry(link.sourceCardId, leftLeafIds);
-      let target = findEntry(link.targetCardId, rightLeafIds);
+      // 左側のleafIdsとソースファイル名でソースカードを検索
+      let source = findEntry(link.sourceCardId, link.sourceFileName, leftLeafIds);
+      // 右側のleafIdsとターゲットファイル名でターゲットカードを検索
+      let target = findEntry(link.targetCardId, link.targetFileName, rightLeafIds);
       let effectiveDirection = link.direction;
 
+      // 見つからない場合は左右を入れ替えて検索
       if (!source || !target) {
-        const altSource = findEntry(link.sourceCardId, rightLeafIds);
-        const altTarget = findEntry(link.targetCardId, leftLeafIds);
+        const altSource = findEntry(link.sourceCardId, link.sourceFileName, rightLeafIds);
+        const altTarget = findEntry(link.targetCardId, link.targetFileName, leftLeafIds);
         if (!altSource || !altTarget) {
           return acc;
         }

@@ -298,6 +298,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             key={card.id}
             card={card}
             leafId={leafId}
+            fileName={activeTab?.fileName ?? ''}
             isActive={card.id === selectedCardId}
             onSelect={handleCardSelect}
             onKeyDown={handleCardKeyDown}
@@ -318,13 +319,14 @@ interface CardListItemProps {
   card: Card;
   isActive: boolean;
   leafId: string;
+  fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
 }
 
-const CardListItem = ({ card, isActive, leafId, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
-  const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, scrollContainerRef: panelScrollRef });
+const CardListItem = ({ card, isActive, leafId, fileName, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
+  const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
 

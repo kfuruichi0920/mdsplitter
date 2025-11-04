@@ -70,8 +70,8 @@ describe('TraceConnectorLayer', () => {
     } as DOMRectReadOnly;
 
     const layoutStore = useConnectorLayoutStore.getState();
-    layoutStore.registerCardAnchor('card-001', 'leaf-left', rectLeft);
-    layoutStore.registerCardAnchor('card-002', 'leaf-right', rectRight);
+    layoutStore.registerCardAnchor('card-001', 'leaf-left', 'test-file-left.json', rectLeft);
+    layoutStore.registerCardAnchor('card-002', 'leaf-right', 'test-file-right.json', rectRight);
 
     render(
       <TraceConnectorLayer

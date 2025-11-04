@@ -9,6 +9,7 @@ import { useConnectorLayoutStore } from '../store/connectorLayoutStore';
 interface CardAnchorOptions {
   cardId: string;
   leafId: string;
+  fileName: string; ///< カードが属するファイル名（同一cardIdの識別に使用）。
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
@@ -20,6 +21,7 @@ interface CardAnchorOptions {
 export const useCardConnectorAnchor = ({
   cardId,
   leafId,
+  fileName,
   scrollContainerRef,
 }: CardAnchorOptions): ((instance: HTMLElement | null) => void) => {
   const registerCardAnchor = useConnectorLayoutStore((state) => state.registerCardAnchor);
@@ -34,8 +36,8 @@ export const useCardConnectorAnchor = ({
       return;
     }
     const rect = elementRef.current.getBoundingClientRect();
-    registerCardAnchor(cardId, leafId, rect);
-  }, [cardId, leafId, registerCardAnchor]);
+    registerCardAnchor(cardId, leafId, fileName, rect);
+  }, [cardId, leafId, fileName, registerCardAnchor]);
 
   const scheduleMeasure = useCallback(() => {
     if (rafRef.current !== null) {
@@ -64,7 +66,7 @@ export const useCardConnectorAnchor = ({
       elementRef.current = node;
 
       if (!node) {
-        removeCardAnchor(cardId, leafId);
+        removeCardAnchor(cardId, leafId, fileName);
         return;
       }
 
@@ -78,7 +80,7 @@ export const useCardConnectorAnchor = ({
         resizeObserverRef.current = observer;
       }
     },
-    [cardId, leafId, cleanupObservers, measure, removeCardAnchor, scheduleMeasure],
+    [cardId, leafId, fileName, cleanupObservers, measure, removeCardAnchor, scheduleMeasure],
   );
 
   useLayoutEffect(() => {
@@ -113,9 +115,9 @@ export const useCardConnectorAnchor = ({
   useEffect(() => {
     return () => {
       cleanupObservers();
-      removeCardAnchor(cardId, leafId);
+      removeCardAnchor(cardId, leafId, fileName);
     };
-  }, [cardId, leafId, cleanupObservers, removeCardAnchor]);
+  }, [cardId, leafId, fileName, cleanupObservers, removeCardAnchor]);
 
   return setRef;
 };
