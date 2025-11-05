@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
@@ -98,7 +98,34 @@ export const TraceConnectorLayer = ({
 }: TraceConnectorLayerProps) => {
   const [containerRect, setContainerRect] = useState<DOMRectReadOnly | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const rafRef = useRef<number | null>(null);
 
+  // 測定処理をuseCallbackでメモ化
+  const measure = useCallback(() => {
+    const element = containerRef.current;
+    if (!element) {
+      setContainerRect(null);
+      return;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
+    setContainerRect(rect);
+  }, [containerRef]);
+
+  // スロットリングされた測定処理
+  const scheduleMeasure = useCallback(() => {
+    if (rafRef.current !== null) {
+      return;
+    }
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      measure();
+    });
+  }, [measure]);
+
+  // コンテナの監視
   useEffect(() => {
     if (direction !== 'vertical') {
       setContainerRect(null);
@@ -111,20 +138,12 @@ export const TraceConnectorLayer = ({
       return () => {};
     }
 
-    const measure = () => {
-      const rect = element.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        return;
-      }
-      setContainerRect(rect);
-    };
-
     measure();
     let observer: ResizeObserver | null = null;
-    const handleWindowResize = () => measure();
+    const handleWindowResize = () => scheduleMeasure();
 
     if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(measure);
+      observer = new ResizeObserver(scheduleMeasure);
       observer.observe(element);
       resizeObserverRef.current = observer;
     } else {
@@ -132,14 +151,26 @@ export const TraceConnectorLayer = ({
       resizeObserverRef.current = null;
     }
 
-    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('resize', handleWindowResize, { passive: true });
 
     return () => {
       window.removeEventListener('resize', handleWindowResize);
       observer?.disconnect();
       resizeObserverRef.current = null;
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [containerRef, direction]);
+  }, [containerRef, direction, measure, scheduleMeasure]);
+
+  // splitRatio変更時にコンテナ矩形を再測定（分割境界ドラッグ対応）
+  useEffect(() => {
+    if (direction !== 'vertical') {
+      return;
+    }
+    scheduleMeasure();
+  }, [splitRatio, direction, scheduleMeasure]);
 
   const cards = useConnectorLayoutStore((state) => state.cards);
   const highlightedCardIds = useWorkspaceStore(

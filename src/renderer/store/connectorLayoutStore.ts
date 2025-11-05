@@ -56,6 +56,22 @@ const rectToMetrics = (rect: DOMRectReadOnly): AnchorMetrics => ({
 });
 
 /**
+ * @brief 2つのAnchorMetricsが実質的に同じかどうかを判定する。
+ * @details 小数点以下の微小な差異を無視し、1px未満の差は同一とみなす。
+ */
+const metricsEqual = (a: AnchorMetrics, b: AnchorMetrics): boolean => {
+  const threshold = 0.5; // 0.5px以下の差は無視
+  return (
+    Math.abs(a.top - b.top) <= threshold &&
+    Math.abs(a.left - b.left) <= threshold &&
+    Math.abs(a.right - b.right) <= threshold &&
+    Math.abs(a.bottom - b.bottom) <= threshold &&
+    Math.abs(a.width - b.width) <= threshold &&
+    Math.abs(a.height - b.height) <= threshold
+  );
+};
+
+/**
  * @brief コネクタレイアウトストア本体。
  */
 export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => ({
@@ -64,6 +80,13 @@ export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => (
     set((state) => {
       const key = toKey(leafId, fileName, cardId);
       const metrics = rectToMetrics(rect);
+
+      // 既存のエントリと比較し、実質的に変更がなければ更新をスキップ
+      const existing = state.cards[key];
+      if (existing && metricsEqual(existing.rect, metrics)) {
+        return state; // 変更なし
+      }
+
       return {
         cards: {
           ...state.cards,

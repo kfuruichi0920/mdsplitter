@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useConnectorLayoutStore } from '../store/connectorLayoutStore';
+import { useSplitStore } from '../store/splitStore';
 
 interface CardAnchorOptions {
   cardId: string;
@@ -111,6 +112,22 @@ export const useCardConnectorAnchor = ({
       window.removeEventListener('scroll', handleWindowScroll);
     };
   }, [scheduleMeasure]);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      scheduleMeasure();
+    };
+    window.addEventListener('resize', handleWindowResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+    };
+  }, [scheduleMeasure]);
+
+  // 分割境界移動時のレイアウトバージョン変更を監視
+  const layoutVersion = useSplitStore((state) => state.layoutVersion);
+  useEffect(() => {
+    scheduleMeasure();
+  }, [layoutVersion, scheduleMeasure]);
 
   useEffect(() => {
     return () => {

@@ -1,5 +1,158 @@
 # 作業記録 2025-11-05
 
+## タスク: P2-10d-3 分割境界ドラッグ時のコネクタ追従対応（第2回）
+
+### 作業概要
+上下分割時の境界を移動させた場合にコネクタが追従しない問題を修正。
+第1回の修正では不十分だったため、根本原因を再分析し、グローバルなレイアウト変更通知メカニズムを実装。
+
+### 問題の再分析
+
+**第1回の修正内容**:
+1. TraceConnectorLayerにsplitRatio変更検知を追加
+2. useCardConnectorAnchorにwindow resizeイベント追跡を追加
+3. 不要な再描画を抑制する最適化を実施
+
+**第1回の問題点**:
+- TraceConnectorLayerでsplitRatio変更を監視していたが、各カード要素は監視していなかった
+- カード要素の`getBoundingClientRect()`はビューポート相対座標を返すため、親コンテナが移動すればカード座標も変わる
+- しかし、スクロールイベントやResizeObserverは発火しないため、カード位置の再測定がトリガーされない
+
+**根本原因**:
+- 分割境界ドラッグ時に`splitRatio`が更新されるが、個々のカード要素にこの変更が伝播していない
+- カード要素は`.panel-cards`スクロールコンテナ内に配置され、このコンテナ自体の位置が変わるが、そのイベントは発火しない
+
+**根拠**:
+- `src/renderer/components/CardPanel.tsx:81,293,329` - panelScrollRef定義と使用箇所
+- `src/renderer/hooks/useConnectorLayout.ts:92-103` - スクロールイベントのみ監視
+- `src/renderer/store/splitStore.ts:343-353` - updateSplitRatioは履歴に追加せず、変更通知もない
+
+### 実装内容（第2回）
+
+#### 1. splitStoreにlayoutVersionカウンターを追加
+**変更箇所**:
+- `src/renderer/store/splitStore.ts:64-70`
+  - `SplitState`インターフェースに`layoutVersion: number`フィールドを追加
+  - コメント: "レイアウト変更バージョン（分割境界移動時にインクリメント）"
+
+- `src/renderer/store/splitStore.ts:299-304`
+  - 初期化時に`layoutVersion: 0`を設定
+
+- `src/renderer/store/splitStore.ts:338-356`
+  - `updateSplitRatio`アクション内で`layoutVersion: state.layoutVersion + 1`をインクリメント
+  - コメント更新: "layoutVersionをインクリメントして、コネクタ位置の再計算をトリガーする"
+
+- `src/renderer/store/splitStore.ts:445-461`
+  - `reset`アクション内で`layoutVersion: 0`にリセット
+
+**根拠**:
+- 分割境界ドラッグ時に全カード要素に変更を通知する必要がある
+- グローバルなバージョンカウンターを使うことで、どのカードからも変更を検知できる
+- 履歴には追加せず、軽量な通知メカニズムとして機能
+
+#### 2. useCardConnectorAnchorでlayoutVersionを監視
+**変更箇所**:
+- `src/renderer/hooks/useConnectorLayout.ts:8`
+  - `useSplitStore`をimport追加
+
+- `src/renderer/hooks/useConnectorLayout.ts:126-130`
+  - 新規useEffect追加: layoutVersionを監視し、変更時に`scheduleMeasure()`を呼び出し
+  - コメント: "分割境界移動時のレイアウトバージョン変更を監視"
+
+**根拠**:
+- 各カード要素がlayoutVersionを監視することで、分割境界移動を検知
+- すでに実装済みの`scheduleMeasure`を再利用し、RAFによるスロットリングを活用
+
+#### 3. metricsEqual関数の条件修正
+**変更箇所**:
+- `src/renderer/store/connectorLayoutStore.ts:62-72`
+  - 比較演算子を`<`から`<=`に変更
+  - コメント: "0.5px以下の差は無視"（"0.5px未満"から変更）
+
+**根拠**:
+- テストケースで0.5px差の座標が更新されてしまう問題が発生
+- 閾値ちょうどの値も無視すべきと判断
+
+#### 4. （第1回実装）TraceConnectorLayerにsplitRatio変更検知を追加
+**変更箇所**:
+- `src/renderer/components/TraceConnectorLayer.tsx:1`
+  - `useCallback`をimportに追加
+
+- `src/renderer/components/TraceConnectorLayer.tsx:91-173`
+  - `rafRef`を追加してrequestAnimationFrameでスロットリング
+  - `measure`関数を`useCallback`でメモ化
+  - `scheduleMeasure`関数を追加（RAF使用でスロットリング）
+  - 既存のResizeObserver監視を`scheduleMeasure`使用に変更
+  - window resizeイベントに`passive: true`を追加
+  - 新規useEffect追加: `splitRatio`変更時に`scheduleMeasure()`を呼び出し
+
+**根拠**:
+- 分割境界ドラッグ時は`splitRatio`が高頻度で更新されるため、それをトリガーとしてコンテナ矩形を再測定する必要がある
+- requestAnimationFrameによるスロットリングで、ドラッグ中の過剰な再計算を抑制
+
+#### 5. （第1回実装）useCardConnectorAnchorにwindow resizeイベント追跡を追加
+**変更箇所**:
+- `src/renderer/hooks/useConnectorLayout.ts:116-124`
+  - 新規useEffect追加: window resizeイベント時に`scheduleMeasure()`を呼び出し
+  - `passive: true`でスクロール性能を最適化
+
+**根拠**:
+- ウィンドウリサイズ時にもカード位置が変化するため、追跡が必要
+- 既存のwindow scrollイベント追跡と同様のパターンで実装
+
+#### 6. （第1回実装）不要な再描画を抑制する最適化
+**変更箇所**:
+- `src/renderer/store/connectorLayoutStore.ts:58-72`
+  - `metricsEqual`関数を追加（0.5px以下の差は無視）
+  - 座標の微小な差異（サブピクセル）を無視して同一とみなす
+
+- `src/renderer/store/connectorLayoutStore.ts:77-104`
+  - `registerCardAnchor`実装に既存エントリとの比較ロジックを追加
+  - `metricsEqual`で実質的に変更がない場合は`state`をそのまま返す
+
+**根拠**:
+- ブラウザの座標計算では浮動小数点の微小な誤差が発生する
+- 0.5px以下の差は視覚的に無意味なため、更新をスキップしてパフォーマンスを向上
+
+### テスト実施
+**実行テスト**:
+1. `npm run test:unit -- connectorLayoutStore.test.ts` - PASS (4テスト)
+2. `npm run test:unit -- splitStore.test.ts` - PASS (14テスト)
+3. `npm run test:unit -- TraceConnectorLayer.test.tsx` - PASS (1テスト)
+4. `npm run typecheck` - エラーなし
+
+**追加・修正テスト**:
+- `src/renderer/store/__tests__/connectorLayoutStore.test.ts:87-151`
+  - "skips update when metrics are effectively unchanged (optimization)"テストを追加
+  - 微小な差異（0.3px）での更新スキップを検証
+  - 大きな差異（1px以上）での正常更新を検証
+  - async/awaitで10ms待機を追加してタイムスタンプの確実な変更を保証
+
+### 決定事項
+1. **変更通知メカニズム**: layoutVersionカウンターを採用
+   - 理由: グローバルで軽量、全カード要素から監視可能
+   - 代替案（イベントバス）は複雑性が高いため却下
+2. **スロットリング閾値**: requestAnimationFrame（約16ms）を採用
+   - 理由: 60fpsの描画に合わせた最適な更新頻度
+3. **座標差異閾値**: 0.5px以下を無視
+   - 理由: サブピクセルの差は視覚的に識別不可能
+4. **イベントリスナーオプション**: `passive: true`を使用
+   - 理由: スクロールパフォーマンスの向上
+
+### 解決した問題
+- ✅ 上下分割時の境界移動にコネクタが追従しない → layoutVersionによる通知で解決
+- ✅ 左右＋上下の複雑な分割でも正しく動作 → 全カード要素が統一的に監視
+- ✅ 不要な再描画の抑制 → metricsEqualによる差分検出で最適化
+
+### 残課題
+- P2-10d-4: コネクタ本数が増えた場合のパフォーマンス検証
+- P2-10e: タブ切替時のコネクタ更新追従
+- P2-10f: トレースファイル未検出時のエラーハンドリング
+
+---
+
+# 作業記録 2025-11-05
+
 ## タスク: P2-10d-2 複数分割パターンとファイル識別対応
 
 ### 作業概要

@@ -66,6 +66,7 @@ export interface SplitState {
   history: SplitHistoryEntry[]; ///< 操作履歴（Undo 用）。
   historyIndex: number; ///< 現在の履歴インデックス。
   activeLeafId: string | null; ///< アクティブな葉ノードのID。
+  layoutVersion: number; ///< レイアウト変更バージョン（分割境界移動時にインクリメント）。
 }
 
 /**
@@ -300,6 +301,7 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
   history: [{ root: createInitialRoot(), timestamp: new Date() }],
   historyIndex: 0,
   activeLeafId: null,
+  layoutVersion: 0,
 
   /**
    * @brief 指定した葉ノードを分割。
@@ -337,6 +339,7 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
    * @brief 分割ノードの比率を更新。
    * @details
    * 指定IDの分割ノードがなければ警告。
+   * layoutVersionをインクリメントして、コネクタ位置の再計算をトリガーする。
    * @param nodeId 分割ノードID。
    * @param ratio 新しい分割比率。
    */
@@ -349,7 +352,7 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
       }
 
       const newRoot = updateSplitRatioInTree(state.root, nodeId, ratio);
-      return { root: newRoot };
+      return { root: newRoot, layoutVersion: state.layoutVersion + 1 };
     }),
 
   /**
@@ -442,7 +445,7 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
   /**
    * @brief 分割状態をリセット。
    * @details
-   * ルート・履歴・アクティブIDを初期化。
+   * ルート・履歴・アクティブID・レイアウトバージョンを初期化。
    */
   reset: () =>
     set(() => {
@@ -452,6 +455,7 @@ export const useSplitStore = create<SplitState & SplitActions>((set) => ({
         history: [{ root: initialRoot, timestamp: new Date() }],
         historyIndex: 0,
         activeLeafId: null,
+        layoutVersion: 0,
       };
     }),
 }));
