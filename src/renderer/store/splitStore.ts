@@ -1,27 +1,32 @@
+
 /**
  * @file splitStore.ts
- * @brief カードパネルエリアの分割状態管理ストア。
+ * @brief カードパネル分割状態管理ストア。
  * @details
- * VSCode のような再帰的な分割構造を実現する。分割ノードはツリー構造で管理し、
- * 各ノードは葉（カードパネル）または内部ノード（左右/上下分割）のいずれかとなる。
- * 分割操作は Undo/Redo 可能とする。
+ * VSCode風の再帰分割構造をツリーで管理。Undo/Redo・分割・統合・レイアウトバージョン管理等を提供。
  * @author K.Furuichi
- * @date 2025-11-03
- * @version 0.1
+ * @date 2025-11-06
+ * @version 0.2
  * @copyright MIT
  */
 
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 
-/** 分割方向。 */
+/**
+ * @brief 分割方向種別。
+ */
 export type SplitDirection = 'horizontal' | 'vertical';
 
-/** 分割ノードの種類。 */
+/**
+ * @brief 分割ノード種別。
+ */
 export type SplitNodeType = 'leaf' | 'split';
 
 /**
  * @brief 分割ノード基底型。
+ * @details
+ * ノードID・種別を保持。
  */
 export interface SplitNodeBase {
   id: string; ///< ノードの一意識別子。
@@ -29,7 +34,9 @@ export interface SplitNodeBase {
 }
 
 /**
- * @brief 葉ノード（カードパネルを表示）。
+ * @brief 葉ノード（カードパネル表示用）。
+ * @details
+ * タブIDを保持。nullは空パネル。
  */
 export interface SplitLeafNode extends SplitNodeBase {
   type: 'leaf';
@@ -37,7 +44,9 @@ export interface SplitLeafNode extends SplitNodeBase {
 }
 
 /**
- * @brief 分割ノード（2つの子ノードを持つ）。
+ * @brief 分割ノード（2子ノード保持）。
+ * @details
+ * 分割方向・子ノード・分割比率を管理。
  */
 export interface SplitContainerNode extends SplitNodeBase {
   type: 'split';
@@ -47,11 +56,15 @@ export interface SplitContainerNode extends SplitNodeBase {
   splitRatio: number; ///< 分割比率（0.0 〜 1.0、first の割合）。
 }
 
-/** 分割ノードのユニオン型。 */
+/**
+ * @brief 分割ノードのユニオン型。
+ */
 export type SplitNode = SplitLeafNode | SplitContainerNode;
 
 /**
- * @brief 分割操作履歴のエントリ。
+ * @brief 分割操作履歴エントリ。
+ * @details
+ * ルートノード・操作時刻を保持。
  */
 export interface SplitHistoryEntry {
   root: SplitNode; ///< その時点のルートノード。
@@ -60,6 +73,8 @@ export interface SplitHistoryEntry {
 
 /**
  * @brief 分割管理ストアの状態。
+ * @details
+ * ルート・履歴・アクティブ葉ID・レイアウトバージョン等を管理。
  */
 export interface SplitState {
   root: SplitNode; ///< ルートノード。
@@ -71,6 +86,8 @@ export interface SplitState {
 
 /**
  * @brief 分割管理ストアのアクション。
+ * @details
+ * 分割・統合・比率変更・Undo/Redo・リセット等を管理。
  */
 export interface SplitActions {
   /**
@@ -116,8 +133,8 @@ export interface SplitActions {
 }
 
 /**
- * @brief 初期ルートノードを生成する。
- * @return 単一の葉ノード。
+ * @brief 初期ルートノード生成。
+ * @return 単一葉ノード。
  */
 const createInitialRoot = (): SplitLeafNode => ({
   id: nanoid(),
@@ -126,10 +143,10 @@ const createInitialRoot = (): SplitLeafNode => ({
 });
 
 /**
- * @brief ノードツリーから指定IDの葉ノードを検索する。
- * @param node 検索対象のノード。
- * @param leafId 検索する葉ノードID。
- * @return 見つかった葉ノード、または null。
+ * @brief ノードツリーから指定IDの葉ノード検索。
+ * @param node 検索対象ノード。
+ * @param leafId 検索葉ID。
+ * @return 見つかれば葉ノード、なければnull。
  */
 const findLeafNode = (node: SplitNode, leafId: string): SplitLeafNode | null => {
   if (node.type === 'leaf') {
@@ -140,10 +157,10 @@ const findLeafNode = (node: SplitNode, leafId: string): SplitLeafNode | null => 
 };
 
 /**
- * @brief ノードツリーから指定IDの分割ノードを検索する。
- * @param node 検索対象のノード。
- * @param nodeId 検索する分割ノードID。
- * @return 見つかった分割ノード、または null。
+ * @brief ノードツリーから指定IDの分割ノード検索。
+ * @param node 検索対象ノード。
+ * @param nodeId 検索分割ノードID。
+ * @return 見つかれば分割ノード、なければnull。
  */
 const findSplitNode = (node: SplitNode, nodeId: string): SplitContainerNode | null => {
   if (node.type === 'split' && node.id === nodeId) {
@@ -158,9 +175,9 @@ const findSplitNode = (node: SplitNode, nodeId: string): SplitContainerNode | nu
 };
 
 /**
- * @brief ノードツリーを再帰的に複製する（イミュータブル更新用）。
- * @param node 複製対象のノード。
- * @return 複製されたノード。
+ * @brief ノードツリーを再帰複製（イミュータブル更新用）。
+ * @param node 複製対象ノード。
+ * @return 複製ノード。
  */
 const cloneNode = (node: SplitNode): SplitNode => {
   if (node.type === 'leaf') {
@@ -175,11 +192,11 @@ const cloneNode = (node: SplitNode): SplitNode => {
 };
 
 /**
- * @brief 指定した葉ノードを分割する。
+ * @brief 指定葉ノードを分割。
  * @param root ルートノード。
- * @param leafId 分割対象の葉ノードID。
+ * @param leafId 分割葉ID。
  * @param direction 分割方向。
- * @return 新しいルートノード、または null（失敗時）。
+ * @return 新ルートノード、失敗時はnull。
  */
 const splitLeafNode = (root: SplitNode, leafId: string, direction: SplitDirection): SplitNode | null => {
   const replaceNode = (node: SplitNode): SplitNode | null => {
@@ -224,10 +241,10 @@ const splitLeafNode = (root: SplitNode, leafId: string, direction: SplitDirectio
 };
 
 /**
- * @brief 指定した葉ノードを削除し、兄弟ノードで置き換える。
+ * @brief 指定葉ノード削除・兄弟ノードで置換。
  * @param root ルートノード。
- * @param leafId 削除対象の葉ノードID。
- * @return 新しいルートノード、または null（削除不可）。
+ * @param leafId 削除葉ID。
+ * @return 新ルートノード、削除不可時はnull。
  */
 const removeLeafNode = (root: SplitNode, leafId: string): SplitNode | null => {
   //! ルートが葉で、かつ削除対象の場合は削除不可（最低1つの葉を保持）
@@ -267,11 +284,11 @@ const removeLeafNode = (root: SplitNode, leafId: string): SplitNode | null => {
 };
 
 /**
- * @brief 指定した分割ノードの比率を更新する。
+ * @brief 指定分割ノードの比率更新。
  * @param root ルートノード。
  * @param nodeId 分割ノードID。
- * @param ratio 新しい分割比率。
- * @return 新しいルートノード。
+ * @param ratio 新分割比率。
+ * @return 新ルートノード。
  */
 const updateSplitRatioInTree = (root: SplitNode, nodeId: string, ratio: number): SplitNode => {
   const updateNode = (node: SplitNode): SplitNode => {
@@ -294,7 +311,9 @@ const updateSplitRatioInTree = (root: SplitNode, nodeId: string, ratio: number):
 };
 
 /**
- * @brief 分割管理ストアを作成する。
+ * @brief 分割管理ストア本体。
+ * @details
+ * 分割・統合・比率変更・Undo/Redo・リセット等を管理。
  */
 export const useSplitStore = create<SplitState & SplitActions>((set) => ({
   root: createInitialRoot(),

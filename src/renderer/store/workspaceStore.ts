@@ -1,9 +1,14 @@
+
 /**
  * @file workspaceStore.ts
- * @brief 分割パネルごとのカードファイル管理ストア。
+ * @brief 分割パネルごとのカードファイル・タブ管理ストア。
  * @details
- * 各分割パネル（葉ノード）に紐づくタブとカードデータを管理する。タブは
- * ファイル単位で一意とし、同一ファイルを複数パネルで同時に開くことを禁止する。
+ * 各分割パネル（葉ノード）に紐づくタブとカードデータを管理。
+ * ファイル単位でタブを一意にし、同一ファイルの複数パネル同時表示を禁止。
+ * @author K.Furuichi
+ * @date 2025-11-06
+ * @version 0.1
+ * @copyright MIT
  */
 
 import { create } from 'zustand';
@@ -23,6 +28,8 @@ export type { Card, CardKind, CardPatch, CardStatus };
 
 /**
  * @brief タブの状態。
+ * @details
+ * パネル内で開かれているカードファイルの状態を保持。
  */
 export interface PanelTabState {
   id: string;
@@ -37,6 +44,8 @@ export interface PanelTabState {
 
 /**
  * @brief 葉ノード単位のタブ集合。
+ * @details
+ * パネルごとに開かれているタブID・アクティブタブIDを管理。
  */
 export interface LeafWorkspaceState {
   leafId: string;
@@ -46,6 +55,8 @@ export interface LeafWorkspaceState {
 
 /**
  * @brief タブオープン時の戻り値。
+ * @details
+ * 新規・再アクティブ・拒否（競合）を区別。
  */
 export type OpenTabResult =
   | { status: 'opened'; tabId: string; leafId: string }
@@ -54,6 +65,8 @@ export type OpenTabResult =
 
 /**
  * @brief ストア全体の状態とアクション。
+ * @details
+ * タブ・パネル・ファイルの紐付けと各種操作を管理。
  */
 export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
@@ -71,10 +84,16 @@ export interface WorkspaceStore {
   reset: () => void;
 }
 
-/** @brief 空の葉ステートを生成する。 */
+/**
+ * @brief 空の葉ステートを生成。
+ * @param leafId 葉ノードID。
+ * @return 新規LeafWorkspaceState。
+ */
 const createLeafState = (leafId: string): LeafWorkspaceState => ({ leafId, tabIds: [], activeTabId: null });
 
-/** @brief 初期ストア状態。 */
+/**
+ * @brief 初期ストア状態。
+ */
 const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'> = {
   tabs: {},
   leafs: {},
@@ -83,6 +102,8 @@ const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'> = {
 
 /**
  * @brief 分割パネル用ワークスペースストア定義。
+ * @details
+ * タブのオープン・クローズ・カード選択・更新・保存・リセット等を管理。
  */
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   ...initialState,

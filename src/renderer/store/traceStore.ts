@@ -1,24 +1,60 @@
+
+/**
+ * @file traceStore.ts
+ * @brief トレーサビリティリンクのキャッシュ・取得を管理するZustandストア。
+ * @details
+ * ファイルペアごとにトレース情報をキャッシュし、UIからの要求に応じてロード・エラー管理を行う。
+ * @author K.Furuichi
+ * @date 2025-11-06
+ * @version 0.1
+ * @copyright MIT
+ */
 import { create } from 'zustand';
 import type { LoadedTraceabilityFile, TraceabilityLink } from '@/shared/traceability';
 import { normalizeDirection } from '@/shared/traceability';
 
+
+/**
+ * @brief トレースキャッシュ1件分の情報。
+ * @details
+ * ファイルペアごとに状態・リンク・エラー等を保持。
+ */
 interface TraceCacheEntry {
-  key: string;
-  status: 'idle' | 'loading' | 'ready' | 'missing' | 'error';
-  timestamp: number;
-  links: TraceabilityLink[];
-  sourceFileName?: string;
-  error?: string;
+  key: string; ///< キャッシュキー（left|||right）
+  status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; ///< 現在の状態。
+  timestamp: number; ///< 最終更新時刻。
+  links: TraceabilityLink[]; ///< トレーサビリティリンク配列。
+  sourceFileName?: string; ///< ソースファイル名。
+  error?: string; ///< エラー内容（失敗時のみ）。
 }
 
+
+/**
+ * @brief トレースストアの状態・アクション定義。
+ */
 interface TraceState {
-  cache: Record<string, TraceCacheEntry>;
-  loadTraceForPair: (leftFile: string, rightFile: string) => Promise<TraceCacheEntry>;
-  getCached: (leftFile: string, rightFile: string) => TraceCacheEntry | undefined;
+  cache: Record<string, TraceCacheEntry>; ///< ファイルペアごとのキャッシュ。
+  loadTraceForPair: (leftFile: string, rightFile: string) => Promise<TraceCacheEntry>; ///< トレースファイルをロード。
+  getCached: (leftFile: string, rightFile: string) => TraceCacheEntry | undefined; ///< キャッシュ取得。
 }
 
+
+/**
+ * @brief ファイルペアからキャッシュキーを生成。
+ * @param leftFile 左側ファイル名。
+ * @param rightFile 右側ファイル名。
+ * @return キャッシュキー文字列。
+ */
 const toKey = (leftFile: string, rightFile: string): string => `${leftFile}|||${rightFile}`;
 
+
+/**
+ * @brief ロード済みトレースファイルをキャッシュエントリへ変換。
+ * @param leftFile 左側ファイル名。
+ * @param rightFile 右側ファイル名。
+ * @param file ロード済みトレースファイル。
+ * @return キャッシュエントリ。
+ */
 const convertLoadedFile = (
   leftFile: string,
   rightFile: string,
@@ -61,6 +97,12 @@ const convertLoadedFile = (
   } satisfies TraceCacheEntry;
 };
 
+
+/**
+ * @brief トレースストア本体。
+ * @details
+ * ファイルペアごとにキャッシュ管理・ロード・エラー処理を行う。
+ */
 export const useTraceStore = create<TraceState>()((set, get) => ({
   cache: {},
   getCached: (leftFile, rightFile) => {
@@ -125,6 +167,10 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
   },
 }));
 
+
+/**
+ * @brief ストアのキャッシュを初期化。
+ */
 export const resetTraceStore = (): void => {
   useTraceStore.setState({ cache: {} });
 };

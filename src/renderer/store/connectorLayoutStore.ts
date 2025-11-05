@@ -1,6 +1,13 @@
+
 /**
  * @file connectorLayoutStore.ts
- * @brief コネクタ描画用にカード要素のレイアウト情報を保持するストア。
+ * @brief コネクタ描画用カード要素レイアウト情報の管理ストア。
+ * @details
+ * 各カードのDOM位置・サイズを記録し、トレース線描画のための座標計算を補助する。
+ * @author K.Furuichi
+ * @date 2025-11-06
+ * @version 0.1
+ * @copyright MIT
  */
 
 import { create } from 'zustand';
@@ -9,6 +16,8 @@ const toKey = (leafId: string, fileName: string, cardId: string): string => `${l
 
 /**
  * @brief カードアンカー位置情報。
+ * @details
+ * DOMRectから計算した座標・サイズ・更新時刻を保持。
  */
 export interface CardAnchorEntry {
   key: string;
@@ -21,6 +30,8 @@ export interface CardAnchorEntry {
 
 /**
  * @brief カードの矩形から算出したアンカー座標。
+ * @details
+ * トレース線描画時の始点・終点計算に利用。
  */
 export interface AnchorMetrics {
   top: number;
@@ -34,6 +45,8 @@ export interface AnchorMetrics {
 
 /**
  * @brief コネクタレイアウトストアの状態。
+ * @details
+ * カードごとのアンカー情報を管理し、登録・削除・リーフ単位クリアを提供。
  */
 interface ConnectorLayoutState {
   cards: Record<string, CardAnchorEntry>;
@@ -43,7 +56,9 @@ interface ConnectorLayoutState {
 }
 
 /**
- * @brief DOMRect から AnchorMetrics を生成する。
+ * @brief DOMRect から AnchorMetrics を生成。
+ * @param rect DOMRectReadOnly。
+ * @return AnchorMetrics。
  */
 const rectToMetrics = (rect: DOMRectReadOnly): AnchorMetrics => ({
   top: rect.top,
@@ -56,8 +71,12 @@ const rectToMetrics = (rect: DOMRectReadOnly): AnchorMetrics => ({
 });
 
 /**
- * @brief 2つのAnchorMetricsが実質的に同じかどうかを判定する。
- * @details 小数点以下の微小な差異を無視し、1px未満の差は同一とみなす。
+ * @brief 2つのAnchorMetricsが実質的に同じか判定。
+ * @details
+ * 小数点以下の微小な差異を無視し、0.5px未満の差は同一とみなす。
+ * @param a 比較元。
+ * @param b 比較先。
+ * @return 同一ならtrue。
  */
 const metricsEqual = (a: AnchorMetrics, b: AnchorMetrics): boolean => {
   const threshold = 0.5; // 0.5px以下の差は無視
@@ -73,6 +92,8 @@ const metricsEqual = (a: AnchorMetrics, b: AnchorMetrics): boolean => {
 
 /**
  * @brief コネクタレイアウトストア本体。
+ * @details
+ * カードアンカー情報の登録・削除・リーフ単位クリアを管理。
  */
 export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => ({
   cards: {},
@@ -124,7 +145,7 @@ export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => (
 }));
 
 /**
- * @brief 単体テスト等でストアを初期化するためのユーティリティ。
+ * @brief ストアのアンカー情報を初期化。
  */
 export const resetConnectorLayoutStore = (): void => {
   useConnectorLayoutStore.setState({ cards: {} });
