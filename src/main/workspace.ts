@@ -49,7 +49,8 @@ let cachedPaths: WorkspacePaths | null = null;
 /**
  * @brief ワークスペース関連ディレクトリ・ファイルパスを解決する。
  * @details
- * ElectronのuserData配下に各種ディレクトリ・ファイルパスを構築。
+ * 実行フォルダ（app.getAppPath()）をベースに各種ディレクトリ・ファイルパスを構築。
+ * _input, _out, _logs は実行フォルダ直下に配置される。
  * @return WorkspacePaths型のパス情報。
  * @throws なし
  */
@@ -58,8 +59,8 @@ const resolveWorkspacePaths = (): WorkspacePaths => {
   if (cachedPaths) {
     return cachedPaths;
   }
-  //! ElectronのuserDataディレクトリを取得
-  const root = app.getPath('userData');
+  //! 実行フォルダをベースパスとして取得
+  const root = app.getAppPath();
   //! 各種サブディレクトリ・ファイルパスを構築
   cachedPaths = {
     root,
@@ -182,7 +183,7 @@ const ensureSettingsFile = async (paths: WorkspacePaths): Promise<AppSettings> =
 export const initializeWorkspace = async (): Promise<WorkspacePaths> => {
   //! ワークスペースパス情報を取得
   const paths = resolveWorkspacePaths();
-  console.log('[workspace] userData path:', paths.root);
+  console.log('[workspace] application root path:', paths.root);
   //! 必要なディレクトリを全て作成（並列実行）
   await Promise.all([
     ensureDirectory(paths.root),

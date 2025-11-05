@@ -13,10 +13,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import {
-  getNextCardStatus,
   useWorkspaceStore,
   type Card,
   type CardKind,
@@ -27,7 +26,7 @@ import { useNotificationStore } from './store/notificationStore';
 import { useSplitStore } from './store/splitStore';
 import type { SplitNode } from './store/splitStore';
 import type { LogLevel } from '@/shared/settings';
-import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE, WORKSPACE_SNAPSHOT_FILENAME } from '@/shared/workspace';
+import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
 import './styles.css';
@@ -145,7 +144,6 @@ export const App = () => {
   const setActiveLeaf = useSplitStore((state) => state.setActiveLeaf);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
-  const hasInitializedCards = useRef<boolean>(false); ///< 初期カードロード判定。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧。
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
@@ -335,127 +333,7 @@ export const App = () => {
     void applySettings();
   }, [pushLog, setThemeStore]);
 
-  useEffect(() => {
-    const loadWorkspace = async () => {
-      const loadApi = window.app?.workspace?.load;
-      if (!loadApi) {
-        pushLog({
-          id: `workspace-load-missing-${Date.now()}`,
-          level: 'WARN',
-          message: 'workspace.load API が未定義のため、既定レイアウトで起動します。',
-          timestamp: new Date(),
-        });
-        return;
-      }
-
-      try {
-        const targetLeafId = activeLeafId ?? fallbackLeafId;
-        if (!targetLeafId) {
-          pushLog({
-            id: `workspace-load-no-leaf-${Date.now()}`,
-            level: 'WARN',
-            message: '保存済みワークスペースの読み込み先パネルを特定できませんでした。',
-            timestamp: new Date(),
-          });
-          return;
-        }
-
-        const snapshot = await loadApi();
-        if (!snapshot || !Array.isArray(snapshot.cards)) {
-          pushLog({
-            id: `workspace-load-empty-${Date.now()}`,
-            level: 'INFO',
-            message: '保存済みスナップショットが見つからないため、既定レイアウトで起動します。',
-            timestamp: new Date(),
-          });
-          return;
-        }
-
-        const { validCards, invalidMessages } = sanitizeSnapshotCards(snapshot.cards);
-        if (validCards.length === 0) {
-          notify('error', '保存済みデータに有効なカードが存在しなかったため、読み込みを中断しました。');
-          pushLog({
-            id: `workspace-load-invalid-${Date.now()}`,
-            level: 'ERROR',
-            message: '保存済みスナップショットに有効なカードが存在しませんでした。',
-            timestamp: new Date(),
-          });
-          if (invalidMessages.length > 0) {
-            pushLog({
-              id: `workspace-load-invalid-list-${Date.now()}`,
-              level: 'WARN',
-              message: `除外理由: ${invalidMessages.join(' / ')}`,
-              timestamp: new Date(),
-            });
-          }
-          return;
-        }
-
-        const result = openTab(targetLeafId, WORKSPACE_SNAPSHOT_FILENAME, validCards, {
-          savedAt: snapshot.savedAt,
-          title: WORKSPACE_SNAPSHOT_FILENAME,
-        });
-
-        if (result.status === 'denied') {
-          notify('warning', result.reason);
-          pushLog({
-            id: `workspace-load-denied-${Date.now()}`,
-            level: 'WARN',
-            message: result.reason,
-            timestamp: new Date(),
-          });
-          return;
-        }
-
-        const savedAtIssue = Boolean(snapshot.savedAt && Number.isNaN(Date.parse(snapshot.savedAt)));
-        if (snapshot.savedAt && !savedAtIssue) {
-          markSaved(result.tabId, snapshot.savedAt);
-        }
-
-        hasInitializedCards.current = true;
-        const issues: string[] = [];
-        if (invalidMessages.length > 0) {
-          issues.push(`無効カード ${invalidMessages.length} 件`);
-        }
-        if (savedAtIssue) {
-          issues.push('保存時刻が不正');
-        }
-
-        const notifyLevel = issues.length > 0 ? 'warning' : 'success';
-        const notifyMessage =
-          issues.length > 0
-            ? `保存済みワークスペースを読み込みました (${issues.join(' / ')})。`
-            : '保存済みワークスペースを読み込みました。';
-        notify(notifyLevel, notifyMessage);
-        pushLog({
-          id: `workspace-loaded-${Date.now()}`,
-          level: issues.length > 0 ? 'WARN' : 'INFO',
-          message: notifyMessage,
-          timestamp: new Date(),
-        });
-
-        if (invalidMessages.length > 0) {
-          pushLog({
-            id: `workspace-invalid-cards-${Date.now()}`,
-            level: 'WARN',
-            message: `除外したカード: ${invalidMessages.join(' / ')}`,
-            timestamp: new Date(),
-          });
-        }
-      } catch (error) {
-        console.error('[renderer] failed to load workspace snapshot', error);
-        notify('error', 'ワークスペースの読込に失敗しました。ログを確認してください。');
-        pushLog({
-          id: `workspace-load-failed-${Date.now()}`,
-          level: 'ERROR',
-          message: 'ワークスペースの読込に失敗しました。コンソールログを確認してください。',
-          timestamp: new Date(),
-        });
-      }
-    };
-
-    void loadWorkspace();
-  }, [activeLeafId, fallbackLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards]);
+  // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
   useEffect(() => {
     //! Tailwind ダークモード切替のため、html 要素へ `dark` クラスを付与する
@@ -621,7 +499,6 @@ export const App = () => {
           markSaved(result.tabId, snapshot.savedAt);
         }
 
-        hasInitializedCards.current = true;
         notify('success', `カードファイルを読み込みました: ${fileName} (${validCards.length}枚)`);
         pushLog({
           id: `load-card-success-${Date.now()}`,
@@ -640,20 +517,10 @@ export const App = () => {
         });
       }
     },
-    [activeLeafId, fallbackLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards],
+    [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot],
   );
 
-  useEffect(() => {
-    //! 初期状態でsample_cards_overview.jsonを自動読み込み
-    const loadInitialFile = async () => {
-      if (cardFiles.includes('sample_cards_overview.json') && !hasInitializedCards.current) {
-        hasInitializedCards.current = true;
-        await handleLoadCardFile('sample_cards_overview.json');
-      }
-    };
-
-    void loadInitialFile();
-  }, [cardFiles, handleLoadCardFile]);
+  // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
   /**
    * @brief 選択カードのステータスを次段へ遷移させる。
