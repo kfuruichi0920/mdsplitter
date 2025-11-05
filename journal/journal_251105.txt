@@ -1125,3 +1125,146 @@ npm test -- App.test.tsx
 - App.test.tsx:138-168: cycles test
 - App.test.tsx:186-221: saves test
 - App.test.tsx:262-314: invalid cards test
+
+---
+
+## タスク P2-11a: ThemeSettings外観設定スキーマ定義と既定値設定
+
+### 実施日時
+2025-11-06 00:40:00
+
+### 実施内容
+
+#### 1. ThemeColorSettings インターフェースを追加
+
+src/shared/settings.ts に以下の型定義を追加：
+
+```typescript
+export interface ThemeColorSettings {
+  background: string;         ///< 背景色
+  foreground: string;         ///< 前景色（テキスト）
+  border: string;             ///< 境界線色
+  primary: string;            ///< プライマリ色（アクセント）
+  secondary: string;          ///< セカンダリ色
+  cardBackground: string;     ///< カード背景色
+  cardBorder: string;         ///< カード境界線色
+  connectorActive: string;    ///< アクティブコネクタ色
+  connectorInactive: string;  ///< 非アクティブコネクタ色
+}
+```
+
+#### 2. ThemeSettings インターフェースを拡張
+
+```typescript
+export interface ThemeSettings {
+  mode: ThemeModeSetting;
+  splitterWidth: number;      ///< 分割境界の幅（px）
+  light: ThemeColorSettings;  ///< ライトモード色設定
+  dark: ThemeColorSettings;   ///< ダークモード色設定
+}
+```
+
+#### 3. defaultSettings に既定値を設定
+
+ライトモードとダークモードそれぞれに以下の既定値を設定：
+
+**ライトモード**:
+- background: '#ffffff'
+- foreground: '#1f2937'
+- border: '#e5e7eb'
+- primary: '#3b82f6'
+- secondary: '#6b7280'
+- cardBackground: '#f9fafb'
+- cardBorder: '#d1d5db'
+- connectorActive: '#60a5fa'
+- connectorInactive: '#9ca3af'
+
+**ダークモード**:
+- background: '#111827'
+- foreground: '#f9fafb'
+- border: '#374151'
+- primary: '#60a5fa'
+- secondary: '#9ca3af'
+- cardBackground: '#1f2937'
+- cardBorder: '#4b5563'
+- connectorActive: '#3b82f6'
+- connectorInactive: '#6b7280'
+
+**splitterWidth**: 4 (px)
+
+#### 4. App.tsx の handleThemeToggle 関数を修正
+
+型エラー解消のため、テーマ切替時に既存設定を読み込んで mode のみ変更するように修正：
+
+```typescript
+const handleThemeToggle = useCallback(async () => {
+  const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+  setThemeStore(nextTheme);
+
+  if (window.app?.settings) {
+    try {
+      const currentSettings = await window.app.settings.load();
+      await window.app.settings.update({
+        theme: {
+          ...currentSettings.theme,
+          mode: nextTheme
+        }
+      });
+    } catch (error) {
+      console.error('[renderer] failed to update settings', error);
+      notify('error', '設定の保存に失敗しました。');
+      pushLog({
+        id: `settings-update-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: '設定の保存に失敗しました。',
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  notify('success', `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`);
+  pushLog({
+    id: `theme-${Date.now()}`,
+    level: 'INFO',
+    message: `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
+    timestamp: new Date(),
+  });
+}, [notify, pushLog, setThemeStore, theme]);
+```
+
+### 検証結果
+
+#### TypeScript型チェック
+```
+npm run typecheck
+```
+**結果**: ✅ 成功（エラーなし）
+
+#### 単体テスト
+```
+npm test -- --testPathPattern='connectorLayoutStore|splitStore'
+```
+**結果**: ✅ 全テスト成功
+- connectorLayoutStore.test.ts: 4件パス
+- splitStore.test.ts: 14件パス
+
+### 判断と根拠
+
+**設計決定**:
+1. **色設定の9項目選定**: UI設計書とコンポーネント実装を参照し、必要十分な色設定項目を定義。
+2. **既定値の選択**: Tailwind CSS の色パレット（gray, blue）を基準とし、視認性とコントラストを考慮。
+3. **splitterWidth の既定値**: 4px は細すぎず太すぎず、ドラッグ操作に適した幅として設定。
+
+**実装方針**:
+- ThemeSettings の型定義を拡張したため、既存コードで `theme.mode` のみを使用している箇所は型エラーが発生。
+- handleThemeToggle では既存設定を保持し mode のみ更新する方針を採用。
+- エラーハンドリングを追加し、設定保存失敗時にユーザに通知。
+
+### 次のステップ
+
+P2-11b: 設定をCSS変数に反映する機能を実装し、テーマ切替時に外観が変更されることを確認する。
+
+### 参照
+- src/shared/settings.ts:54-77 (型定義)
+- src/shared/settings.ts:91-118 (既定値)
+- src/renderer/App.tsx:562-594 (handleThemeToggle)
