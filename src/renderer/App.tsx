@@ -559,23 +559,29 @@ export const App = () => {
   /**
    * @brief テーマを切り替える。
    */
-  const handleThemeToggle = useCallback(() => {
+  const handleThemeToggle = useCallback(async () => {
     const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
     setThemeStore(nextTheme);
 
     if (window.app?.settings) {
-      void window.app.settings
-        .update({ theme: { mode: nextTheme } })
-        .catch((error) => {
-          console.error('[renderer] failed to update settings', error);
-          notify('error', '設定の保存に失敗しました。コンソールログを確認してください。');
-          pushLog({
-            id: `settings-update-failed-${Date.now()}`,
-            level: 'ERROR',
-            message: '設定の保存に失敗しました。コンソールログを確認してください。',
-            timestamp: new Date(),
-          });
+      try {
+        const currentSettings = await window.app.settings.load();
+        await window.app.settings.update({
+          theme: {
+            ...currentSettings.theme,
+            mode: nextTheme
+          }
         });
+      } catch (error) {
+        console.error('[renderer] failed to update settings', error);
+        notify('error', '設定の保存に失敗しました。コンソールログを確認してください。');
+        pushLog({
+          id: `settings-update-failed-${Date.now()}`,
+          level: 'ERROR',
+          message: '設定の保存に失敗しました。コンソールログを確認してください。',
+          timestamp: new Date(),
+        });
+      }
     }
 
     notify('success', `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`);

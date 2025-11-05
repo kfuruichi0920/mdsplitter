@@ -51,8 +51,29 @@ export interface WorkspaceSettings {
   recentFiles: string[];
 }
 
+/**
+ * @brief ライト/ダークモード毎の色設定。
+ */
+export interface ThemeColorSettings {
+  background: string;         ///< 背景色
+  foreground: string;         ///< 前景色（テキスト）
+  border: string;             ///< 境界線色
+  primary: string;            ///< プライマリ色（アクセント）
+  secondary: string;          ///< セカンダリ色
+  cardBackground: string;     ///< カード背景色
+  cardBorder: string;         ///< カード境界線色
+  connectorActive: string;    ///< アクティブコネクタ色
+  connectorInactive: string;  ///< 非アクティブコネクタ色
+}
+
+/**
+ * @brief テーマ設定（モード + 外観設定）。
+ */
 export interface ThemeSettings {
   mode: ThemeModeSetting;
+  splitterWidth: number;      ///< 分割境界の幅（px）
+  light: ThemeColorSettings;  ///< ライトモード色設定
+  dark: ThemeColorSettings;   ///< ダークモード色設定
 }
 
 export interface AppSettings {
@@ -70,7 +91,30 @@ export type AppSettingsPatch = Partial<AppSettings>;
 export const defaultSettings: AppSettings = {
   version: SETTINGS_VERSION,
   theme: {
-    mode: 'dark'
+    mode: 'dark',
+    splitterWidth: 4,
+    light: {
+      background: '#ffffff',
+      foreground: '#1f2937',
+      border: '#e5e7eb',
+      primary: '#3b82f6',
+      secondary: '#6b7280',
+      cardBackground: '#f9fafb',
+      cardBorder: '#d1d5db',
+      connectorActive: '#60a5fa',
+      connectorInactive: '#9ca3af'
+    },
+    dark: {
+      background: '#111827',
+      foreground: '#f9fafb',
+      border: '#374151',
+      primary: '#60a5fa',
+      secondary: '#9ca3af',
+      cardBackground: '#1f2937',
+      cardBorder: '#4b5563',
+      connectorActive: '#3b82f6',
+      connectorInactive: '#6b7280'
+    }
   },
   input: {
     maxWarnSizeMB: 10,
