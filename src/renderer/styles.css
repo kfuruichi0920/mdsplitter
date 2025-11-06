@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * テーマ設定から動的に注入されるCSS変数
+ * - App.tsx の applyThemeColors() / applySplitterWidth() により設定される
+ * - カスタムコンポーネントで var(--theme-*) として参照可能
+ *
+ * 利用可能な変数:
+ *   --theme-background
+ *   --theme-foreground
+ *   --theme-border
+ *   --theme-primary
+ *   --theme-secondary
+ *   --theme-card-background
+ *   --theme-card-border
+ *   --theme-connector-active
+ *   --theme-connector-inactive
+ *   --theme-splitter-width
+ */
+
 @layer base {
   html {
     @apply h-full;

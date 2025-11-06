@@ -1268,3 +1268,142 @@ P2-11b: 設定をCSS変数に反映する機能を実装し、テーマ切替時
 - src/shared/settings.ts:54-77 (型定義)
 - src/shared/settings.ts:91-118 (既定値)
 - src/renderer/App.tsx:562-594 (handleThemeToggle)
+
+---
+
+## タスク P2-11b: 設定をCSS変数に反映し、テーマ切替時の外観変更を確認
+
+### 実施日時
+2025-11-07 00:53:00
+
+### 実施内容
+
+#### 1. テーマユーティリティ関数を実装
+
+src/renderer/utils/themeUtils.ts を新規作成し、以下の関数を実装：
+
+```typescript
+export const applyThemeColors = (colors: ThemeColorSettings): void
+export const applySplitterWidth = (widthPx: number): void
+```
+
+**機能**:
+- `applyThemeColors()`: ThemeColorSettings の9つの色設定を対応するCSS変数に変換し、document.documentElement.style に設定
+- `applySplitterWidth()`: 分割境界幅をCSS変数 `--theme-splitter-width` に設定
+
+**CSS変数マッピング**:
+- background → --theme-background
+- foreground → --theme-foreground
+- border → --theme-border
+- primary → --theme-primary
+- secondary → --theme-secondary
+- cardBackground → --theme-card-background
+- cardBorder → --theme-card-border
+- connectorActive → --theme-connector-active
+- connectorInactive → --theme-connector-inactive
+
+#### 2. App.tsx でテーマ設定を起動時に反映
+
+既存の設定読み込み処理（lines 296-341）を拡張し、テーマ色とsplitterWidthをCSS変数に反映：
+
+```typescript
+// lines 316-319
+const colors = resolvedTheme === 'dark' ? settings.theme.dark : settings.theme.light;
+applyThemeColors(colors);
+applySplitterWidth(settings.theme.splitterWidth);
+```
+
+#### 3. テーマ切替時にCSS変数を更新
+
+handleThemeToggle 関数（lines 569-607）を修正し、テーマ切替時にもCSS変数を更新：
+
+```typescript
+// lines 577-580
+const colors = nextTheme === 'dark' ? currentSettings.theme.dark : currentSettings.theme.light;
+applyThemeColors(colors);
+applySplitterWidth(currentSettings.theme.splitterWidth);
+```
+
+#### 4. CSS変数の使用方法をドキュメント化
+
+src/renderer/styles.css の冒頭にコメントを追加し、利用可能なCSS変数を明記（lines 5-21）。
+
+将来的にカスタムコンポーネントで `var(--theme-*)` として参照可能。
+
+#### 5. ユニットテストを作成
+
+src/renderer/utils/__tests__/themeUtils.test.ts を作成し、以下をテスト：
+
+1. **applyThemeColors**:
+   - 全9色が正しくCSS変数に設定されること
+   - 複数回呼び出し時に色設定が更新されること
+
+2. **applySplitterWidth**:
+   - 幅がpx単位で設定されること
+   - 複数回呼び出し時に値が更新されること
+   - 0および大きい値の処理
+
+### 検証結果
+
+#### TypeScript型チェック
+```
+npm run typecheck
+```
+**結果**: ✅ 成功（エラーなし）
+
+#### 単体テスト
+```
+npm test -- --testPathPattern='themeUtils'
+```
+**結果**: ✅ 全テスト成功
+- applyThemeColors: 2件パス
+- applySplitterWidth: 3件パス
+
+### 判断と根拠
+
+**実装方針**:
+1. **CSS変数の採用理由**:
+   - Tailwindクラスは静的だが、CSS変数は実行時に動的変更可能
+   - 将来的にユーザー定義テーマのカスタマイズが容易
+   - コンポーネント間で統一された色管理が可能
+
+2. **ルート要素への適用**:
+   - document.documentElement.style に設定することで、全コンポーネントから `var()` 関数で参照可能
+   - グローバルスコープでの色管理を実現
+
+3. **テーマ切替時の即時反映**:
+   - handleThemeToggle 内で設定読み込み後、即座にCSS変数を更新
+   - Tailwindの `dark:` クラスとCSS変数の両方を更新することで、既存スタイルとの互換性を維持
+
+4. **テスト方針**:
+   - document.documentElement.style を直接検証
+   - 色設定の上書き動作を確認
+   - 境界値（0px, 100px）のテストを含める
+
+**技術的決定**:
+- CSS変数名は `--theme-*` プレフィックスを使用（命名衝突を回避）
+- splitterWidth は px 単位を明示的に付与（calc() での使用を想定）
+- applyThemeColors は Object.entries でループ処理（保守性向上）
+
+### 制限事項と今後の改善
+
+**現状の制限**:
+- 既存のTailwindクラスは引き続き使用（CSS変数に移行していない）
+- CSS変数の使用は将来的な拡張のための基盤整備
+
+**改善案**:
+- 既存のTailwindクラスを段階的にCSS変数参照に置き換え
+- カスタムテーマエディタUIの実装
+- CSS変数のホットリロード対応
+
+### 次のステップ
+
+P2-11c: 設定変更が`settings.json`へ保存され、再起動後も反映されることをテストで確認する。
+
+### 参照
+- src/renderer/utils/themeUtils.ts (ユーティリティ関数)
+- src/renderer/utils/__tests__/themeUtils.test.ts (テスト)
+- src/renderer/App.tsx:36 (import)
+- src/renderer/App.tsx:316-319 (起動時適用)
+- src/renderer/App.tsx:577-580 (テーマ切替時適用)
+- src/renderer/styles.css:5-21 (ドキュメント)

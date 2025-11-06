@@ -33,6 +33,7 @@ import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
+import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -311,6 +312,12 @@ export const App = () => {
           : (settings.theme.mode === 'dark' ? 'dark' : 'light');
 
         setThemeStore(resolvedTheme);
+
+        //! テーマ色設定をCSS変数に反映
+        const colors = resolvedTheme === 'dark' ? settings.theme.dark : settings.theme.light;
+        applyThemeColors(colors);
+        applySplitterWidth(settings.theme.splitterWidth);
+
         notify('success', `設定を読み込みました (テーマ: ${settings.theme.mode}).`);
         pushLog({
           id: `settings-loaded-${Date.now()}`,
@@ -331,7 +338,7 @@ export const App = () => {
     };
 
     void applySettings();
-  }, [pushLog, setThemeStore]);
+  }, [pushLog, setThemeStore, notify]);
 
   // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
@@ -566,6 +573,12 @@ export const App = () => {
     if (window.app?.settings) {
       try {
         const currentSettings = await window.app.settings.load();
+
+        //! テーマ切替時にCSS変数を更新
+        const colors = nextTheme === 'dark' ? currentSettings.theme.dark : currentSettings.theme.light;
+        applyThemeColors(colors);
+        applySplitterWidth(currentSettings.theme.splitterWidth);
+
         await window.app.settings.update({
           theme: {
             ...currentSettings.theme,
