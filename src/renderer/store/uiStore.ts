@@ -19,14 +19,22 @@ import { create } from 'zustand';
 export type ThemeMode = 'light' | 'dark';
 
 /**
+ * @brief カード表示モード種別。
+ */
+export type CardDisplayMode = 'detailed' | 'compact';
+
+/**
  * @brief UI設定ストアの状態。
  * @details
  * テーマ・切替・明示設定・リセット操作を管理。
  */
 export interface UiStoreState {
   theme: ThemeMode; ///< 現在のテーマモード。
+  cardDisplayMode: CardDisplayMode; ///< カード表示モード（詳細/コンパクト）。
   toggleTheme: () => void; ///< テーマをトグルする。
   setTheme: (mode: ThemeMode) => void; ///< テーマを明示的に設定する。
+  toggleCardDisplayMode: () => void; ///< カード表示モードをトグルする。
+  setCardDisplayMode: (mode: CardDisplayMode) => void; ///< カード表示モードを明示的に設定する。
   reset: () => void; ///< テーマ状態を初期値に戻す。
 }
 
@@ -37,12 +45,18 @@ export interface UiStoreState {
 const DEFAULT_THEME: ThemeMode = 'dark';
 
 /**
+ * @brief デフォルトカード表示モード。
+ */
+const DEFAULT_CARD_DISPLAY_MODE: CardDisplayMode = 'detailed';
+
+/**
  * @brief UIストア本体。
  * @details
  * テーマ状態・切替・明示設定・リセットを管理。
  */
 export const useUiStore = create<UiStoreState>()((set) => ({
   theme: DEFAULT_THEME,
+  cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE,
   /**
    * @brief テーマをトグルする。
    * @details
@@ -59,10 +73,25 @@ export const useUiStore = create<UiStoreState>()((set) => ({
     set({ theme: mode });
   },
   /**
+   * @brief カード表示モードをトグルする。
+   * @details
+   * 現在のモードがdetailedならcompact、compactならdetailedに切り替え。
+   */
+  toggleCardDisplayMode: () => {
+    set((state) => ({ cardDisplayMode: state.cardDisplayMode === 'detailed' ? 'compact' : 'detailed' }));
+  },
+  /**
+   * @brief カード表示モードを明示的に設定。
+   * @param mode 新しいカード表示モード。
+   */
+  setCardDisplayMode: (mode: CardDisplayMode) => {
+    set({ cardDisplayMode: mode });
+  },
+  /**
    * @brief テーマ状態を初期値にリセット。
    */
   reset: () => {
-    set({ theme: DEFAULT_THEME });
+    set({ theme: DEFAULT_THEME, cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE });
   },
 }));
 

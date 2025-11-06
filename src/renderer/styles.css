@@ -269,6 +269,10 @@
     @apply rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
   }
 
+  .panel-toolbar__button--active {
+    @apply bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600;
+  }
+
   .panel-toolbar__input {
     @apply rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
   }
@@ -295,6 +299,19 @@
 
   .card--active {
     @apply border-l-4 border-blue-500 bg-blue-50/70 shadow-lg dark:bg-slate-800/80;
+  }
+
+  .card--compact {
+    @apply flex-row items-center gap-2 py-1.5;
+  }
+
+  .card--compact .card__header {
+    @apply contents;
+  }
+
+  .card--compact .card__body,
+  .card--compact .card__footer {
+    @apply hidden;
   }
 
   .card__header {
@@ -335,6 +352,10 @@
 
   .card__title {
     @apply flex-1 text-sm font-semibold text-slate-800 dark:text-slate-100;
+  }
+
+  .card__title--truncate {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap;
   }
 
   .card__body {

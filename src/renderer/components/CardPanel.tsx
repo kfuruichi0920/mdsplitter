@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
 
 /** ステータスラベル表示用マッピング。 */
@@ -96,6 +97,8 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
+  const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
 
   const activeTab = useMemo<PanelTabState | null>(() => {
     if (!activeTabId) {
@@ -199,6 +202,17 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     [handleCardSelect],
   );
 
+  /**
+   * @brief カード表示モードを切り替える。
+   * @details
+   * コンパクト/詳細モードをトグルし、ログに記録する。
+   */
+  const handleToggleDisplayMode = useCallback(() => {
+    toggleCardDisplayMode();
+    const nextMode = cardDisplayMode === 'detailed' ? 'コンパクト' : '詳細';
+    onLog?.('INFO', `カード表示モードを「${nextMode}」に切り替えました。`);
+  }, [cardDisplayMode, onLog, toggleCardDisplayMode]);
+
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー: 各カードファイルのタブを表示 */}
@@ -278,7 +292,13 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
           </button>
         </div>
         <div className="panel-toolbar__group">
-          <button type="button" className="panel-toolbar__button">
+          <button
+            type="button"
+            className={`panel-toolbar__button${cardDisplayMode === 'compact' ? ' panel-toolbar__button--active' : ''}`}
+            onClick={handleToggleDisplayMode}
+            title={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
+            aria-label={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
+          >
             ☰ コンパクト
           </button>
         </div>
@@ -300,6 +320,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             leafId={leafId}
             fileName={activeTab?.fileName ?? ''}
             isActive={card.id === selectedCardId}
+            displayMode={cardDisplayMode}
             onSelect={handleCardSelect}
             onKeyDown={handleCardKeyDown}
             panelScrollRef={panelScrollRef}
@@ -320,16 +341,39 @@ interface CardListItemProps {
   isActive: boolean;
   leafId: string;
   fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
+  displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
 }
 
-const CardListItem = ({ card, isActive, leafId, fileName, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
+const CardListItem = ({ card, isActive, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
 
+  //! コンパクト表示の場合は1行のみ表示
+  if (displayMode === 'compact') {
+    return (
+      <article
+        className={`card card--compact${isActive ? ' card--active' : ''}`}
+        aria-selected={isActive}
+        role="listitem"
+        tabIndex={0}
+        ref={anchorRef}
+        onClick={() => onSelect(card)}
+        onKeyDown={(event) => onKeyDown(event, card)}
+      >
+        <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+        <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+        <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+        <span className="card__title card__title--truncate">{card.title}</span>
+        <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+      </article>
+    );
+  }
+
+  //! 詳細表示
   return (
     <article
       className={`card${isActive ? ' card--active' : ''}`}

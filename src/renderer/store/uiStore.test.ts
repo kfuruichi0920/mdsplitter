@@ -53,4 +53,57 @@ describe('uiStore', () => {
     });
     expect(useUiStore.getState().theme).toBe('light');
   });
+
+  /**
+   * @brief カード表示モードの初期状態を検証。
+   */
+  it('initializes with default card display mode', () => {
+    expect(useUiStore.getState().cardDisplayMode).toBe('detailed');
+  });
+
+  /**
+   * @brief カード表示モードのトグル動作を検証。
+   */
+  it('toggles between detailed and compact card display mode', () => {
+    act(() => {
+      useUiStore.getState().toggleCardDisplayMode();
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('compact');
+
+    act(() => {
+      useUiStore.getState().toggleCardDisplayMode();
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('detailed');
+  });
+
+  /**
+   * @brief カード表示モードの明示的設定を検証。
+   */
+  it('sets card display mode explicitly', () => {
+    act(() => {
+      useUiStore.getState().setCardDisplayMode('compact');
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('compact');
+
+    act(() => {
+      useUiStore.getState().setCardDisplayMode('detailed');
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('detailed');
+  });
+
+  /**
+   * @brief リセット時にカード表示モードも初期化されることを検証。
+   */
+  it('resets card display mode to default', () => {
+    act(() => {
+      useUiStore.getState().setCardDisplayMode('compact');
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('compact');
+
+    act(() => {
+      useUiStore.getState().reset();
+    });
+    expect(useUiStore.getState().cardDisplayMode).toBe('detailed');
+    expect(useUiStore.getState().theme).toBe('dark');
+  });
 });
