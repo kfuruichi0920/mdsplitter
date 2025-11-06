@@ -224,7 +224,14 @@ export const App = () => {
           return;
         }
 
-        validCards.push(card);
+        //! 階層情報のバリデーション（デフォルト値で補完）
+        const parent_id = card.parent_id === null || typeof card.parent_id === 'string' ? card.parent_id : null;
+        const child_ids = Array.isArray(card.child_ids) ? card.child_ids : [];
+        const prev_id = card.prev_id === null || typeof card.prev_id === 'string' ? card.prev_id : null;
+        const next_id = card.next_id === null || typeof card.next_id === 'string' ? card.next_id : null;
+        const level = typeof card.level === 'number' ? card.level : 0;
+
+        validCards.push({ ...card, parent_id, child_ids, prev_id, next_id, level });
       });
 
       return { validCards, invalidMessages };

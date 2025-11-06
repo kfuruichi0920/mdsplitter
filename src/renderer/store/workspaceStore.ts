@@ -40,6 +40,7 @@ export interface PanelTabState {
   selectedCardId: string | null;
   isDirty: boolean;
   lastSavedAt: string | null;
+  expandedCardIds: Set<string>; ///< 展開状態のカードIDセット（子を持つカードのみ）
 }
 
 /**
@@ -81,6 +82,9 @@ export interface WorkspaceStore {
   cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
   hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
   markSaved: (tabId: string, savedAt: string) => void;
+  toggleCardExpanded: (leafId: string, tabId: string, cardId: string) => void; ///< カードの展開/折畳をトグル
+  expandAll: (leafId: string, tabId: string) => void; ///< 全カードを展開
+  collapseAll: (leafId: string, tabId: string) => void; ///< 全カードを折畳
   reset: () => void;
 }
 
@@ -130,12 +134,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       if (existingTabId) {
         //! 同一パネル内で開いている場合は再アクティブ化し、内容を最新化する
         const prevTab = state.tabs[existingTabId];
+        //! 展開状態を維持しつつ、新しいカードで存在しないIDは削除
+        const updatedExpandedIds = new Set<string>(
+          Array.from(prevTab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
+        );
         const nextTab: PanelTabState = {
           ...prevTab,
           cards: [...cards],
           selectedCardId: cards[0]?.id ?? null,
           isDirty: false,
           lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
+          expandedCardIds: updatedExpandedIds,
         } satisfies PanelTabState;
 
         outcome = { status: 'activated', tabId: existingTabId, leafId } satisfies OpenTabResult;
@@ -151,6 +160,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       }
 
       const tabId = nanoid();
+      //! 初期状態では子を持つカードをすべて展開
+      const initialExpandedIds = new Set<string>(
+        cards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
+      );
       const nextTab: PanelTabState = {
         id: tabId,
         leafId,
@@ -160,6 +173,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         selectedCardId: cards[0]?.id ?? null,
         isDirty: false,
         lastSavedAt: options?.savedAt ?? null,
+        expandedCardIds: initialExpandedIds,
       } satisfies PanelTabState;
 
       const nextLeaf: LeafWorkspaceState = {
@@ -352,6 +366,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      //! 展開状態を維持しつつ、新しいカードで存在しないIDは削除
+      const updatedExpandedIds = new Set<string>(
+        Array.from(tab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
+      );
+
       return {
         ...state,
         tabs: {
@@ -362,6 +381,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             selectedCardId: cards[0]?.id ?? null,
             isDirty: false,
             lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
+            expandedCardIds: updatedExpandedIds,
           },
         },
       };
@@ -380,6 +400,73 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         tabs: {
           ...state.tabs,
           [tabId]: { ...tab, isDirty: false, lastSavedAt: savedAt },
+        },
+      };
+    });
+  },
+
+  toggleCardExpanded: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const card = tab.cards.find((c) => c.id === cardId);
+      if (!card || !card.child_ids || card.child_ids.length === 0) {
+        return state; //! 子を持たないカードは展開/折畳対象外
+      }
+
+      const nextExpandedIds = new Set(tab.expandedCardIds);
+      if (nextExpandedIds.has(cardId)) {
+        nextExpandedIds.delete(cardId);
+      } else {
+        nextExpandedIds.add(cardId);
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, expandedCardIds: nextExpandedIds },
+        },
+      };
+    });
+  },
+
+  expandAll: (leafId, tabId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const allExpandableIds = new Set<string>(
+        tab.cards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
+      );
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, expandedCardIds: allExpandableIds },
+        },
+      };
+    });
+  },
+
+  collapseAll: (leafId, tabId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, expandedCardIds: new Set<string>() },
         },
       };
     });

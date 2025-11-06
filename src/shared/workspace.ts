@@ -51,6 +51,7 @@ export const CARD_KIND_VALUES: readonly CardKind[] = [
  * @brief カード情報を表す構造体。
  * @details
  * 1枚のカードの全属性を保持。
+ * 階層構造はparent_id/child_idsで管理し、順序関係はprev_id/next_idの双方向リンクで管理。
  * @ingroup workspace
  */
 export interface Card {
@@ -62,6 +63,11 @@ export interface Card {
   hasLeftTrace: boolean;   ///< 左トレース有無
   hasRightTrace: boolean;  ///< 右トレース有無
   updatedAt: string;       ///< 最終更新日時（ISO8601）
+  parent_id: string | null;  ///< 親カードID（ルートの場合null）
+  child_ids: string[];       ///< 子カード（1階層下）IDリスト
+  prev_id: string | null;    ///< 兄弟の前のカードID（先頭の場合null）
+  next_id: string | null;    ///< 兄弟の次のカードID（末尾の場合null）
+  level: number;             ///< 階層レベル（0=ルート、1=第1階層、...）
 }
 
 /**
@@ -134,7 +140,12 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
       typeof target.kind === 'string' &&
       typeof target.hasLeftTrace === 'boolean' &&
       typeof target.hasRightTrace === 'boolean' &&
-      typeof target.updatedAt === 'string'
+      typeof target.updatedAt === 'string' &&
+      (target.parent_id === null || typeof target.parent_id === 'string') &&
+      Array.isArray(target.child_ids) &&
+      (target.prev_id === null || typeof target.prev_id === 'string') &&
+      (target.next_id === null || typeof target.next_id === 'string') &&
+      typeof target.level === 'number'
     );
   });
 };

@@ -25,6 +25,11 @@ describe('workspaceStore (multi-panel tabs)', () => {
       hasLeftTrace: false,
       hasRightTrace: true,
       updatedAt: '2025-11-01T00:00:00.000Z',
+      parent_id: null,
+      child_ids: ['card-002'],
+      prev_id: null,
+      next_id: null,
+      level: 0,
     },
     {
       id: 'card-002',
@@ -35,6 +40,11 @@ describe('workspaceStore (multi-panel tabs)', () => {
       hasLeftTrace: true,
       hasRightTrace: false,
       updatedAt: '2025-11-01T01:00:00.000Z',
+      parent_id: 'card-001',
+      child_ids: [],
+      prev_id: null,
+      next_id: null,
+      level: 1,
     },
   ];
 
@@ -48,6 +58,11 @@ describe('workspaceStore (multi-panel tabs)', () => {
       hasLeftTrace: true,
       hasRightTrace: true,
       updatedAt: '2025-11-01T02:00:00.000Z',
+      parent_id: null,
+      child_ids: [],
+      prev_id: null,
+      next_id: null,
+      level: 0,
     },
   ];
 

@@ -109,7 +109,46 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
   const cards = activeTab?.cards ?? [];
   const selectedCardId = activeTab?.selectedCardId ?? null;
+  const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
   const cardCount = cards.length;
+
+  /**
+   * @brief 階層構造を考慮して表示すべきカードをフィルタリングする。
+   * @details
+   * 親が折畳まれている場合、その子カードは表示しない。
+   * @return 表示対象のカードリスト。
+   */
+  const visibleCards = useMemo(() => {
+    const result: Card[] = [];
+    const cardMap = new Map(cards.map((c) => [c.id, c]));
+
+    /**
+     * @brief カードとその子孫が表示可能かを判定する。
+     * @param card 判定対象のカード。
+     * @return 表示可能な場合true。
+     */
+    const isVisible = (card: Card): boolean => {
+      if (!card.parent_id) {
+        return true; //! ルートカードは常に表示
+      }
+      const parent = cardMap.get(card.parent_id);
+      if (!parent) {
+        return true; //! 親が見つからない場合は表示
+      }
+      if (!expandedCardIds.has(parent.id)) {
+        return false; //! 親が折畳まれている場合は非表示
+      }
+      return isVisible(parent); //! 再帰的に祖先を確認
+    };
+
+    cards.forEach((card) => {
+      if (isVisible(card)) {
+        result.push(card);
+      }
+    });
+
+    return result;
+  }, [cards, expandedCardIds]);
 
   /**
    * @brief アクティブタブを変更する。
@@ -213,6 +252,24 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     onLog?.('INFO', `カード表示モードを「${nextMode}」に切り替えました。`);
   }, [cardDisplayMode, onLog, toggleCardDisplayMode]);
 
+  /**
+   * @brief 全カードを展開する。
+   */
+  const handleExpandAll = useCallback(() => {
+    if (!activeTabId) return;
+    useWorkspaceStore.getState().expandAll(leafId, activeTabId);
+    onLog?.('INFO', 'すべてのカードを展開しました。');
+  }, [activeTabId, leafId, onLog]);
+
+  /**
+   * @brief 全カードを折畳む。
+   */
+  const handleCollapseAll = useCallback(() => {
+    if (!activeTabId) return;
+    useWorkspaceStore.getState().collapseAll(leafId, activeTabId);
+    onLog?.('INFO', 'すべてのカードを折畳みました。');
+  }, [activeTabId, leafId, onLog]);
+
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー: 各カードファイルのタブを表示 */}
@@ -275,10 +332,22 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       {/* パネルツールバー: 各種操作ボタン・フィルタ・メタ情報 */}
       <div className="panel-toolbar">
         <div className="panel-toolbar__group">
-          <button type="button" className="panel-toolbar__button">
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleExpandAll}
+            title="すべて展開"
+            aria-label="すべて展開"
+          >
             ⏬ 展開
           </button>
-          <button type="button" className="panel-toolbar__button">
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleCollapseAll}
+            title="すべて折畳"
+            aria-label="すべて折畳"
+          >
             ⏫ 折畳
           </button>
         </div>
@@ -313,19 +382,31 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
         ref={panelScrollRef}
         id={activeTab ? `panel-${leafId}-${activeTab.id}` : undefined}
       >
-        {cards.map((card) => (
+        {visibleCards.map((card) => (
           <CardListItem
             key={card.id}
             card={card}
             leafId={leafId}
             fileName={activeTab?.fileName ?? ''}
             isActive={card.id === selectedCardId}
+            isExpanded={expandedCardIds.has(card.id)}
+            hasChildren={card.child_ids.length > 0}
             displayMode={cardDisplayMode}
             onSelect={handleCardSelect}
             onKeyDown={handleCardKeyDown}
+            onToggleExpand={() => {
+              if (activeTabId) {
+                useWorkspaceStore.getState().toggleCardExpanded(leafId, activeTabId, card.id);
+              }
+            }}
             panelScrollRef={panelScrollRef}
           />
         ))}
+        {visibleCards.length === 0 && cards.length > 0 && (
+          <div className="panel-cards__empty" role="note">
+            すべてのカードが折畳まれています。
+          </div>
+        )}
         {cards.length === 0 && (
           <div className="panel-cards__empty" role="note">
             表示するカードがありません。
@@ -339,24 +420,49 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 interface CardListItemProps {
   card: Card;
   isActive: boolean;
+  isExpanded: boolean; ///< 展開状態（子を持つカードのみ有効）。
+  hasChildren: boolean; ///< 子カードを持つかどうか。
   leafId: string;
   fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
+  onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
 }
 
-const CardListItem = ({ card, isActive, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown }: CardListItemProps) => {
+const CardListItem = ({ card, isActive, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+
+  //! 階層インデントのスタイル
+  const indentStyle = { paddingLeft: `${12 + card.level * 24}px` };
+
+  //! 展開/折畳ボタン
+  const expandButton = hasChildren ? (
+    <button
+      type="button"
+      className="card__expand-button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleExpand();
+      }}
+      aria-label={isExpanded ? '折畳' : '展開'}
+      title={isExpanded ? '折畳' : '展開'}
+    >
+      {isExpanded ? '▼' : '▶'}
+    </button>
+  ) : (
+    <span className="card__expand-placeholder" />
+  );
 
   //! コンパクト表示の場合は1行のみ表示
   if (displayMode === 'compact') {
     return (
       <article
         className={`card card--compact${isActive ? ' card--active' : ''}`}
+        style={indentStyle}
         aria-selected={isActive}
         role="listitem"
         tabIndex={0}
@@ -364,6 +470,7 @@ const CardListItem = ({ card, isActive, leafId, fileName, displayMode, panelScro
         onClick={() => onSelect(card)}
         onKeyDown={(event) => onKeyDown(event, card)}
       >
+        {expandButton}
         <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
         <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
         <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
@@ -377,6 +484,7 @@ const CardListItem = ({ card, isActive, leafId, fileName, displayMode, panelScro
   return (
     <article
       className={`card${isActive ? ' card--active' : ''}`}
+      style={indentStyle}
       aria-selected={isActive}
       role="listitem"
       tabIndex={0}
@@ -385,6 +493,7 @@ const CardListItem = ({ card, isActive, leafId, fileName, displayMode, panelScro
       onKeyDown={(event) => onKeyDown(event, card)}
     >
       <header className="card__header">
+        {expandButton}
         <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
         <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
         <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
