@@ -539,6 +539,27 @@
     @apply relative flex cursor-pointer select-none flex-col gap-2 rounded-lg border border-transparent bg-white/80 p-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-900/80;
   }
 
+  .card[data-tooltip]::after {
+    content: attr(data-tooltip);
+    @apply pointer-events-none absolute left-1/2 top-full z-50 mt-2 max-w-[28rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-xs leading-snug text-slate-900 shadow-lg opacity-0 transition-opacity duration-150 ease-out dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100;
+    transform: translateX(-50%);
+    white-space: pre-wrap;
+  }
+
+  .card[data-tooltip]::before {
+    content: '';
+    @apply pointer-events-none absolute left-1/2 top-full z-40 mt-1 h-2 w-2 rotate-45 border border-slate-300 bg-white opacity-0 transition-opacity duration-150 ease-out dark:border-slate-600 dark:bg-slate-700;
+    transform: translateX(-50%);
+  }
+
+  .card[data-tooltip]:hover::after,
+  .card[data-tooltip]:focus-visible::after,
+  .card[data-tooltip]:hover::before,
+  .card[data-tooltip]:focus-visible::before {
+    @apply opacity-100;
+  }
+
+
   .card--selected-primary {
     @apply border-l-4 border-blue-500 bg-blue-50/70 shadow-lg dark:bg-slate-800/80;
   }
@@ -637,7 +658,7 @@
   }
 
   .card__body {
-    @apply text-xs leading-relaxed text-slate-600 dark:text-slate-200;
+    @apply whitespace-pre-wrap text-xs leading-relaxed text-slate-600 dark:text-slate-200;
   }
 
   .card__footer {

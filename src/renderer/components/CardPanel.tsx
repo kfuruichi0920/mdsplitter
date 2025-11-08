@@ -1294,7 +1294,10 @@ const CardListItem = ({
     <span className="card__expand-placeholder" />
   );
 
-  const articleContent = displayMode === 'compact'
+  const isCompact = displayMode === 'compact';
+  const compactTooltip = isCompact && card.body ? card.body : undefined;
+
+  const articleContent = isCompact
     ? (
         <>
           {expandButton}
@@ -1333,6 +1336,7 @@ const CardListItem = ({
         aria-selected={isSelected}
         role="listitem"
         tabIndex={0}
+        data-tooltip={compactTooltip}
         ref={anchorRef}
         draggable={Boolean(onDragStart)}
         onDragStart={handleDragStartInternal}
