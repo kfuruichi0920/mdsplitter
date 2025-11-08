@@ -343,3 +343,11 @@
 - スタイルに drop indicator・highlight・コンテキストメニュー区切りを追加 (`src/renderer/styles.css`)。UI設計書/要件定義へコピー&ペースト仕様とフィードバック要件を追記。
 - トレーサビリティ追従: カード追加/移動/削除/貼り付け後に `mdsplitter:card-layout-changed` イベントを発火し、`useConnectorLayout` が受け取って座標再計測するようにした（workspaceStore/useConnectorLayout）。カード移動後もコネクタ描画が最新位置へ追従することを確認。
 - P2-19対応: JSON読込時に `normalizeCardOrder` でカード配列を深さ優先に整列し、`openTab/hydrateTab` で適用。`child_ids` が欠落していても元順序から兄弟順を補完し、`rebuildSiblingLinks` で prev/next/child_ids を再生成することで、親の直下に必ず子カードが表示されるようにした。単体テスト `normalizes card order...` を追加し回帰を防止。
+- P2-20設定ビュー: `SettingsModal` を新規実装し、メニューバー「編集」ボタンおよび `Ctrl+,` で開くモーダルからテーマ/入出力/ログ/ワークスペース設定を編集できるようにした。App側で設定ドラフト状態とバリデーション、保存処理、プレビュー（テーマ/スプリッタ幅）を管理し、キャンセル時は既存設定へロールバックする。スタイル・ショートカット・ドキュメントを更新し、保存時は `window.app.settings.update` を通じて `settings.json` が更新される。
+
+### カードパネルスクロール挙動是正 (2025-11-08)
+- 調査: `CardPanel` のDOM構造 (`src/renderer/components/CardPanel.tsx:520-760`) はタブバー→ツールバー→カード一覧の縦フレックスだが、`.panel-cards` に `flex:1/min-height:0` が無く、カード数が増えると親 `.split-node` 全体がスクロールしてタブバーまで流れてしまうことを確認。
+- 対策: `src/renderer/styles.css:210-314` で `.tab-bar`/`.panel-toolbar` を `flex-shrink-0` に固定し、`.panel-cards` を `flex-1 min-h-0 overflow-y-auto overflow-x-hidden` へ変更。これによりタブバーとツールバーを常時表示したままカード一覧のみ縦スクロールする構造に統一。
+- コネクタ影響確認: `CardPanel` から `panelScrollRef` を `CardListItem` へ渡し、`useCardConnectorAnchor` (`src/renderer/hooks/useConnectorLayout.ts:9-140`) がスクロールイベントで接合点を再計測しているため、新たなスクロール領域でもトレーサビリティのコネクタ追従が維持されることを再確認。
+- ドキュメント: 仕様書 `doc/software_requirement.md:360-370` に「カード一覧は独立スクロールしタブバーは固定」「スクロール時にコネクタ座標を再計測する」要件を追記し、詳細設計 `doc/software_detail_design.md:218-222` へ実装内容と参照ファイルを記録。
+- テスト: UI挙動のみの変更につき追加の自動テストは未実施（既存Jestテストに影響なし）。

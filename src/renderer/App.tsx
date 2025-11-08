@@ -26,7 +26,8 @@ import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import { useSplitStore } from './store/splitStore';
 import type { SplitNode } from './store/splitStore';
-import type { LogLevel } from '@/shared/settings';
+import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
+import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 
@@ -34,6 +35,7 @@ import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
+import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 
 /** サイドバー幅のデフォルト (px)。 */
@@ -70,6 +72,20 @@ const toDisplayNumber = (cards: Card[], id: string | null): string => {
   return `#${String(index + 1).padStart(3, '0')}`;
 };
 
+const cloneSettings = <T extends unknown>(value: T): T => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+};
+
+const resolveThemeMode = (mode: ThemeModeSetting): ThemeMode => {
+  if (mode === 'system') {
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return mode === 'dark' ? 'dark' : 'light';
+};
+
 /** ログエントリ構造体。 */
 type LogEntry = {
   id: string; ///< 一意識別子。
@@ -79,6 +95,65 @@ type LogEntry = {
 };
 
 const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
+
+const applyThemeFromSettings = (
+  themeConfig: ThemeSettings,
+  requestedMode: ThemeModeSetting,
+  setThemeStore: (mode: ThemeMode) => void,
+) => {
+  const resolved = resolveThemeMode(requestedMode);
+  setThemeStore(resolved);
+  const colors = resolved === 'dark' ? themeConfig.dark : themeConfig.light;
+  applyThemeColors(colors);
+  applySplitterWidth(themeConfig.splitterWidth);
+  return resolved;
+};
+
+interface SettingsModalState {
+  open: boolean;
+  loading: boolean;
+  saving: boolean;
+  draft: AppSettings | null;
+  section: SettingsSection;
+  error: string | null;
+  validationErrors: Record<string, string>;
+}
+
+const createSettingsModalState = (): SettingsModalState => ({
+  open: false,
+  loading: false,
+  saving: false,
+  draft: null,
+  section: 'theme',
+  error: null,
+  validationErrors: {},
+});
+
+const validateSettingsDraft = (draft: AppSettings | null): Record<string, string> => {
+  const errors: Record<string, string> = {};
+  if (!draft) {
+    errors.general = '設定が読み込まれていません。';
+    return errors;
+  }
+
+  if (draft.input.maxWarnSizeMB <= 0) {
+    errors['input.maxWarnSizeMB'] = '1MB以上に設定してください。';
+  }
+  if (draft.input.maxAbortSizeMB <= draft.input.maxWarnSizeMB) {
+    errors['input.maxAbortSizeMB'] = '中断サイズは警告サイズより大きくしてください。';
+  }
+  if (draft.logging.maxSizeMB <= 0) {
+    errors['logging.maxSizeMB'] = '1MB以上に設定してください。';
+  }
+  if (draft.logging.maxFiles < 1) {
+    errors['logging.maxFiles'] = '1以上の整数を入力してください。';
+  }
+  if (draft.theme.splitterWidth < 2 || draft.theme.splitterWidth > 12) {
+    errors['theme.splitterWidth'] = '分割境界幅は2〜12pxの範囲で指定してください。';
+  }
+
+  return errors;
+};
 
 /**
  * @brief 数値を指定範囲内に収める。
@@ -133,6 +208,8 @@ export const App = () => {
   ]);
 
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
   const openTab = useWorkspaceStore((state) => state.openTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
@@ -268,6 +345,136 @@ export const App = () => {
     }
   }, []);
 
+  const handleSettingsChange = useCallback((next: AppSettings) => {
+    setSettingsModalState((prev) => ({
+      ...prev,
+      draft: next,
+      validationErrors: {},
+      error: null,
+    }));
+  }, []);
+
+  const handleSettingsSectionChange = useCallback((nextSection: SettingsSection) => {
+    setSettingsModalState((prev) => ({ ...prev, section: nextSection }));
+  }, []);
+
+  const previewThemeSettings = useCallback(
+    (mode: ThemeModeSetting, themeSettings: ThemeSettings) => {
+      applyThemeFromSettings(themeSettings, mode, setThemeStore);
+    },
+    [setThemeStore],
+  );
+
+  const closeSettingsModal = useCallback(
+    (persistTheme: boolean) => {
+      setSettingsModalState(createSettingsModalState());
+      if (!persistTheme && appSettings) {
+        applyThemeFromSettings(appSettings.theme, appSettings.theme.mode, setThemeStore);
+      }
+    },
+    [appSettings, setThemeStore],
+  );
+
+  const handleSettingsOpen = useCallback(async () => {
+    if (!window.app?.settings) {
+      notify('warn', '設定APIが利用できません。');
+      return;
+    }
+    setSettingsModalState({
+      ...createSettingsModalState(),
+      open: true,
+      loading: true,
+    });
+    try {
+      const loaded = await window.app.settings.load();
+      setAppSettings(loaded);
+      setSettingsModalState({
+        ...createSettingsModalState(),
+        open: true,
+        draft: cloneSettings(loaded),
+      });
+    } catch (error) {
+      console.error('[renderer] failed to open settings', error);
+      notify('error', '設定の読み込みに失敗しました。');
+      pushLog({
+        id: `settings-modal-load-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: '設定モーダルの読み込みに失敗しました。',
+        timestamp: new Date(),
+      });
+      setSettingsModalState((prev) => ({
+        ...prev,
+        loading: false,
+        error: '設定の読み込みに失敗しました。',
+      }));
+    }
+  }, [notify, pushLog]);
+
+  const handleClearRecent = useCallback(() => {
+    setSettingsModalState((prev) => {
+      if (!prev.draft || prev.draft.workspace.recentFiles.length === 0) {
+        return prev;
+      }
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          workspace: {
+            ...prev.draft.workspace,
+            recentFiles: [],
+          },
+        },
+        validationErrors: {},
+        error: null,
+      };
+    });
+  }, []);
+
+  const handleSettingsSave = useCallback(async () => {
+    if (!window.app?.settings) {
+      notify('warn', '設定APIが利用できません。');
+      return;
+    }
+    const draft = settingsModalState.draft;
+    const validation = validateSettingsDraft(draft);
+    if (Object.keys(validation).length > 0) {
+      setSettingsModalState((prev) => ({
+        ...prev,
+        validationErrors: validation,
+        error: '入力内容を確認してください。',
+      }));
+      return;
+    }
+    if (!draft) {
+      setSettingsModalState((prev) => ({ ...prev, error: '設定が読み込まれていません。' }));
+      return;
+    }
+    setSettingsModalState((prev) => ({ ...prev, saving: true, error: null }));
+    try {
+      const updated = await window.app.settings.update(draft);
+      setAppSettings(updated);
+      applyThemeFromSettings(updated.theme, updated.theme.mode, setThemeStore);
+      notify('success', '設定を保存しました。');
+      pushLog({
+        id: `settings-save-${Date.now()}`,
+        level: 'INFO',
+        message: '設定を保存しました。',
+        timestamp: new Date(),
+      });
+      closeSettingsModal(true);
+    } catch (error) {
+      console.error('[renderer] failed to save settings', error);
+      notify('error', '設定の保存に失敗しました。');
+      pushLog({
+        id: `settings-save-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: '設定の保存に失敗しました。',
+        timestamp: new Date(),
+      });
+      setSettingsModalState((prev) => ({ ...prev, saving: false, error: '設定の保存に失敗しました。' }));
+    }
+  }, [closeSettingsModal, notify, pushLog, setThemeStore, settingsModalState.draft]);
+
   useEffect(() => {
     /**
      * @brief メインプロセスとのハンドシェイクを実行する。
@@ -326,16 +533,8 @@ export const App = () => {
 
       try {
         const settings = await window.app.settings.load();
-        const resolvedTheme: ThemeMode = settings.theme.mode === 'system'
-          ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-          : (settings.theme.mode === 'dark' ? 'dark' : 'light');
-
-        setThemeStore(resolvedTheme);
-
-        //! テーマ色設定をCSS変数に反映
-        const colors = resolvedTheme === 'dark' ? settings.theme.dark : settings.theme.light;
-        applyThemeColors(colors);
-        applySplitterWidth(settings.theme.splitterWidth);
+        setAppSettings(settings);
+        applyThemeFromSettings(settings.theme, settings.theme.mode, setThemeStore);
 
         notify('success', `設定を読み込みました (テーマ: ${settings.theme.mode}).`);
         pushLog({
@@ -357,7 +556,7 @@ export const App = () => {
     };
 
     void applySettings();
-  }, [pushLog, setThemeStore, notify]);
+  }, [pushLog, setAppSettings, setThemeStore, notify]);
 
   // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
@@ -586,44 +785,44 @@ export const App = () => {
    * @brief テーマを切り替える。
    */
   const handleThemeToggle = useCallback(async () => {
-    const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
-    setThemeStore(nextTheme);
+    const nextThemeModeSetting: ThemeModeSetting = theme === 'dark' ? 'light' : 'dark';
+    const previewTheme = appSettings?.theme ?? defaultSettings.theme;
+    applyThemeFromSettings(previewTheme, nextThemeModeSetting, setThemeStore);
 
-    if (window.app?.settings) {
-      try {
-        const currentSettings = await window.app.settings.load();
-
-        //! テーマ切替時にCSS変数を更新
-        const colors = nextTheme === 'dark' ? currentSettings.theme.dark : currentSettings.theme.light;
-        applyThemeColors(colors);
-        applySplitterWidth(currentSettings.theme.splitterWidth);
-
-        await window.app.settings.update({
-          theme: {
-            ...currentSettings.theme,
-            mode: nextTheme
-          }
-        });
-      } catch (error) {
-        console.error('[renderer] failed to update settings', error);
-        notify('error', '設定の保存に失敗しました。コンソールログを確認してください。');
-        pushLog({
-          id: `settings-update-failed-${Date.now()}`,
-          level: 'ERROR',
-          message: '設定の保存に失敗しました。コンソールログを確認してください。',
-          timestamp: new Date(),
-        });
-      }
+    if (!window.app?.settings) {
+      notify('warn', '設定APIが利用できません。');
+      return;
     }
 
-    notify('success', `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`);
-    pushLog({
-      id: `theme-${Date.now()}`,
-      level: 'INFO',
-      message: `テーマを ${nextTheme === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
-      timestamp: new Date(),
-    });
-  }, [notify, pushLog, setThemeStore, theme]);
+    try {
+      const updated = await window.app.settings.update({
+        theme: {
+          ...previewTheme,
+          mode: nextThemeModeSetting,
+        },
+      });
+      setAppSettings(updated);
+      notify('success', `テーマを ${nextThemeModeSetting === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`);
+      pushLog({
+        id: `theme-${Date.now()}`,
+        level: 'INFO',
+        message: `テーマを ${nextThemeModeSetting === 'dark' ? 'ダークモード' : 'ライトモード'} に切り替えました。`,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      console.error('[renderer] failed to update settings', error);
+      notify('error', '設定の保存に失敗しました。コンソールログを確認してください。');
+      pushLog({
+        id: `settings-update-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: '設定の保存に失敗しました。コンソールログを確認してください。',
+        timestamp: new Date(),
+      });
+      if (appSettings) {
+        applyThemeFromSettings(appSettings.theme, appSettings.theme.mode, setThemeStore);
+      }
+    }
+  }, [appSettings, notify, pushLog, setThemeStore, theme]);
 
   /**
    * @brief ワークスペースを保存する。
@@ -893,6 +1092,7 @@ export const App = () => {
     : isDirty
       ? '保存状態: ● 未保存'
       : `保存状態: ✓ 保存済み${lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString()})` : ''}`;
+  const isSettingsOpen = settingsModalState.open;
 
   const handleExplorerToggle = useCallback(() => {
     setExplorerOpen((prev) => !prev);
@@ -963,8 +1163,21 @@ export const App = () => {
       const primaryPressed = isMac ? event.metaKey : event.ctrlKey;
       const key = event.key.toLowerCase();
 
+      if (isSettingsOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeSettingsModal(false);
+        }
+        return;
+      }
+
       if (primaryPressed) {
         if (!event.altKey) {
+          if (key === ',' && !event.shiftKey) {
+            event.preventDefault();
+            handleSettingsOpen();
+            return;
+          }
           if (key === 'c' && !event.shiftKey) {
             event.preventDefault();
             if (!effectiveLeafId || !activeTabId) {
@@ -1139,12 +1352,15 @@ export const App = () => {
     addCardViaShortcut,
     canRedo,
     canUndo,
+    closeSettingsModal,
     copySelection,
     deleteCards,
     effectiveLeafId,
     handleSave,
+    handleSettingsOpen,
     handleSplit,
     hasClipboard,
+    isSettingsOpen,
     notify,
     openSearchPanel,
     pasteClipboard,
@@ -1157,10 +1373,25 @@ export const App = () => {
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
       <NotificationCenter />
+      <SettingsModal
+        isOpen={settingsModalState.open}
+        isLoading={settingsModalState.loading}
+        isSaving={settingsModalState.saving}
+        settings={settingsModalState.draft}
+        section={settingsModalState.section}
+        validationErrors={settingsModalState.validationErrors}
+        errorMessage={settingsModalState.error}
+        onSectionChange={handleSettingsSectionChange}
+        onClose={() => closeSettingsModal(false)}
+        onSave={handleSettingsSave}
+        onChange={handleSettingsChange}
+        onPreviewTheme={previewThemeSettings}
+        onClearRecent={handleClearRecent}
+      />
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">
           <button className="menu-bar__item" type="button">ファイル(F)</button>
-          <button className="menu-bar__item" type="button">編集(E)</button>
+          <button className="menu-bar__item" type="button" onClick={handleSettingsOpen}>編集(E)</button>
           <button className="menu-bar__item" type="button">表示(V)</button>
           <button className="menu-bar__item" type="button">ヘルプ(H)</button>
         </nav>
