@@ -576,6 +576,14 @@
     @apply absolute -top-1 -right-1 min-w-[14px] rounded-full bg-blue-500 px-1 text-[0.55rem] font-bold leading-3 text-white dark:bg-blue-300 dark:text-slate-900;
   }
 
+  .card--active-secondary {
+    @apply border-l-4 border-amber-400 bg-amber-50/70 dark:border-amber-400 dark:bg-amber-500/10;
+  }
+
+  .card--trace-related {
+    @apply ring-1 ring-offset-1 ring-blue-300/50 ring-offset-blue-50 dark:ring-blue-400/40 dark:ring-offset-slate-900/50;
+  }
+
   .card__icon {
     @apply text-sm;
   }
@@ -725,7 +733,7 @@
 
   .trace-connector-path {
     fill: none;
-    stroke: rgba(96, 165, 250, 0.7); /* tailwind blue-400 */
+    stroke: var(--trace-color-trace, rgba(96, 165, 250, 0.7));
     stroke-width: 2;
     transition: stroke 0.2s ease;
   }
@@ -735,26 +743,39 @@
   }
 
   .trace-connector-path--trace {
-    stroke: rgba(96, 165, 250, 0.9);
+    stroke: var(--trace-color-trace, rgba(96, 165, 250, 0.9));
   }
 
   .trace-connector-path--refines {
-    stroke: rgba(16, 185, 129, 0.85); /* emerald */
+    stroke: var(--trace-color-refines, rgba(16, 185, 129, 0.85));
   }
 
   .trace-connector-path--tests {
-    stroke: rgba(249, 115, 22, 0.85); /* orange */
+    stroke: var(--trace-color-tests, rgba(249, 115, 22, 0.85));
     stroke-dasharray: 6 4;
   }
 
   .trace-connector-path--duplicates {
-    stroke: rgba(244, 63, 94, 0.8); /* rose */
+    stroke: var(--trace-color-duplicates, rgba(244, 63, 94, 0.8));
     stroke-width: 2.5;
+  }
+
+  .trace-connector-path--satisfy {
+    stroke: var(--trace-color-satisfy, rgba(99, 102, 241, 0.9));
+  }
+
+  .trace-connector-path--relate {
+    stroke: var(--trace-color-relate, rgba(20, 184, 166, 0.85));
+  }
+
+  .trace-connector-path--specialize {
+    stroke: var(--trace-color-specialize, rgba(168, 85, 247, 0.85));
   }
 
   .trace-connector-path--highlight {
     stroke-width: 3.2;
-    filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.5));
+    stroke: var(--trace-highlight-color, rgba(147, 197, 253, 0.95));
+    filter: drop-shadow(0 0 4px var(--trace-highlight-color, rgba(147, 197, 253, 0.4)));
   }
 
   .trace-connector-path--dir-forward {

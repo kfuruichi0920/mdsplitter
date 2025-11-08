@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
-import { useTraceStore } from '../store/traceStore';
+import { useTraceStore, type TraceSeed, toTraceNodeKey } from '../store/traceStore';
 import { useTracePreferenceStore } from '../store/tracePreferenceStore';
 import type { TraceabilityLink } from '@/shared/traceability';
 
@@ -174,19 +174,18 @@ export const TraceConnectorLayer = ({
   }, [splitRatio, direction, scheduleMeasure]);
 
   const cards = useConnectorLayoutStore((state) => state.cards);
-  const highlightedCardIds = useWorkspaceStore(
-    (state) => {
-      const ids: string[] = [];
-      Object.values(state.tabs).forEach((tab) => {
-        if (tab?.selectedCardIds) {
-          ids.push(...Array.from(tab.selectedCardIds));
-        }
-      });
-      return ids;
-    },
-    shallow,
-  );
-  const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
+  const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
+  const selectionSeeds = useMemo<TraceSeed[]>(() => {
+    const seeds: TraceSeed[] = [];
+    Object.values(tabsSnapshot).forEach((tab) => {
+      if (tab?.fileName && tab.selectedCardIds.size > 0) {
+        tab.selectedCardIds.forEach((cardId) => {
+          seeds.push({ fileName: tab.fileName as string, cardId });
+        });
+      }
+    });
+    return seeds;
+  }, [tabsSnapshot]);
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
 
   const activeFilePairs = useActiveFiles(leftLeafIds, rightLeafIds);
@@ -236,6 +235,19 @@ export const TraceConnectorLayer = ({
   const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
   const isCardVisible = useTracePreferenceStore((state) => state.isCardVisible);
 
+  const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
+  const highlightedNodeKeys = useMemo(() => {
+    const keys = new Set<string>();
+    selectionSeeds.forEach((seed) => {
+      keys.add(toTraceNodeKey(seed.fileName, seed.cardId));
+    });
+    if (focusSelectionOnly && selectionSeeds.length > 0) {
+      const related = useTraceStore.getState().getRelatedNodeKeys(selectionSeeds);
+      related.forEach((key) => keys.add(key));
+    }
+    return keys;
+  }, [focusSelectionOnly, selectionSeeds, traceCacheSnapshot]);
+
   const filteredLinks = useMemo(() => {
     if (!isTraceVisible) {
       return [] as ExtendedLink[];
@@ -254,11 +266,13 @@ export const TraceConnectorLayer = ({
         return false;
       }
       if (focusSelectionOnly) {
-        return highlightedSet.has(link.sourceCardId) || highlightedSet.has(link.targetCardId);
+        const sourceKey = toTraceNodeKey(link.sourceFileName, link.sourceCardId);
+        const targetKey = toTraceNodeKey(link.targetFileName, link.targetCardId);
+        return highlightedNodeKeys.has(sourceKey) || highlightedNodeKeys.has(targetKey);
       }
       return true;
     });
-  }, [enabledRelationKinds, focusSelectionOnly, highlightedSet, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, focusSelectionOnly, highlightedNodeKeys, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {
@@ -304,13 +318,15 @@ export const TraceConnectorLayer = ({
 
       const curvature = Math.max(deltaX * 0.35, 24);
       const path = `M ${start.x} ${start.y} C ${start.x + curvature} ${start.y}, ${end.x - curvature} ${end.y}, ${end.x} ${end.y}`;
+      const sourceKey = toTraceNodeKey(source.fileName, source.cardId);
+      const targetKey = toTraceNodeKey(target.fileName, target.cardId);
+      const shouldHighlight = highlightedNodeKeys.has(sourceKey) || highlightedNodeKeys.has(targetKey);
+
       const className = [
         'trace-connector-path',
         `trace-connector-path--${link.relation}`,
         `trace-connector-path--dir-${effectiveDirection}`,
-        (highlightedSet.has(link.sourceCardId) || highlightedSet.has(link.targetCardId))
-          ? 'trace-connector-path--highlight'
-          : '',
+        shouldHighlight ? 'trace-connector-path--highlight' : '',
       ]
         .filter(Boolean)
         .join(' ');
@@ -318,7 +334,7 @@ export const TraceConnectorLayer = ({
       acc.push({ id: link.id, path, className });
       return acc;
     }, []);
-  }, [cards, containerRect, direction, filteredLinks, highlightedSet, leftLeafIds, rightLeafIds]);
+  }, [cards, containerRect, direction, filteredLinks, highlightedNodeKeys, leftLeafIds, rightLeafIds]);
 
   if (direction !== 'vertical' || !isTraceVisible) {
     return null;

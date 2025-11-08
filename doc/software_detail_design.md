@@ -283,6 +283,16 @@ Deprecated --> Draft : 再利用
   - `src/renderer/store/tracePreferenceStore.ts` で可視状態・選択カード限定表示・種別別チェックボックスを管理。`TraceConnectorLayer` はこのストアを購読し、フィルタ条件に合致しないリンクを描画から除外。
   - グローバルツールバーの `⛓️` トグル、`🧐` 選択カード強調、`🧬` タイプフィルタポップオーバーを実装。ポップオーバーは CSS (`src/renderer/styles.css`) で簡易レイヤーを提供。
   - `src/renderer/store/__tests__/tracePreferenceStore.test.ts`・`traceStore.test.ts` で設定ストアと relation 永続化の挙動をユニットテストし、Playground なしでも挙動を担保。
+- **P5-04 選択カードフォーカス/強調**
+  - `TracePreferenceStore.focusSelectionOnly` が ON の間、`CardPanel` と `TraceConnectorLayer` が `useTraceStore.getRelatedCards` を用いて選択カードから到達可能なカード集合を計算し、`card--trace-related` クラスと太線ハイライトで数珠繋ぎパネルを強調表示。
+  - アクティブでないパネルの選択状態は `card--active-secondary` クラスで表示し、どのパネルがフォーカス中か視覚的に識別可能にした。
+  - カード左右の接合点はボタン化され、関係数バッジと個別トグル（`toggleCardVisibility`）によってカード単位のコネクタ表示を制御できる。`aggregateCountsForFile` が左右別件数を提供。
+- **P5-05 種別選択 UI**
+  - トレース作成用の relation セレクタをツールバーへ追加し (`App.tsx`)、`useTracePreferenceStore.creationRelationKind` によって新規コネクタの `type` を決定。表示側は `🧬` ポップオーバーをチェックボックス構成へ改修し、`TraceConnectorLayer` が `enabledKinds` を参照して描画を抑制。
+- **P5-06 パネル単位表示**
+  - `CardPanel` ツールバーへ `⛓️` トグルを実装し、アクティブファイルごとにコネクタ描画を ON/OFF。`tracePreferenceStore` に `fileVisibility` を持たせ、`TraceConnectorLayer` と接合点が同じ状態を共有する。
+- **P5-07 トレース接合点機能**
+  - カード左右の接合点をボタン化し、relation 数のバッジと個別ミュート操作を実現。`useTraceStore.aggregateCountsForFile` がカード別接続数を算出し、`tracePreferenceStore` の `toggleCardVisibility` が `TraceConnectorLayer`/`CardPanel` 双方に反映される。
 - **P5-05 種別選択 UI**
   - トレース作成用の relation セレクタをツールバーへ追加し (`App.tsx`)、`useTracePreferenceStore.creationRelationKind` によって新規コネクタの `type` を決定。種別は `TRACE_RELATION_KINDS` から選択し、処理ログにも種別名を表示。
   - 表示側のタイプフィルタ (`🧬`) はチェックボックス式ドロップダウンへ刷新し、`TraceConnectorLayer` が `enabledKinds` を参照して描画を抑制。

@@ -16,7 +16,7 @@ import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
-import { useTraceStore, aggregateCountsForFile } from '../store/traceStore';
+import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
 import { useTracePreferenceStore, type TraceConnectorSide } from '../store/tracePreferenceStore';
 
 /** ステータスラベル表示用マッピング。 */
@@ -175,6 +175,38 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const toggleFileTraceVisibility = useTracePreferenceStore((state) => state.toggleFileVisibility);
   const toggleCardTraceVisibility = useTracePreferenceStore((state) => state.toggleCardVisibility);
   const isCardTraceVisible = useTracePreferenceStore((state) => state.isCardVisible);
+  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
+
+  const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
+  const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
+  const globalSelections = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    Object.values(tabsSnapshot).forEach((tab) => {
+      if (tab?.fileName && tab.selectedCardIds.size > 0) {
+        map[tab.fileName] = Array.from(tab.selectedCardIds);
+      }
+    });
+    return map;
+  }, [tabsSnapshot]);
+
+  const selectionSeeds = useMemo<TraceSeed[]>(() => {
+    const seeds: TraceSeed[] = [];
+    Object.entries(globalSelections).forEach(([fileName, ids]) => {
+      ids.forEach((cardId) => {
+        seeds.push({ fileName, cardId });
+      });
+    });
+    return seeds;
+  }, [globalSelections]);
+
+  const traceHighlightIds = useMemo(() => {
+    if (!focusSelectionOnly || !activeFileName || selectionSeeds.length === 0) {
+      return null;
+    }
+    const related = useTraceStore.getState().getRelatedCards(selectionSeeds);
+    const forFile = related[activeFileName];
+    return forFile ?? null;
+  }, [activeFileName, focusSelectionOnly, selectionSeeds, traceCacheSnapshot]);
 
   const handlePanelTraceToggle = useCallback(() => {
     if (!activeFileName) {
@@ -766,8 +798,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             onClick={handlePanelTraceToggle}
             disabled={!activeFileName}
             aria-disabled={!activeFileName}
-            title="トレース表示切替"
-            aria-label="トレース表示切替"
+            title="トレース表示ミュート"
+            aria-label="トレース表示ミュート"
           >
             ⛓️
           </button>
@@ -800,6 +832,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             card={card}
             leafId={leafId}
             fileName={activeFileIdentifier}
+            panelIsActive={isActive}
             isSelected={selectedCardIds.has(card.id)}
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
@@ -824,6 +857,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             currentDropTarget={visualDropTarget}
             draggedCardIds={draggedCardIds}
             highlightIds={highlightedIds}
+            traceHighlightIds={traceHighlightIds ?? undefined}
             leftTraceCount={activeFileName ? leftTraceCounts[card.id] ?? 0 : 0}
             rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
             leftConnectorVisible={!activeFileName ? true : isCardTraceVisible(activeFileName, card.id, 'left')}
@@ -1001,6 +1035,7 @@ interface CardListItemProps {
   isEditing: boolean; ///< 編集モード中かどうか。
   leafId: string;
   fileName: string; ///< カードが属するファイル識別子（ファイル名またはタブID）。
+  panelIsActive: boolean;
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
@@ -1017,6 +1052,7 @@ interface CardListItemProps {
   currentDropTarget?: { cardId: string | null; position: InsertPosition } | null;
   draggedCardIds?: string[];
   highlightIds?: Set<string>;
+  traceHighlightIds?: Set<string> | null;
   leftTraceCount: number;
   rightTraceCount: number;
   leftConnectorVisible: boolean;
@@ -1033,6 +1069,7 @@ const CardListItem = ({
   isEditing,
   leafId,
   fileName,
+  panelIsActive,
   displayMode,
   panelScrollRef,
   onSelect,
@@ -1049,6 +1086,7 @@ const CardListItem = ({
   currentDropTarget,
   draggedCardIds,
   highlightIds,
+  traceHighlightIds,
   leftTraceCount,
   rightTraceCount,
   leftConnectorVisible,
@@ -1110,13 +1148,15 @@ const CardListItem = ({
   const dropChild = currentDropTarget?.cardId === card.id && currentDropTarget.position === 'child';
   const isDragging = draggedCardIds?.includes(card.id) ?? false;
   const isHighlighted = highlightIds?.has(card.id) ?? false;
+  const isTraceHighlighted = traceHighlightIds?.has(card.id) ?? false;
   const baseClass = displayMode === 'compact' ? 'card card--compact' : 'card';
   const articleClassName = [
     baseClass,
-    isSelected ? 'card--active' : '',
+    isSelected ? (panelIsActive ? 'card--active' : 'card--active-secondary') : '',
     isDragging ? 'card--dragging' : '',
     dropChild ? 'card--drop-child' : '',
     isHighlighted ? 'card--highlighted' : '',
+    isTraceHighlighted ? 'card--trace-related' : '',
   ]
     .filter(Boolean)
     .join(' ');

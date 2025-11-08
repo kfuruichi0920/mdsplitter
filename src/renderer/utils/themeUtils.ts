@@ -11,13 +11,17 @@
  */
 
 import type { ThemeColorSettings } from '@/shared/settings';
+import { TRACE_RELATION_KINDS, type TraceRelationKind } from '@/shared/traceability';
 
 /**
  * @brief CSS変数名のマッピング定義。
  * @details
  * ThemeColorSettings のプロパティ名とCSS変数名の対応表。
  */
-const CSS_VAR_MAP: Record<keyof ThemeColorSettings, string> = {
+const CSS_VAR_MAP: Record<
+  Exclude<keyof ThemeColorSettings, 'relationColors' | 'connectorHighlight'>,
+  string
+> = {
   background: '--theme-background',
   foreground: '--theme-foreground',
   border: '--theme-border',
@@ -27,6 +31,16 @@ const CSS_VAR_MAP: Record<keyof ThemeColorSettings, string> = {
   cardBorder: '--theme-card-border',
   connectorActive: '--theme-connector-active',
   connectorInactive: '--theme-connector-inactive',
+};
+
+const FALLBACK_TRACE_COLORS: Record<TraceRelationKind, string> = {
+  trace: '#60a5fa',
+  refines: '#10b981',
+  tests: '#f97316',
+  duplicates: '#f43f5e',
+  satisfy: '#6366f1',
+  relate: '#14b8a6',
+  specialize: '#a855f7',
 };
 
 /**
@@ -39,8 +53,16 @@ const CSS_VAR_MAP: Record<keyof ThemeColorSettings, string> = {
 export const applyThemeColors = (colors: ThemeColorSettings): void => {
   const root = document.documentElement;
   Object.entries(CSS_VAR_MAP).forEach(([key, varName]) => {
-    const colorKey = key as keyof ThemeColorSettings;
+    const colorKey = key as keyof typeof CSS_VAR_MAP;
     root.style.setProperty(varName, colors[colorKey]);
+  });
+
+  const highlightColor = colors.connectorHighlight ?? colors.connectorActive ?? '#93c5fd';
+  root.style.setProperty('--trace-highlight-color', highlightColor);
+
+  TRACE_RELATION_KINDS.forEach((kind) => {
+    const value = colors.relationColors?.[kind] ?? FALLBACK_TRACE_COLORS[kind];
+    root.style.setProperty(`--trace-color-${kind}`, value);
   });
 };
 

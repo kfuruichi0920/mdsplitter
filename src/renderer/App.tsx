@@ -2017,8 +2017,8 @@ export const App = () => {
             type="button"
             className={`toolbar-button${focusSelectionOnly ? ' toolbar-button--active' : ''}`}
             onClick={toggleTraceFocus}
-            title="選択中カードのみ表示"
-            aria-label="選択中カードのみ表示"
+            title="選択中カードトレースフィルタ"
+            aria-label="選択中カードトレースフィルタ"
           >
             🧐
           </button>
@@ -2027,8 +2027,8 @@ export const App = () => {
             ref={traceFilterButtonRef}
             className={`toolbar-button${isRelationFilterDirty || isTraceFilterOpen ? ' toolbar-button--active' : ''}`}
             onClick={() => setTraceFilterOpen((prev) => !prev)}
-            title="トレースタイプフィルタ"
-            aria-label="トレースタイプフィルタ"
+            title="トレース種別表示フィルタ"
+            aria-label="トレース種別表示フィルタ"
           >
             🧬
           </button>

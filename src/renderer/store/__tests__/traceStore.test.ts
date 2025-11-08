@@ -1,5 +1,5 @@
 import { act } from '@testing-library/react';
-import { useTraceStore, resetTraceStore } from '../traceStore';
+import { useTraceStore, resetTraceStore, toTraceNodeKey } from '../traceStore';
 
 describe('traceStore.saveRelationsForPair', () => {
   beforeEach(() => {
@@ -24,8 +24,9 @@ describe('traceStore.saveRelationsForPair', () => {
   });
 
   it('persists relations and refreshes the cache entry', async () => {
+    let entry;
     await act(async () => {
-      const entry = await useTraceStore.getState().saveRelationsForPair({
+      entry = await useTraceStore.getState().saveRelationsForPair({
         leftFile: 'left.json',
         rightFile: 'right.json',
         relations: [
@@ -63,5 +64,16 @@ describe('traceStore.saveRelationsForPair', () => {
     expect(leftFileCounts.right['card-l']).toBe(1);
     const rightFileCounts = useTraceStore.getState().getCountsForFile('right.json');
     expect(rightFileCounts.left['card-r']).toBe(1);
+
+    const related = useTraceStore.getState().getRelatedCards([
+      { fileName: 'left.json', cardId: 'card-l' },
+    ]);
+    expect(related['left.json']?.has('card-l')).toBe(true);
+    expect(related['right.json']?.has('card-r')).toBe(true);
+
+    const nodeKeys = useTraceStore.getState().getRelatedNodeKeys([
+      { fileName: 'left.json', cardId: 'card-l' },
+    ]);
+    expect(nodeKeys.has(toTraceNodeKey('right.json', 'card-r'))).toBe(true);
   });
 });

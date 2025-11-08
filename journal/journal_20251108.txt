@@ -26,3 +26,8 @@
 - **種別選択 (P5-05)**: トレース作成ハンドラに relation ドロップダウンを追加し、`useTracePreferenceStore.creationRelationKind` で新規コネクタの `type` を決定。表示側は `🧬` ポップオーバーをチェックボックス構成へ改修し、`TraceConnectorLayer` が `enabledKinds` を参照して描画を制御。
 - **パネル単位表示 (P5-06)**: `CardPanel` ツールバーへ `⛓️` トグルを実装し、アクティブファイルごとにコネクタ描画を ON/OFF。`tracePreferenceStore` に `fileVisibility` を持たせ、`TraceConnectorLayer` と接合点が同じ状態を共有する。
 - **接合点拡張 (P5-07)**: カード左右の接合点をボタン化し、relation 数のバッジと個別ミュート操作を実現。`useTraceStore.aggregateCountsForFile` がカード別接続数を算出し、`tracePreferenceStore` の `toggleCardVisibility` が `TraceConnectorLayer` と `CardPanel` の双方に反映される。
+
+### P5-04 選択カードフォーカス強調 (2025-11-08)
+- `useTraceStore.getRelatedCards`/`getRelatedNodeKeys` を追加し、選択カードからトレーサ経路で到達可能なカード集合を算出。`TraceConnectorLayer` は nodeKey 単位でハイライトを管理し、`🧐` トグル ON 時に数珠繋ぎパネルを強調表示する。
+- `CardPanel` 側では同集合を `card--trace-related` クラスで表示し、非アクティブパネル内の選択状態は `card--active-secondary` で識別。接合点は件数付きボタンへ置き換え、クリックでカード単位の表示可否を切り替えられる。
+- テーマ設定へ `relationColors`/`connectorHighlight` を追加し、CSS 変数 `--trace-color-*` 経由でトレース色をカスタマイズ可能にした。`styles.css` はこれら変数を参照するよう更新。

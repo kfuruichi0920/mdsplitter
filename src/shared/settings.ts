@@ -10,6 +10,8 @@
  * @copyright MIT
  */
 
+import type { TraceRelationKind } from './traceability';
+
 export const SETTINGS_VERSION = 1;
 
 export type ThemeModeSetting = 'light' | 'dark' | 'system';
@@ -64,6 +66,8 @@ export interface ThemeColorSettings {
   cardBorder: string;         ///< カード境界線色
   connectorActive: string;    ///< アクティブコネクタ色
   connectorInactive: string;  ///< 非アクティブコネクタ色
+  connectorHighlight?: string; ///< 強調時のコネクタ色
+  relationColors?: Partial<Record<TraceRelationKind, string>>; ///< 種別ごとのコネクタ色
 }
 
 /**
@@ -102,7 +106,17 @@ export const defaultSettings: AppSettings = {
       cardBackground: '#f9fafb',
       cardBorder: '#d1d5db',
       connectorActive: '#60a5fa',
-      connectorInactive: '#9ca3af'
+      connectorInactive: '#9ca3af',
+      connectorHighlight: '#93c5fd',
+      relationColors: {
+        trace: '#60a5fa',
+        refines: '#10b981',
+        tests: '#f97316',
+        duplicates: '#f43f5e',
+        satisfy: '#6366f1',
+        relate: '#14b8a6',
+        specialize: '#a855f7',
+      },
     },
     dark: {
       background: '#111827',
@@ -113,7 +127,17 @@ export const defaultSettings: AppSettings = {
       cardBackground: '#1f2937',
       cardBorder: '#4b5563',
       connectorActive: '#3b82f6',
-      connectorInactive: '#6b7280'
+      connectorInactive: '#6b7280',
+      connectorHighlight: '#bfdbfe',
+      relationColors: {
+        trace: '#3b82f6',
+        refines: '#34d399',
+        tests: '#fb923c',
+        duplicates: '#f87171',
+        satisfy: '#818cf8',
+        relate: '#2dd4bf',
+        specialize: '#c084fc',
+      },
     }
   },
   input: {

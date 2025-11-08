@@ -24,6 +24,11 @@ import { TRACEABILITY_FILE_SCHEMA_VERSION, relationsToLinks } from '@/shared/tra
  * @details
  * ファイルペアごとに状態・リンク・エラー等を保持。
  */
+export interface TraceSeed {
+  fileName: string;
+  cardId: string;
+}
+
 interface TraceCacheEntry {
   key: string; ///< キャッシュキー（left|||right）
   status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; ///< 現在の状態。
@@ -43,6 +48,18 @@ interface TraceCacheEntry {
   };
 }
 
+const NODE_DELIMITER = '::';
+
+export const toTraceNodeKey = (fileName: string, cardId: string): string => `${fileName}${NODE_DELIMITER}${cardId}`;
+
+export const splitTraceNodeKey = (key: string): { fileName: string; cardId: string } => {
+  const index = key.indexOf(NODE_DELIMITER);
+  if (index === -1) {
+    return { fileName: '', cardId: key };
+  }
+  return { fileName: key.slice(0, index), cardId: key.slice(index + NODE_DELIMITER.length) };
+};
+
 
 /**
  * @brief トレースストアの状態・アクション定義。
@@ -57,6 +74,8 @@ interface TraceState {
     relations: TraceabilityRelation[];
   }) => Promise<TraceCacheEntry>;
   getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
+  getRelatedCards: (seeds: TraceSeed[]) => Record<string, Set<string>>;
+  getRelatedNodeKeys: (seeds: TraceSeed[]) => Set<string>;
 }
 
 
@@ -121,6 +140,61 @@ const mergeCounts = (target: Record<string, number>, source: Record<string, numb
   });
 };
 
+const buildAdjacency = (cache: Record<string, TraceCacheEntry>): Map<string, Set<string>> => {
+  const adjacency = new Map<string, Set<string>>();
+  const addEdge = (a: string, b: string) => {
+    if (!adjacency.has(a)) {
+      adjacency.set(a, new Set<string>());
+    }
+    adjacency.get(a)?.add(b);
+  };
+
+  Object.values(cache).forEach((entry) => {
+    entry.relations.forEach((relation) => {
+      relation.left_ids.forEach((leftId) => {
+        relation.right_ids.forEach((rightId) => {
+          const leftKey = toTraceNodeKey(entry.leftFile, leftId);
+          const rightKey = toTraceNodeKey(entry.rightFile, rightId);
+          addEdge(leftKey, rightKey);
+          addEdge(rightKey, leftKey);
+        });
+      });
+    });
+  });
+
+  return adjacency;
+};
+
+const collectRelatedNodeKeys = (cache: Record<string, TraceCacheEntry>, seeds: TraceSeed[]): Set<string> => {
+  const adjacency = buildAdjacency(cache);
+  const visited = new Set<string>();
+  const queue: string[] = [];
+
+  seeds.forEach(({ fileName, cardId }) => {
+    const key = toTraceNodeKey(fileName, cardId);
+    if (!visited.has(key)) {
+      visited.add(key);
+      queue.push(key);
+    }
+  });
+
+  while (queue.length > 0) {
+    const current = queue.shift() as string;
+    const neighbors = adjacency.get(current);
+    if (!neighbors) {
+      continue;
+    }
+    neighbors.forEach((neighbor) => {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    });
+  }
+
+  return visited;
+};
+
 export const aggregateCountsForFile = (
   cache: Record<string, TraceCacheEntry>,
   fileName: string,
@@ -159,6 +233,30 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
       return { left: {}, right: {} };
     }
     return aggregateCountsForFile(get().cache, fileName);
+  },
+  getRelatedNodeKeys: (seeds) => {
+    if (!seeds || seeds.length === 0) {
+      return new Set<string>();
+    }
+    return collectRelatedNodeKeys(get().cache, seeds);
+  },
+  getRelatedCards: (seeds) => {
+    if (!seeds || seeds.length === 0) {
+      return {};
+    }
+    const nodeKeys = collectRelatedNodeKeys(get().cache, seeds);
+    const result: Record<string, Set<string>> = {};
+    nodeKeys.forEach((nodeKey) => {
+      const { fileName, cardId } = splitTraceNodeKey(nodeKey);
+      if (!fileName) {
+        return;
+      }
+      if (!result[fileName]) {
+        result[fileName] = new Set<string>();
+      }
+      result[fileName]?.add(cardId);
+    });
+    return result;
   },
   loadTraceForPair: async (leftFile, rightFile) => {
     const key = toKey(leftFile, rightFile);
