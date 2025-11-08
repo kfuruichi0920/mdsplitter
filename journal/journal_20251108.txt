@@ -342,3 +342,4 @@
 - `App.tsx` のショートカット処理に `Ctrl+C`/`Ctrl+V` を追加し、通知とログを出力。`CardPanel` にコピー/ペーストボタンとコンテキストメニュー項目を実装し、貼り付け結果を可視化するプレビューを表示。`CardListItem` は HTML5 Drag&Drop を用いたドロップゾーン検出・挿入線描画・ドラッグプレビュー（半透明化）・貼り付けハイライトに対応 (`src/renderer/components/CardPanel.tsx`)。
 - スタイルに drop indicator・highlight・コンテキストメニュー区切りを追加 (`src/renderer/styles.css`)。UI設計書/要件定義へコピー&ペースト仕様とフィードバック要件を追記。
 - トレーサビリティ追従: カード追加/移動/削除/貼り付け後に `mdsplitter:card-layout-changed` イベントを発火し、`useConnectorLayout` が受け取って座標再計測するようにした（workspaceStore/useConnectorLayout）。カード移動後もコネクタ描画が最新位置へ追従することを確認。
+- P2-19対応: JSON読込時に `normalizeCardOrder` でカード配列を深さ優先に整列し、`openTab/hydrateTab` で適用。`child_ids` が欠落していても元順序から兄弟順を補完し、`rebuildSiblingLinks` で prev/next/child_ids を再生成することで、親の直下に必ず子カードが表示されるようにした。単体テスト `normalizes card order...` を追加し回帰を防止。

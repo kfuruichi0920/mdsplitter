@@ -330,6 +330,71 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(children.length).toBeGreaterThan(1);
   });
 
+  it('normalizes card order so parents precede children even when input is shuffled', () => {
+    const shuffledCards: Card[] = [
+      {
+        id: 'child-002',
+        title: '子B',
+        body: '本文B',
+        status: 'draft',
+        kind: 'paragraph',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: '2025-11-01T02:00:00.000Z',
+        parent_id: 'root-001',
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: 0,
+      },
+      {
+        id: 'root-001',
+        title: 'ルート',
+        body: '本文ルート',
+        status: 'draft',
+        kind: 'heading',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: '2025-11-01T01:00:00.000Z',
+        parent_id: null,
+        child_ids: ['child-001', 'child-002'],
+        prev_id: null,
+        next_id: null,
+        level: 0,
+      },
+      {
+        id: 'child-001',
+        title: '子A',
+        body: '本文A',
+        status: 'draft',
+        kind: 'paragraph',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: '2025-11-01T01:30:00.000Z',
+        parent_id: 'root-001',
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: 0,
+      },
+    ];
+
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-shuffle', 'shuffle.json', shuffledCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    const orderedCards = useWorkspaceStore.getState().tabs[tabId]?.cards ?? [];
+    expect(orderedCards.map((card) => card.id)).toEqual(['root-001', 'child-001', 'child-002']);
+    expect(orderedCards[0].level).toBe(0);
+    expect(orderedCards[1].level).toBe(1);
+    expect(orderedCards[2].level).toBe(1);
+  });
+
   it('ignores nested selections when copying multiple cards', () => {
     let tabId = '';
     act(() => {

@@ -182,6 +182,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   ...initialState,
 
   openTab: (leafId, fileName, cards, options) => {
+    const normalizedCards = normalizeCardOrder(cards);
     let outcome: OpenTabResult = { status: 'denied', tabId: null, leafId, reason: 'unknown', conflictLeafId: null };
 
     set((state) => {
@@ -205,16 +206,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         const prevTab = state.tabs[existingTabId];
         //! 展開状態を維持しつつ、新しいカードで存在しないIDは削除
         const updatedExpandedIds = new Set<string>(
-          Array.from(prevTab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
+          Array.from(prevTab.expandedCardIds).filter((id) => normalizedCards.some((card) => card.id === id && card.child_ids.length > 0)),
         );
         //! 選択状態も維持しつつ、新しいカードで存在しないIDは削除
         const updatedSelectedIds = new Set<string>(
-          Array.from(prevTab.selectedCardIds).filter((id) => cards.some((card) => card.id === id)),
+          Array.from(prevTab.selectedCardIds).filter((id) => normalizedCards.some((card) => card.id === id)),
         );
         const nextTab: PanelTabState = {
           ...prevTab,
-          cards: [...cards],
-          selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(cards[0]?.id ? [cards[0].id] : []),
+          cards: [...normalizedCards],
+          selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(normalizedCards[0]?.id ? [normalizedCards[0].id] : []),
           isDirty: false,
           lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
           expandedCardIds: updatedExpandedIds,
@@ -236,16 +237,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const tabId = nanoid();
       //! 初期状態では子を持つカードをすべて展開
       const initialExpandedIds = new Set<string>(
-        cards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
+        normalizedCards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
       );
       //! 初期選択は最初のカード
-      const initialSelectedIds = new Set<string>(cards[0]?.id ? [cards[0].id] : []);
+      const initialSelectedIds = new Set<string>(normalizedCards[0]?.id ? [normalizedCards[0].id] : []);
       const nextTab: PanelTabState = {
         id: tabId,
         leafId,
         fileName,
         title: options?.title ?? fileName,
-        cards: [...cards],
+        cards: [...normalizedCards],
         selectedCardIds: initialSelectedIds,
         isDirty: false,
         lastSavedAt: options?.savedAt ?? null,
@@ -802,6 +803,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   },
 
   hydrateTab: (leafId, tabId, cards, options) => {
+    const normalizedCards = normalizeCardOrder(cards);
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
@@ -810,11 +812,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       //! 展開状態を維持しつつ、新しいカードで存在しないIDは削除
       const updatedExpandedIds = new Set<string>(
-        Array.from(tab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
+        Array.from(tab.expandedCardIds).filter((id) => normalizedCards.some((card) => card.id === id && card.child_ids.length > 0)),
       );
       //! 選択状態も維持しつつ、新しいカードで存在しないIDは削除
       const updatedSelectedIds = new Set<string>(
-        Array.from(tab.selectedCardIds).filter((id) => cards.some((card) => card.id === id)),
+        Array.from(tab.selectedCardIds).filter((id) => normalizedCards.some((card) => card.id === id)),
       );
 
       return {
@@ -823,8 +825,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           ...state.tabs,
           [tabId]: {
             ...tab,
-            cards: [...cards],
-            selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(cards[0]?.id ? [cards[0].id] : []),
+            cards: [...normalizedCards],
+            selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(normalizedCards[0]?.id ? [normalizedCards[0].id] : []),
             isDirty: false,
             lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
             expandedCardIds: updatedExpandedIds,
@@ -1440,6 +1442,72 @@ function buildClipboardTree(cardId: string, cardMap: Map<string, Card>): Clipboa
     },
     children: card.child_ids.map((childId) => buildClipboardTree(childId, cardMap)),
   } satisfies ClipboardCardNode;
+}
+
+function normalizeCardOrder(cards: Card[]): Card[] {
+  if (cards.length === 0) {
+    return [];
+  }
+
+  const cardMap = new Map<string, Card>(cards.map((card) => [card.id, card]));
+  const indexMap = new Map<string, number>();
+  cards.forEach((card, index) => {
+    indexMap.set(card.id, index);
+  });
+
+  const childrenByParent = new Map<string, string[]>();
+  cards.forEach((card) => {
+    if (card.parent_id) {
+      if (!childrenByParent.has(card.parent_id)) {
+        childrenByParent.set(card.parent_id, []);
+      }
+      childrenByParent.get(card.parent_id)!.push(card.id);
+    }
+  });
+
+  const getChildIds = (card: Card): string[] => {
+    const fromChildIds = Array.isArray(card.child_ids) ? [...card.child_ids] : [];
+    const ordered = fromChildIds.filter((id) => cardMap.has(id));
+    const fallback = (childrenByParent.get(card.id) ?? []).filter((id) => !ordered.includes(id));
+    fallback.sort((a, b) => (indexMap.get(a) ?? Number.MAX_SAFE_INTEGER) - (indexMap.get(b) ?? Number.MAX_SAFE_INTEGER));
+    return [...ordered, ...fallback];
+  };
+
+  const result: Card[] = [];
+  const visited = new Set<string>();
+  const levelMap = new Map<string, number>();
+
+  const visit = (card: Card, level: number) => {
+    if (visited.has(card.id)) {
+      return;
+    }
+    visited.add(card.id);
+    const copy: Card = { ...card, level };
+    result.push(copy);
+    levelMap.set(card.id, level);
+    const children = getChildIds(card);
+    children.forEach((childId) => {
+      const child = cardMap.get(childId);
+      if (child) {
+        visit(child, level + 1);
+      }
+    });
+  };
+
+  const roots = cards
+    .filter((card) => !card.parent_id || !cardMap.has(card.parent_id))
+    .sort((a, b) => (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0));
+
+  roots.forEach((root) => visit(root, 0));
+
+  cards.forEach((card) => {
+    if (!visited.has(card.id)) {
+      const parentLevel = card.parent_id && levelMap.has(card.parent_id) ? (levelMap.get(card.parent_id) ?? -1) + 1 : 0;
+      visit(card, Math.max(parentLevel, 0));
+    }
+  });
+
+  return rebuildSiblingLinks(result);
 }
 
 function materializeClipboardNode(node: ClipboardCardNode, parentId: string | null, level: number): { cards: Card[]; rootId: string } {
