@@ -960,8 +960,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         if (!card) {
           return state; //! 存在しないカードは移動不可
         }
+        if (targetCard.id === cardId) {
+          return state; //! 自分自身へは移動不可
+        }
         //! ターゲットが移動対象カードの子孫である場合は移動不可（循環参照防止）
-        if (isDescendant(targetCard, card, cardMap)) {
+        if (isDescendant(card, targetCard, cardMap)) {
           return state;
         }
       }

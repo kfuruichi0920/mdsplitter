@@ -327,6 +327,123 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(tab.cards[targetIndex].level).toBe(tab.cards[parentIndex].level + 1);
   });
 
+  it('allows moving a card to a higher level (ancestor parent)', () => {
+    const cards: Card[] = [
+      {
+        ...baseCards[0],
+        id: 'root',
+        child_ids: ['child'],
+        next_id: null,
+      },
+      {
+        ...baseCards[1],
+        id: 'child',
+        parent_id: 'root',
+        child_ids: ['grandchild'],
+        prev_id: null,
+        next_id: null,
+        level: 1,
+      },
+      {
+        ...baseCards[1],
+        id: 'grandchild',
+        parent_id: 'child',
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: 2,
+      },
+      {
+        ...otherCards[0],
+        id: 'other-root',
+        parent_id: null,
+        child_ids: [],
+        prev_id: 'root',
+        next_id: null,
+        level: 0,
+      },
+    ];
+
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'reparent.json', cards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      const ok = useWorkspaceStore.getState().moveCards('leaf-A', tabId, ['child'], 'other-root', 'before');
+      expect(ok).toBe(true);
+    });
+
+    const tab = useWorkspaceStore.getState().tabs[tabId];
+    expect(tab).toBeDefined();
+    if (!tab) return;
+    const childCard = tab.cards.find((card) => card.id === 'child');
+    expect(childCard?.parent_id).toBeNull();
+    expect(childCard?.level).toBe(0);
+    const grandChild = tab.cards.find((card) => card.id === 'grandchild');
+    expect(grandChild?.parent_id).toBe('child');
+    expect(grandChild?.level).toBe(1);
+  });
+
+  it('rejects moving a card into its own descendant subtree', () => {
+    const cards: Card[] = [
+      {
+        id: 'root',
+        title: 'Root',
+        body: '',
+        status: 'draft',
+        kind: 'heading',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: '2025-11-01T00:00:00.000Z',
+        parent_id: null,
+        child_ids: ['child'],
+        prev_id: null,
+        next_id: null,
+        level: 0,
+      },
+      {
+        id: 'child',
+        title: 'Child',
+        body: '',
+        status: 'draft',
+        kind: 'paragraph',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: '2025-11-01T00:10:00.000Z',
+        parent_id: 'root',
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: 1,
+      },
+    ];
+
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'reject.json', cards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    let result = true;
+    act(() => {
+      result = useWorkspaceStore.getState().moveCards('leaf-A', tabId, ['root'], 'child', 'child');
+    });
+
+    expect(result).toBe(false);
+    const tab = useWorkspaceStore.getState().tabs[tabId];
+    expect(tab?.cards.map((c) => c.id)).toEqual(['root', 'child']);
+    expect(tab?.cards[0].parent_id).toBeNull();
+    expect(tab?.cards[1].parent_id).toBe('root');
+  });
+
   it('copies selected root subtree and pastes after the anchor', () => {
     let tabId = '';
     act(() => {
