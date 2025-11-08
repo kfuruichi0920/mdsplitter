@@ -1159,7 +1159,6 @@ export const App = () => {
   const firstSelectedId = Array.from(selectedCardIds)[0] ?? null;
   const selectedDisplayNumber = toDisplayNumber(cards, firstSelectedId);
   const themeLabel = theme === 'dark' ? 'ダークモード' : 'ライトモード';
-  const themeButtonLabel = theme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード';
   const saveStatusText = isSaving
     ? '保存状態: ⏳ 保存中...'
     : isDirty
@@ -1477,7 +1476,14 @@ export const App = () => {
 
       <section className="top-toolbar" aria-label="グローバルツールバー">
         <div className="toolbar-group">
-          <button type="button" className="toolbar-button">📂 開く</button>
+          <button
+            type="button"
+            className="toolbar-button"
+            title="ファイルを開く"
+            aria-label="ファイルを開く"
+          >
+            📂
+          </button>
           <button
             type="button"
             className="toolbar-button"
@@ -1486,8 +1492,10 @@ export const App = () => {
             }}
             disabled={isSaving}
             aria-disabled={isSaving}
+            title="上書き保存 (Ctrl+S)"
+            aria-label="上書き保存"
           >
-            💾 保存
+            💾
           </button>
           <button
             type="button"
@@ -1497,29 +1505,55 @@ export const App = () => {
             }}
             disabled={isSaving}
             aria-disabled={isSaving}
+            title="名前を付けて保存 (Ctrl+Shift+S)"
+            aria-label="名前を付けて保存"
           >
-            📝 別名保存
+            📝
           </button>
         </div>
         <div className="toolbar-group">
-          <button type="button" className="toolbar-button">⛓️ トレース</button>
-          <button type="button" className="toolbar-button">種別フィルタ</button>
-          <button type="button" className="toolbar-button" onClick={handleCycleStatus}>
-            🔄 ステータス切替
+          <button type="button" className="toolbar-button" title="トレーサ表示切替" aria-label="トレーサ表示切替">⛓️</button>
+          <button type="button" className="toolbar-button" title="トレースタイプフィルタ" aria-label="トレースタイプフィルタ">🧬</button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={handleCycleStatus}
+            title="ステータスを切り替え"
+            aria-label="ステータスを切り替え"
+          >
+            🔄
           </button>
         </div>
         <div className="toolbar-group">
-          <button type="button" className="toolbar-button" onClick={() => handleSplit('horizontal')}>
-            ⇅ 上下分割
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('horizontal')}
+            title="上下分割"
+            aria-label="上下分割"
+          >
+            ⇅
           </button>
-          <button type="button" className="toolbar-button" onClick={() => handleSplit('vertical')}>
-            ⇆ 左右分割
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('vertical')}
+            title="左右分割"
+            aria-label="左右分割"
+          >
+            ⇆
           </button>
         </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-group toolbar-group--right">
-          <button type="button" className="toolbar-button" onClick={handleThemeToggle}>
-            {themeButtonLabel}
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={handleThemeToggle}
+            title={theme === 'dark' ? 'ライトモードに切替' : 'ダークモードに切替'}
+            aria-label={theme === 'dark' ? 'ライトモードに切替' : 'ダークモードに切替'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
           </button>
         </div>
       </section>

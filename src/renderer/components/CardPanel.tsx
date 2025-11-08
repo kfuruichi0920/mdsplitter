@@ -632,7 +632,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             title="すべて展開"
             aria-label="すべて展開"
           >
-            ⏬ 展開
+            ⏬
           </button>
           <button
             type="button"
@@ -641,7 +641,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             title="すべて折畳"
             aria-label="すべて折畳"
           >
-            ⏫ 折畳
+            ⏫
           </button>
         </div>
         <div className="panel-toolbar__group">
@@ -653,7 +653,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             aria-disabled={!activeTabId}
             title={`選択中カードの${toolbarInsertMode === 'before' ? '前' : toolbarInsertMode === 'child' ? '子' : '後'}に追加`}
           >
-            ➕ 追加
+            ➕
           </button>
           <label className="panel-toolbar__select-wrapper">
             <span className="sr-only">挿入モード</span>
@@ -676,7 +676,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             aria-disabled={!activeTabId || selectedCardIds.size === 0}
             title="選択中カードを削除"
           >
-            🗑️ 削除
+            🗑️
           </button>
           <button
             type="button"
@@ -686,7 +686,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             aria-disabled={!activeTabId || !hasSelection}
             title="選択中カードをコピー (Ctrl+C)"
           >
-            📋 コピー
+            📋
           </button>
           <button
             type="button"
@@ -696,16 +696,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             aria-disabled={!activeTabId || !hasClipboardItems}
             title="クリップボードを貼り付け (Ctrl+V)"
           >
-            📥 ペースト
+            📥
           </button>
         </div>
         <div className="panel-toolbar__group">
-          <input className="panel-toolbar__input" placeholder="� 文字列フィルタ" />
-          <button type="button" className="panel-toolbar__button">
-            📚 カード種別
+          <input className="panel-toolbar__input" placeholder="🔍 文字列フィルタ" aria-label="文字列フィルタ" />
+          <button type="button" className="panel-toolbar__button" title="カード種別フィルタ" aria-label="カード種別フィルタ">
+            📚
           </button>
-          <button type="button" className="panel-toolbar__button">
-            � トレースのみ
+          <button type="button" className="panel-toolbar__button" title="トレースのみ表示" aria-label="トレースのみ表示">
+            🪢
           </button>
         </div>
         <div className="panel-toolbar__group">
@@ -716,7 +716,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             title={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
             aria-label={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
           >
-            ☰ コンパクト
+            ☰
           </button>
         </div>
         <div className="panel-toolbar__spacer" />
