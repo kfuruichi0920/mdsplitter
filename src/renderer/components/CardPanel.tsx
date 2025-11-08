@@ -18,6 +18,8 @@ import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
 import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
 import { useTracePreferenceStore, type TraceConnectorSide } from '../store/tracePreferenceStore';
+import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
+import { useSplitStore } from '../store/splitStore';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -123,6 +125,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
   const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
   const hasClipboardItems = Boolean(clipboardData && clipboardData.length > 0);
+  const panelFocusState = usePanelEngagementStore((state) => state.states[leafId] ?? (isActive ? 'active' : 'inactive'));
+  const panelSelectionTransition = usePanelEngagementStore((state) => state.handleSelectionTransition);
 
   const activeTab = useMemo<PanelTabState | null>(() => {
     if (!activeTabId) {
@@ -428,6 +432,10 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
       const isCtrlOrCmd = event?.ctrlKey || event?.metaKey;
       const isShift = event?.shiftKey;
+      const selectionMode = (isCtrlOrCmd ? 'ctrl' : isShift ? 'shift' : 'normal') as const;
+      const splitStore = useSplitStore.getState();
+      panelSelectionTransition(splitStore.activeLeafId ?? null, leafId, selectionMode);
+      splitStore.setActiveLeaf(leafId);
 
       if (isCtrlOrCmd) {
         //! Ctrl/Cmd+クリック: 複数選択トグル
@@ -446,7 +454,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         onLog?.('INFO', `カード「${card.title}」を選択しました。`);
       }
     },
-    [activeTabId, leafId, onLog, selectCard, selectedCardIds],
+    [activeTabId, leafId, onLog, panelSelectionTransition, selectCard, selectedCardIds],
   );
 
   /**
@@ -646,11 +654,19 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     onLog?.('INFO', 'カードの編集をキャンセルしました。');
   }, [activeTabId, leafId, onLog, setEditingCard]);
 
+  const panelClassName = [
+    'split-node',
+    panelFocusState === 'active' ? 'split-node--active' : '',
+    panelFocusState === 'semiActive' ? 'split-node--semi-active' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div
-      className={`split-node${isActive ? ' split-node--active' : ''}`}
+      className={panelClassName}
       data-leaf-id={leafId}
-      data-active={isActive ? 'true' : 'false'}
+      data-panel-state={panelFocusState}
       onClick={handlePanelClick}
     >
       {/* タブバー: 各カードファイルのタブを表示 */}
@@ -840,7 +856,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             card={card}
             leafId={leafId}
             fileName={activeFileIdentifier}
-            panelIsActive={isActive}
+            panelFocusState={panelFocusState}
             isSelected={selectedCardIds.has(card.id)}
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
@@ -1043,7 +1059,7 @@ interface CardListItemProps {
   isEditing: boolean; ///< 編集モード中かどうか。
   leafId: string;
   fileName: string; ///< カードが属するファイル識別子（ファイル名またはタブID）。
-  panelIsActive: boolean;
+  panelFocusState: PanelVisualState;
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
@@ -1077,7 +1093,7 @@ const CardListItem = ({
   isEditing,
   leafId,
   fileName,
-  panelIsActive,
+  panelFocusState,
   displayMode,
   panelScrollRef,
   onSelect,
@@ -1158,9 +1174,16 @@ const CardListItem = ({
   const isHighlighted = highlightIds?.has(card.id) ?? false;
   const isTraceHighlighted = traceHighlightIds?.has(card.id) ?? false;
   const baseClass = displayMode === 'compact' ? 'card card--compact' : 'card';
+  const selectionClass = isSelected
+    ? panelFocusState === 'active'
+      ? 'card--selected-primary'
+      : panelFocusState === 'semiActive'
+        ? 'card--selected-secondary'
+        : 'card--selected-inactive'
+    : '';
   const articleClassName = [
     baseClass,
-    isSelected ? (panelIsActive ? 'card--active' : 'card--active-secondary') : '',
+    selectionClass,
     isDragging ? 'card--dragging' : '',
     dropChild ? 'card--drop-child' : '',
     isHighlighted ? 'card--highlighted' : '',

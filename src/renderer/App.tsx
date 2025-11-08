@@ -31,6 +31,7 @@ import { useSplitStore } from './store/splitStore';
 import type { SplitNode } from './store/splitStore';
 import { useTraceStore } from './store/traceStore';
 import { useTracePreferenceStore } from './store/tracePreferenceStore';
+import { usePanelEngagementStore } from './store/panelEngagementStore';
 import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
 import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
@@ -328,6 +329,8 @@ export const App = () => {
   const splitLeaf = useSplitStore((state) => state.splitLeaf);
   const activeLeafId = useSplitStore((state) => state.activeLeafId);
   const setActiveLeaf = useSplitStore((state) => state.setActiveLeaf);
+  const markPanelEngagement = usePanelEngagementStore((state) => state.handleSelectionTransition);
+  const removePanelEngagement = usePanelEngagementStore((state) => state.removePanel);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
@@ -919,6 +922,8 @@ export const App = () => {
    */
   const handlePanelClick = useCallback(
     (leafId: string) => {
+      const prevLeafId = useSplitStore.getState().activeLeafId;
+      markPanelEngagement(prevLeafId ?? null, leafId, 'normal');
       setActiveLeaf(leafId);
       pushLog({
         id: `panel-activate-${Date.now()}`,
@@ -927,7 +932,7 @@ export const App = () => {
         timestamp: new Date(),
       });
     },
-    [pushLog, setActiveLeaf],
+    [markPanelEngagement, pushLog, setActiveLeaf],
   );
 
   /**
@@ -939,6 +944,7 @@ export const App = () => {
       closeLeafWorkspace(leafId);
       const removeLeaf = useSplitStore.getState().removeLeaf;
       removeLeaf(leafId);
+      removePanelEngagement(leafId);
       const now = new Date();
       notify('info', 'パネルを閉じました。');
       pushLog({
@@ -948,7 +954,7 @@ export const App = () => {
         timestamp: now,
       });
     },
-    [closeLeafWorkspace, notify, pushLog],
+    [closeLeafWorkspace, notify, pushLog, removePanelEngagement],
   );
 
   /**

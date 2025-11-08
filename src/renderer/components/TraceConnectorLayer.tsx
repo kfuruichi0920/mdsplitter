@@ -228,6 +228,7 @@ export const TraceConnectorLayer = ({
     },
     shallow,
   );
+  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
 
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
@@ -261,9 +262,16 @@ export const TraceConnectorLayer = ({
       if (!isCardVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
+      if (focusSelectionOnly && highlightedNodeKeys.size > 0) {
+        const sourceKey = toTraceNodeKey(link.sourceFileName, link.sourceCardId);
+        const targetKey = toTraceNodeKey(link.targetFileName, link.targetCardId);
+        if (!highlightedNodeKeys.has(sourceKey) && !highlightedNodeKeys.has(targetKey)) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [enabledRelationKinds, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, focusSelectionOnly, highlightedNodeKeys, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {
