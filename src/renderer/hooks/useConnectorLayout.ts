@@ -33,12 +33,21 @@ export const useCardConnectorAnchor = ({
   const rafRef = useRef<number | null>(null);
 
   const measure = useCallback(() => {
-    if (!elementRef.current) {
+    const element = elementRef.current;
+    if (!element) {
       return;
     }
-    const rect = elementRef.current.getBoundingClientRect();
-    registerCardAnchor(cardId, leafId, fileName, rect);
-  }, [cardId, leafId, fileName, registerCardAnchor]);
+    const rect = element.getBoundingClientRect();
+    let isVisible = true;
+    const scrollElement = scrollContainerRef?.current;
+    if (scrollElement) {
+      const containerRect = scrollElement.getBoundingClientRect();
+      const overlapY = Math.min(rect.bottom, containerRect.bottom) - Math.max(rect.top, containerRect.top);
+      const overlapX = Math.min(rect.right, containerRect.right) - Math.max(rect.left, containerRect.left);
+      isVisible = overlapY > 0 && overlapX > 0;
+    }
+    registerCardAnchor(cardId, leafId, fileName, rect, { isVisible });
+  }, [cardId, fileName, leafId, registerCardAnchor, scrollContainerRef]);
 
   const scheduleMeasure = useCallback(() => {
     if (rafRef.current !== null) {

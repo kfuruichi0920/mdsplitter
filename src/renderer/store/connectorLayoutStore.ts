@@ -26,6 +26,7 @@ export interface CardAnchorEntry {
   fileName: string; ///< カードが属するファイル名（同一cardIdの識別に使用）。
   rect: AnchorMetrics;
   updatedAt: number;
+  isVisible: boolean;
 }
 
 /**
@@ -48,9 +49,19 @@ export interface AnchorMetrics {
  * @details
  * カードごとのアンカー情報を管理し、登録・削除・リーフ単位クリアを提供。
  */
+interface RegisterCardAnchorOptions {
+  isVisible?: boolean;
+}
+
 interface ConnectorLayoutState {
   cards: Record<string, CardAnchorEntry>;
-  registerCardAnchor: (cardId: string, leafId: string, fileName: string, rect: DOMRectReadOnly) => void;
+  registerCardAnchor: (
+    cardId: string,
+    leafId: string,
+    fileName: string,
+    rect: DOMRectReadOnly,
+    options?: RegisterCardAnchorOptions,
+  ) => void;
   removeCardAnchor: (cardId: string, leafId: string, fileName: string) => void;
   clearLeafAnchors: (leafId: string) => void;
 }
@@ -97,14 +108,15 @@ const metricsEqual = (a: AnchorMetrics, b: AnchorMetrics): boolean => {
  */
 export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => ({
   cards: {},
-  registerCardAnchor: (cardId, leafId, fileName, rect) => {
+  registerCardAnchor: (cardId, leafId, fileName, rect, options) => {
     set((state) => {
       const key = toKey(leafId, fileName, cardId);
       const metrics = rectToMetrics(rect);
+      const isVisible = options?.isVisible ?? true;
 
       // 既存のエントリと比較し、実質的に変更がなければ更新をスキップ
       const existing = state.cards[key];
-      if (existing && metricsEqual(existing.rect, metrics)) {
+      if (existing && metricsEqual(existing.rect, metrics) && existing.isVisible === isVisible) {
         return state; // 変更なし
       }
 
@@ -118,6 +130,7 @@ export const useConnectorLayoutStore = create<ConnectorLayoutState>()((set) => (
             fileName,
             rect: metrics,
             updatedAt: Date.now(),
+            isVisible,
           },
         },
       } satisfies Pick<ConnectorLayoutState, 'cards'>;

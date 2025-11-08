@@ -302,7 +302,7 @@ export const TraceConnectorLayer = ({
       return [];
     }
 
-    const entries = Object.values(cards);
+    const entries = Object.values(cards).filter((entry) => entry.isVisible);
 
     // ファイル名とleafIdsでエントリを検索するヘルパー
     const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>

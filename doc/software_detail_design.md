@@ -294,3 +294,4 @@ Deprecated --> Draft : 再利用
 - **P5-07 トレース接合点機能**
   - カード左右の接合点をボタン化し、relation 数のバッジと個別ミュート操作を実現。`useTraceStore.aggregateCountsForFile` は「現在開かれているカードファイル集合」を引数に受け取り、オープン中ファイルに限定した件数を算出するため、タブのオープン/クローズに合わせてバッジが即時更新される。
   - `tracePreferenceStore.toggleCardVisibility` は `mutedCards` を更新し、`CardPanel`/`TraceConnectorLayer` がこのマップを購読しているため、接合点クリック時にバッジ・コネクタ可視状態が即座に反映される。
+  - `connectorLayoutStore` ではアンカー登録時に「スクロールビューポート内に表示されているか」を判定して `isVisible` を保持し、`TraceConnectorLayer` はこのフラグが真のアンカー同士に限定して線を描画することで、スクロールアウトしたカードのコネクタを自動的に抑制する。

@@ -28,6 +28,7 @@ describe('connectorLayoutStore', () => {
     expect(entry.fileName).toBe('test-file.json');
     expect(entry.rect.top).toBe(20);
     expect(entry.rect.midY).toBe(50);
+    expect(entry.isVisible).toBe(true);
 
     useConnectorLayoutStore.getState().removeCardAnchor('card-001', 'leaf-A', 'test-file.json');
     cards = useConnectorLayoutStore.getState().cards;
@@ -148,5 +149,34 @@ describe('connectorLayoutStore', () => {
     // 大きな差異のため更新される
     expect(entry3.updatedAt).toBeGreaterThan(firstUpdatedAt);
     expect(entry3.rect.top).toBe(25);
+  });
+
+  it('updates visibility even if metrics stay the same', async () => {
+    const rect: DOMRectReadOnly = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      top: 0,
+      left: 0,
+      bottom: 10,
+      right: 10,
+      toJSON: () => ({}),
+    } as DOMRectReadOnly;
+
+    useConnectorLayoutStore.getState().registerCardAnchor('card-001', 'leaf-A', 'test-file.json', rect, {
+      isVisible: true,
+    });
+    const firstEntry = Object.values(useConnectorLayoutStore.getState().cards)[0];
+    const firstUpdatedAt = firstEntry.updatedAt;
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    useConnectorLayoutStore.getState().registerCardAnchor('card-001', 'leaf-A', 'test-file.json', rect, {
+      isVisible: false,
+    });
+    const secondEntry = Object.values(useConnectorLayoutStore.getState().cards)[0];
+    expect(secondEntry.isVisible).toBe(false);
+    expect(secondEntry.updatedAt).toBeGreaterThan(firstUpdatedAt);
   });
 });
