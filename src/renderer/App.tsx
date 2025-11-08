@@ -2016,8 +2016,8 @@ export const App = () => {
             type="button"
             className={`toolbar-button${isTraceVisible ? ' toolbar-button--active' : ''}`}
             onClick={toggleTraceVisibility}
-            title="トレース表示切替"
-            aria-label="トレース表示切替"
+            title="トレース表示有効"
+            aria-label="トレース表示有効"
           >
             ⛓️
           </button>

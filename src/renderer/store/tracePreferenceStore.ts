@@ -26,11 +26,34 @@ interface TracePreferenceState {
   toggleRelationKind: (kind: TraceRelationKind) => void;
   setAllKinds: (value: boolean) => void;
   isFileVisible: (fileName: string) => boolean;
-  toggleFileVisibility: (fileName: string) => void;
+  toggleFileVisibility: (fileName: string, cardIds: string[]) => void;
   isCardVisible: (fileName: string, cardId: string, side: TraceConnectorSide) => boolean;
   toggleCardVisibility: (fileName: string, cardId: string, side: TraceConnectorSide) => void;
   resetCardVisibilityForFile: (fileName: string) => void;
 }
+
+const applyFileConnectorVisibility = (
+  currentMuted: Record<string, boolean>,
+  fileName: string,
+  cardIds: string[],
+  visible: boolean,
+): Record<string, boolean> => {
+  if (cardIds.length === 0) {
+    return currentMuted;
+  }
+  const nextMuted = { ...currentMuted };
+  cardIds.forEach((cardId) => {
+    (['left', 'right'] as TraceConnectorSide[]).forEach((side) => {
+      const key = makeCardKey(fileName, cardId, side);
+      if (visible) {
+        delete nextMuted[key];
+      } else {
+        nextMuted[key] = false;
+      }
+    });
+  });
+  return nextMuted;
+};
 
 export const useTracePreferenceStore = create<TracePreferenceState>()((set, get) => ({
   isVisible: true,
@@ -59,13 +82,18 @@ export const useTracePreferenceStore = create<TracePreferenceState>()((set, get)
       ),
     })),
   isFileVisible: (fileName) => get().fileVisibility[fileName] !== false,
-  toggleFileVisibility: (fileName) =>
-    set((state) => ({
-      fileVisibility: {
-        ...state.fileVisibility,
-        [fileName]: state.fileVisibility[fileName] === false,
-      },
-    })),
+  toggleFileVisibility: (fileName, cardIds) =>
+    set((state) => {
+      const isCurrentlyVisible = state.fileVisibility[fileName] !== false;
+      const nextVisible = !isCurrentlyVisible;
+      return {
+        fileVisibility: {
+          ...state.fileVisibility,
+          [fileName]: nextVisible,
+        },
+        mutedCards: applyFileConnectorVisibility(state.mutedCards, fileName, cardIds, nextVisible),
+      };
+    }),
   isCardVisible: (fileName, cardId, side) => {
     const key = makeCardKey(fileName, cardId, side);
     return get().mutedCards[key] !== false;

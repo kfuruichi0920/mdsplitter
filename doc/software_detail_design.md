@@ -296,3 +296,4 @@ Deprecated --> Draft : 再利用
   - `tracePreferenceStore.toggleCardVisibility` は `mutedCards` を更新し、`CardPanel`/`TraceConnectorLayer` がこのマップを購読しているため、接合点クリック時にバッジ・コネクタ可視状態が即座に反映される。
   - `connectorLayoutStore` ではアンカー登録時に「スクロールビューポート内に表示されているか」を判定して `isVisible` を保持し、`TraceConnectorLayer` はこのフラグが真のアンカー同士に限定して線を描画することで、スクロールアウトしたカードのコネクタを自動的に抑制する。
   - 新設した `showOffscreenConnectors` フラグ（🛰️ トグル）は `tracePreferenceStore` で管理し、ON の場合は `TraceConnectorLayer` が `isVisible` 判定をスキップしてビューポート外カード間のコネクタも描画する。
+  - カードパネルツールバーの ⛓️ トグルは、対象ファイル内の全カードIDを取得して `toggleFileVisibility(fileName, cardIds)` を呼び出し、左右接合点の `mutedCards` 状態を一括で書き換える。これにより、UI 上でも各トレース接合点ボタンの状態が即時反映され、仕様どおり「トレース接合点のコネクタ表示の有無」を通じてファイル全体の表示を制御する。

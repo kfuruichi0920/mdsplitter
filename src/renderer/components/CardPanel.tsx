@@ -250,8 +250,9 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     if (!activeFileName) {
       return;
     }
-    toggleFileTraceVisibility(activeFileName);
-  }, [activeFileName, toggleFileTraceVisibility]);
+    const cardIds = cards.map((card) => card.id);
+    toggleFileTraceVisibility(activeFileName, cardIds);
+  }, [activeFileName, cards, toggleFileTraceVisibility]);
 
   /**
    * @brief 階層構造を考慮して表示すべきカードをフィルタリングする。
@@ -870,8 +871,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             onClick={handlePanelTraceToggle}
             disabled={!activeFileName}
             aria-disabled={!activeFileName}
-            title="トレース表示ミュート"
-            aria-label="トレース表示ミュート"
+            title="トレース表示切替"
+            aria-label="トレース表示切替"
           >
             ⛓️
           </button>

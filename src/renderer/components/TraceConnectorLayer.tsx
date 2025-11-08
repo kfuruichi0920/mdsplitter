@@ -240,7 +240,6 @@ export const TraceConnectorLayer = ({
   );
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
-  const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
   const cardVisibilityMap = useTracePreferenceStore((state) => state.mutedCards, shallow);
   const showOffscreenConnectors = useTracePreferenceStore((state) => state.showOffscreenConnectors);
 
@@ -280,9 +279,6 @@ export const TraceConnectorLayer = ({
       if (!enabledRelationKinds[link.relation]) {
         return false;
       }
-      if (!isFileVisible(link.sourceFileName) || !isFileVisible(link.targetFileName)) {
-        return false;
-      }
       if (!isCardSideVisible(link.sourceFileName, link.sourceCardId, 'right')) {
         return false;
       }
@@ -291,7 +287,7 @@ export const TraceConnectorLayer = ({
       }
       return true;
     });
-  }, [enabledRelationKinds, isCardSideVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, isCardSideVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

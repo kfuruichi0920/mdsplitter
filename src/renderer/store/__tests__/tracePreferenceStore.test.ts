@@ -43,11 +43,18 @@ describe('tracePreferenceStore', () => {
   it('toggles file and card visibility', () => {
     expect(useTracePreferenceStore.getState().isFileVisible('spec.json')).toBe(true);
     act(() => {
-      useTracePreferenceStore.getState().toggleFileVisibility('spec.json');
+      useTracePreferenceStore.getState().toggleFileVisibility('spec.json', ['card-1']);
     });
     expect(useTracePreferenceStore.getState().isFileVisible('spec.json')).toBe(false);
+    expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'left')).toBe(false);
+    expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'right')).toBe(false);
 
+    act(() => {
+      useTracePreferenceStore.getState().toggleFileVisibility('spec.json', ['card-1']);
+    });
+    expect(useTracePreferenceStore.getState().isFileVisible('spec.json')).toBe(true);
     expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'left')).toBe(true);
+
     act(() => {
       useTracePreferenceStore.getState().toggleCardVisibility('spec.json', 'card-1', 'left');
     });
