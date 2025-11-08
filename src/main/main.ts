@@ -25,6 +25,7 @@ import {
   listCardFiles,
   listOutputFiles,
   loadCardFile,
+  loadOutputFile,
   loadTraceFile,
   loadSettings,
   loadWorkspaceSnapshot,
@@ -168,12 +169,23 @@ ipcMain.handle('workspace:listOutputFiles', async () => {
 });
 
 ipcMain.handle('workspace:loadCardFile', async (_event, fileName: string) => {
-  logMessage('info', `カードファイルを読み込みます: ${fileName}`);
+  logMessage('info', `カードファイルを読み込みます (_input): ${fileName}`);
   const snapshot = await loadCardFile(fileName);
   if (snapshot) {
     logMessage('info', `カードファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
   } else {
     logMessage('warn', `カードファイルの読み込みに失敗しました: ${fileName}`);
+  }
+  return snapshot;
+});
+
+ipcMain.handle('workspace:loadOutputFile', async (_event, fileName: string) => {
+  logMessage('info', `出力ファイルを読み込みます (_out): ${fileName}`);
+  const snapshot = await loadOutputFile(fileName);
+  if (snapshot) {
+    logMessage('info', `出力ファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
+  } else {
+    logMessage('warn', `出力ファイルの読み込みに失敗しました: ${fileName}`);
   }
   return snapshot;
 });

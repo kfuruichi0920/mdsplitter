@@ -31,6 +31,7 @@ declare global {
         listCardFiles: () => Promise<string[]>;
         listOutputFiles: () => Promise<string[]>;
         loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
+        loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
         loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
       };
     };

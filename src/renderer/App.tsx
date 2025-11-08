@@ -820,6 +820,119 @@ export const App = () => {
     [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot, tabs],
   );
 
+  /**
+   * @brief 出力ファイル（_outディレクトリ）を読み込んでワークスペースに反映する。
+   * @param fileName ファイル名。
+   */
+  const handleLoadOutputFile = useCallback(
+    async (fileName: string) => {
+      if (!window.app?.workspace?.loadOutputFile) {
+        notify('error', '出力ファイル読み込み機能が利用できません。');
+        return;
+      }
+
+      try {
+        pushLog({
+          id: `load-output-start-${Date.now()}`,
+          level: 'INFO',
+          message: `出力ファイルを読み込んでいます: ${fileName}`,
+          timestamp: new Date(),
+        });
+
+        const targetLeafId = activeLeafId ?? (splitRoot.type === 'leaf' ? splitRoot.id : null);
+        if (!targetLeafId) {
+          notify('warning', 'ファイルを表示できるパネルがありません。対象パネルを選択してください。');
+          pushLog({
+            id: `load-output-no-leaf-${Date.now()}`,
+            level: 'WARN',
+            message: `出力ファイル ${fileName} を割り当てるパネルがありません。`,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        // 同じファイルが既に開かれていて未保存変更がある場合は確認
+        const existingTab = Object.values(tabs).find((tab) => tab.fileName === fileName);
+        if (existingTab?.isDirty) {
+          const confirmed = window.confirm(
+            `ファイル「${fileName}」は既に開かれており、未保存の変更があります。\n\n再読み込みすると未保存の変更は失われます。続行しますか?`
+          );
+          if (!confirmed) {
+            pushLog({
+              id: `load-output-cancelled-${Date.now()}`,
+              level: 'INFO',
+              message: `ファイル ${fileName} の再読み込みをキャンセルしました。`,
+              timestamp: new Date(),
+            });
+            return;
+          }
+        }
+
+        const snapshot = await window.app.workspace.loadOutputFile(fileName);
+        if (!snapshot) {
+          notify('error', `出力ファイルの読み込みに失敗しました: ${fileName}`);
+          pushLog({
+            id: `load-output-failed-${Date.now()}`,
+            level: 'ERROR',
+            message: `出力ファイルの読み込みに失敗しました: ${fileName}`,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        const { validCards, invalidMessages } = sanitizeSnapshotCards(snapshot.cards);
+
+        if (invalidMessages.length > 0) {
+          notify('warning', `一部のカードデータが不正です (${invalidMessages.length}件)`);
+          pushLog({
+            id: `load-output-invalid-${Date.now()}`,
+            level: 'WARN',
+            message: `無効なカードを除外しました: ${invalidMessages.join(', ')}`,
+            timestamp: new Date(),
+          });
+        }
+
+        const result = openTab(targetLeafId, fileName, validCards, {
+          savedAt: snapshot.savedAt,
+          title: fileName,
+        });
+
+        if (result.status === 'denied') {
+          notify('warning', result.reason);
+          pushLog({
+            id: `load-output-denied-${Date.now()}`,
+            level: 'WARN',
+            message: result.reason,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        if (snapshot.savedAt && !Number.isNaN(Date.parse(snapshot.savedAt))) {
+          markSaved(result.tabId, snapshot.savedAt);
+        }
+
+        notify('success', `出力ファイルを読み込みました: ${fileName} (${validCards.length}枚)`);
+        pushLog({
+          id: `load-output-success-${Date.now()}`,
+          level: 'INFO',
+          message: `出力ファイルを読み込みました: ${fileName} (${validCards.length}枚)`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error('[App] failed to load output file', error);
+        notify('error', '出力ファイルの読み込み中にエラーが発生しました。');
+        pushLog({
+          id: `load-output-error-${Date.now()}`,
+          level: 'ERROR',
+          message: `出力ファイル読み込みエラー: ${fileName}`,
+          timestamp: new Date(),
+        });
+      }
+    },
+    [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot, tabs],
+  );
+
   // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
   /**
@@ -1693,7 +1806,15 @@ export const App = () => {
                             key={file}
                             role="treeitem"
                             className="sidebar__tree-file"
-                            title={`保存済み: ${file}`}
+                            onDoubleClick={() => handleLoadOutputFile(file)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                void handleLoadOutputFile(file);
+                              }
+                            }}
+                            tabIndex={0}
+                            title={`ダブルクリックして ${file} を読み込む (_out)`}
                           >
                             📄 {file}
                           </li>

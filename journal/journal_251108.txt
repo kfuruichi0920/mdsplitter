@@ -637,3 +637,109 @@ listOutputFiles: () => Promise<string[]>;
 - TypeScript型チェック: ✅ 通過
 - P2-22a~P2-22b: ✅ 完全実装
 - _out ディレクトリ可視化: ✅ 完了
+
+## 追加対応: _outディレクトリからのファイル読み込み機能 (2025-11-08 16:30)
+
+ユーザーから「"_out"フォルダのファイルも、"_input"フォルダと同様に、ダブルクリックで開けるようにして」との要望を受け、以下を実装。
+
+### フォルダの使い分け仕様
+- **_input**: ダブルクリックでファイルを開き編集できるが、編集結果は _out へ保存
+- **_out**: ダブルクリックでファイルを開き編集でき、同名で保存可能。trace_* ファイルも _out から読み出す
+
+### 実装内容
+
+#### 1. バックエンド: _outディレクトリからの読み込み機能 (workspace.ts:493-531)
+```typescript
+export const loadOutputFile = async (fileName: string): Promise<WorkspaceSnapshot | null> => {
+  const paths = resolveWorkspacePaths();
+  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('..')) {
+    console.warn('[workspace] invalid file name, rejecting:', fileName);
+    return null;
+  }
+
+  const filePath = path.join(paths.outputDir, fileName);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (isWorkspaceSnapshot(parsed)) {
+      return parsed;
+    }
+    console.warn('[workspace] invalid card file structure:', fileName);
+    return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      console.warn('[workspace] card file not found:', fileName);
+      return null;
+    }
+    console.error('[workspace] failed to load card file:', fileName, error);
+    throw error;
+  }
+};
+```
+
+#### 2. traceファイルの読み込み先を_outに変更 (workspace.ts:555, 565)
+- `loadTraceFile` が `paths.inputDir` ではなく `paths.outputDir` から trace_*.json ファイルを検索するように変更
+- これにより、保存されたカードファイルと同じディレクトリからトレーサビリティ情報を読み込める
+
+#### 3. IPCハンドラ追加 (main.ts:182-191)
+```typescript
+ipcMain.handle('workspace:loadOutputFile', async (_event, fileName: string) => {
+  logMessage('info', `出力ファイルを読み込みます (_out): ${fileName}`);
+  const snapshot = await loadOutputFile(fileName);
+  if (snapshot) {
+    logMessage('info', `出力ファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
+  } else {
+    logMessage('warn', `出力ファイルの読み込みに失敗しました: ${fileName}`);
+  }
+  return snapshot;
+});
+```
+
+#### 4. Preload API追加 (preload.ts:60, 87)
+- 型定義: `loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>`
+- 実装: `ipcRenderer.invoke('workspace:loadOutputFile', fileName)`
+
+#### 5. 型定義追加 (global.d.ts:34)
+```typescript
+loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
+```
+
+#### 6. フロントエンド実装 (App.tsx)
+- **handleLoadOutputFile** (827-934行): _out ディレクトリからファイルを読み込むハンドラ
+  - handleLoadCardFile とほぼ同じロジック
+  - エラーメッセージとログで「出力ファイル」と明示
+  - 未保存変更の確認ダイアログも実装
+
+- **UI更新** (1809-1817行): _out ディレクトリのファイルにダブルクリックハンドラを追加
+  ```tsx
+  <li
+    onDoubleClick={() => handleLoadOutputFile(file)}
+    onKeyDown={(event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        void handleLoadOutputFile(file);
+      }
+    }}
+    tabIndex={0}
+    title={`ダブルクリックして ${file} を読み込む (_out)`}
+  >
+    📄 {file}
+  </li>
+  ```
+
+### 動作フロー
+1. **_inputからの読み込み**: `handleLoadCardFile` → `loadCardFile` (_input/) → 編集 → `saveCardFile` (_out/)
+2. **_outからの読み込み**: `handleLoadOutputFile` → `loadOutputFile` (_out/) → 編集 → `saveCardFile` (_out/) (同名で上書き)
+3. **traceファイル**: トレーサビリティパネルが2つのカードファイルを開いたとき、_out/ 配下の trace_*.json を自動検索・読み込み
+
+### 技術的特徴
+- **パストラバーサル対策**: ファイル名に `/`, `\`, `..` が含まれていないことを確認
+- **エラーハンドリング**: ファイルが存在しない場合は null を返し、その他のエラーはログ出力
+- **一貫性**: loadCardFile と同じ構造でコードの可読性と保守性を維持
+- **型安全性**: main/preload/renderer 全てで TypeScript 型定義を完備
+
+### 実装完了
+- TypeScript型チェック: ✅ 通過
+- 本番ビルド: ✅ 成功
+- _out ファイルのダブルクリック読み込み: ✅ 完了
+- trace ファイルの _out からの読み込み: ✅ 完了

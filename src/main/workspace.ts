@@ -480,6 +480,45 @@ export const loadCardFile = async (fileName: string): Promise<WorkspaceSnapshot 
     return null;
   } catch (error) {
     const err = error as NodeJS.ErrnoException;
+    //! ファイル未存在ならnull返却
+    if (err?.code === 'ENOENT') {
+      return null;
+    }
+    //! その他の読込失敗はエラーログ
+    console.error('[workspace] failed to load card file', error);
+    return null;
+  }
+};
+
+/**
+ * @brief _outディレクトリから指定されたカードファイルを読み込む。
+ * @param fileName ファイル名（_outディレクトリ内の相対パス）。
+ * @return カードスナップショット、または null（無効な構造の場合）。
+ */
+export const loadOutputFile = async (fileName: string): Promise<WorkspaceSnapshot | null> => {
+  //! ワークスペースパス情報を取得
+  const paths = resolveWorkspacePaths();
+  //! パストラバーサル対策: ファイル名にディレクトリ区切り文字が含まれていないことを確認
+  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('..')) {
+    console.warn('[workspace] invalid file name, rejecting:', fileName);
+    return null;
+  }
+
+  //! 対象ファイルパスを構築
+  const filePath = path.join(paths.outputDir, fileName);
+  try {
+    //! ファイル内容を読込・パース
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    //! 構造妥当性検証
+    if (isWorkspaceSnapshot(parsed)) {
+      return parsed;
+    }
+    //! 不正構造の場合は警告
+    console.warn('[workspace] invalid card file structure:', fileName);
+    return null;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
     //! ファイル未存在なら警告＋null返却
     if (err?.code === 'ENOENT') {
       console.warn('[workspace] card file not found:', fileName);
@@ -513,7 +552,7 @@ export const loadTraceFile = async (
   const paths = resolveWorkspacePaths();
   let candidates: string[] = [];
   try {
-    const entries = await fs.readdir(paths.inputDir, { withFileTypes: true });
+    const entries = await fs.readdir(paths.outputDir, { withFileTypes: true });
     candidates = entries
       .filter((entry) => entry.isFile() && entry.name.startsWith('trace_') && entry.name.endsWith('.json'))
       .map((entry) => entry.name);
@@ -523,7 +562,7 @@ export const loadTraceFile = async (
   }
 
   for (const candidate of candidates) {
-    const filePath = path.join(paths.inputDir, candidate);
+    const filePath = path.join(paths.outputDir, candidate);
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       const parsed = JSON.parse(raw) as TraceabilityFile;
