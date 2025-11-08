@@ -10,7 +10,7 @@
  * @copyright MIT
  */
 
-import { useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
@@ -80,6 +80,9 @@ export interface CardPanelProps {
  */
 export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
+  const [draggedCardIds, setDraggedCardIds] = useState<string[]>([]);
+  const [dropTarget, setDropTarget] = useState<{ cardId: string; position: 'before' | 'after' | 'child' } | null>(null);
+
   const leafTabs = useWorkspaceStore(
     useCallback((state) => {
       const leaf = state.leafs[leafId];
@@ -97,6 +100,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const moveCards = useWorkspaceStore((state) => state.moveCards);
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
   const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
 
@@ -292,6 +296,61 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     onLog?.('INFO', 'すべてのカードを折畳みました。');
   }, [activeTabId, leafId, onLog]);
 
+  /**
+   * @brief ドラッグ開始時の処理。
+   * @param cardId ドラッグ開始したカードID。
+   */
+  const handleDragStart = useCallback(
+    (cardId: string) => {
+      //! 選択中のカードをドラッグ対象にする
+      const cardsToMove = selectedCardIds.has(cardId) ? Array.from(selectedCardIds) : [cardId];
+      setDraggedCardIds(cardsToMove);
+      onLog?.('INFO', `${cardsToMove.length}件のカードをドラッグ中...`);
+    },
+    [onLog, selectedCardIds],
+  );
+
+  /**
+   * @brief ドラッグオーバー時の処理。
+   * @param cardId ドラッグオーバーしたカードID。
+   * @param position ドロップ位置。
+   */
+  const handleDragOver = useCallback(
+    (cardId: string, position: 'before' | 'after' | 'child') => {
+      setDropTarget({ cardId, position });
+    },
+    [],
+  );
+
+  /**
+   * @brief ドロップ時の処理。
+   */
+  const handleDrop = useCallback(() => {
+    if (!activeTabId || !dropTarget || draggedCardIds.length === 0) {
+      setDraggedCardIds([]);
+      setDropTarget(null);
+      return;
+    }
+
+    const success = moveCards(leafId, activeTabId, draggedCardIds, dropTarget.cardId, dropTarget.position);
+    if (success) {
+      onLog?.('INFO', `${draggedCardIds.length}件のカードを移動しました。`);
+    } else {
+      onLog?.('WARN', 'カードの移動に失敗しました。');
+    }
+
+    setDraggedCardIds([]);
+    setDropTarget(null);
+  }, [activeTabId, draggedCardIds, dropTarget, leafId, moveCards, onLog]);
+
+  /**
+   * @brief ドラッグ終了時の処理。
+   */
+  const handleDragEnd = useCallback(() => {
+    setDraggedCardIds([]);
+    setDropTarget(null);
+  }, []);
+
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー: 各カードファイルのタブを表示 */}
@@ -421,6 +480,10 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
                 useWorkspaceStore.getState().toggleCardExpanded(leafId, activeTabId, card.id);
               }
             }}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
             panelScrollRef={panelScrollRef}
           />
         ))}
@@ -451,9 +514,13 @@ interface CardListItemProps {
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
   onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
+  onDragStart?: (cardId: string) => void; ///< ドラッグ開始ハンドラ。
+  onDragOver?: (cardId: string, position: 'before' | 'after' | 'child') => void; ///< ドラッグオーバーハンドラ。
+  onDrop?: () => void; ///< ドロップハンドラ。
+  onDragEnd?: () => void; ///< ドラッグ終了ハンドラ。
 }
 
-const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand }: CardListItemProps) => {
+const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDragStart, onDragOver, onDrop, onDragEnd }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;

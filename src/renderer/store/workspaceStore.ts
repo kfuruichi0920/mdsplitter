@@ -88,6 +88,7 @@ export interface WorkspaceStore {
   toggleCardExpanded: (leafId: string, tabId: string, cardId: string) => void; ///< カードの展開/折畳をトグル
   expandAll: (leafId: string, tabId: string) => void; ///< 全カードを展開
   collapseAll: (leafId: string, tabId: string) => void; ///< 全カードを折畳
+  moveCards: (leafId: string, tabId: string, cardIds: string[], targetCardId: string, position: 'before' | 'after' | 'child') => boolean; ///< カード移動（階層構造を維持）
   reset: () => void;
 }
 
@@ -616,10 +617,200 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     });
   },
 
+  moveCards: (leafId, tabId, cardIds, targetCardId, position) => {
+    let success = false;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      //! 移動対象カードと移動先カードの検証
+      if (cardIds.length === 0 || !targetCardId) {
+        return state;
+      }
+
+      const cardMap = new Map(tab.cards.map((c) => [c.id, c]));
+      const targetCard = cardMap.get(targetCardId);
+      if (!targetCard) {
+        return state;
+      }
+
+      //! 移動対象カードのバリデーション
+      const moveCardsSet = new Set(cardIds);
+      for (const cardId of cardIds) {
+        const card = cardMap.get(cardId);
+        if (!card) {
+          return state; //! 存在しないカードは移動不可
+        }
+        //! ターゲットが移動対象カードの子孫である場合は移動不可（循環参照防止）
+        if (isDescendant(targetCard, card, cardMap)) {
+          return state;
+        }
+      }
+
+      //! カードの移動処理
+      const nextCards = [...tab.cards];
+      const movedCards: Card[] = [];
+      const movedCardIds = new Set(cardIds);
+
+      //! 移動対象カードとその子孫を収集
+      const collectDescendants = (cardId: string): string[] => {
+        const result = [cardId];
+        const card = cardMap.get(cardId);
+        if (card && card.child_ids) {
+          card.child_ids.forEach((childId) => {
+            result.push(...collectDescendants(childId));
+          });
+        }
+        return result;
+      };
+
+      const allMovedIds = new Set<string>();
+      cardIds.forEach((cardId) => {
+        collectDescendants(cardId).forEach((id) => allMovedIds.add(id));
+      });
+
+      //! 移動対象カードを元の位置から削除（階層構造も更新）
+      const cardsToMove = nextCards.filter((c) => movedCardIds.has(c.id));
+      const remainingCards = nextCards.filter((c) => !allMovedIds.has(c.id));
+
+      //! 新しい親と位置の決定
+      let newParentId: string | null = null;
+      let insertIndex = 0;
+
+      if (position === 'child') {
+        newParentId = targetCardId;
+        insertIndex = remainingCards.findIndex((c) => c.parent_id === targetCardId);
+        if (insertIndex === -1) {
+          insertIndex = remainingCards.length;
+        }
+      } else {
+        newParentId = targetCard.parent_id;
+        const targetIndex = remainingCards.findIndex((c) => c.id === targetCardId);
+        if (targetIndex === -1) {
+          return state;
+        }
+        insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      }
+
+      //! 移動対象カードの階層情報を更新
+      const updatedMovedCards = cardsToMove.map((card) => {
+        if (movedCardIds.has(card.id)) {
+          //! 直接移動するカード
+          const newLevel = newParentId ? (cardMap.get(newParentId)?.level ?? 0) + 1 : 0;
+          return { ...card, parent_id: newParentId, level: newLevel };
+        }
+        //! 子孫カード（相対的なレベルを維持）
+        const rootMoveCard = cardsToMove.find((c) => movedCardIds.has(c.id) && isAncestor(c, card, cardMap));
+        if (rootMoveCard) {
+          const levelDiff = card.level - rootMoveCard.level;
+          const newRootLevel = newParentId ? (cardMap.get(newParentId)?.level ?? 0) + 1 : 0;
+          return { ...card, level: newRootLevel + levelDiff };
+        }
+        return card;
+      });
+
+      //! カードを挿入
+      const finalCards = [
+        ...remainingCards.slice(0, insertIndex),
+        ...updatedMovedCards,
+        ...remainingCards.slice(insertIndex),
+      ];
+
+      //! prev_id/next_idの再計算（簡易実装: 同じ親を持つ兄弟間でリンク）
+      const rebuiltCards = rebuildSiblingLinks(finalCards);
+
+      success = true;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, cards: rebuiltCards, isDirty: true },
+        },
+      };
+    });
+
+    return success;
+  },
+
   reset: () => {
     set(() => ({ ...initialState }));
   },
 }));
+
+/**
+ * @brief カードAがカードBの子孫かどうかを判定。
+ * @param ancestor 祖先候補カード。
+ * @param descendant 子孫候補カード。
+ * @param cardMap カードIDマップ。
+ * @return 子孫である場合true。
+ */
+function isDescendant(ancestor: Card, descendant: Card, cardMap: Map<string, Card>): boolean {
+  let current = descendant;
+  while (current.parent_id) {
+    if (current.parent_id === ancestor.id) {
+      return true;
+    }
+    const parent = cardMap.get(current.parent_id);
+    if (!parent) {
+      break;
+    }
+    current = parent;
+  }
+  return false;
+}
+
+/**
+ * @brief カードAがカードBの祖先かどうかを判定。
+ * @param ancestor 祖先候補カード。
+ * @param descendant 子孫候補カード。
+ * @param cardMap カードIDマップ。
+ * @return 祖先である場合true。
+ */
+function isAncestor(ancestor: Card, descendant: Card, cardMap: Map<string, Card>): boolean {
+  return isDescendant(ancestor, descendant, cardMap);
+}
+
+/**
+ * @brief 兄弟リンク（prev_id/next_id）を再構築。
+ * @param cards カードリスト。
+ * @return リンク再構築後のカードリスト。
+ */
+function rebuildSiblingLinks(cards: Card[]): Card[] {
+  //! 親ごとにグループ化
+  const groupedByParent = new Map<string | null, Card[]>();
+  cards.forEach((card) => {
+    const parentId = card.parent_id;
+    if (!groupedByParent.has(parentId)) {
+      groupedByParent.set(parentId, []);
+    }
+    groupedByParent.get(parentId)!.push(card);
+  });
+
+  //! 各グループ内でprev_id/next_idを設定
+  const updatedCards = cards.map((card) => {
+    const siblings = groupedByParent.get(card.parent_id) ?? [];
+    const index = siblings.findIndex((c) => c.id === card.id);
+    if (index === -1) {
+      return card;
+    }
+    const prev_id = index > 0 ? siblings[index - 1].id : null;
+    const next_id = index < siblings.length - 1 ? siblings[index + 1].id : null;
+    return { ...card, prev_id, next_id };
+  });
+
+  //! parent.child_idsも更新
+  const finalCards = updatedCards.map((card) => {
+    const children = updatedCards.filter((c) => c.parent_id === card.id);
+    const child_ids = children.map((c) => c.id);
+    return { ...card, child_ids };
+  });
+
+  return finalCards;
+}
 
 /**
  * @brief ストアの状態を初期値へ戻すヘルパ。
