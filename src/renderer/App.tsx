@@ -1677,6 +1677,7 @@ export const App = () => {
       const isMac = platform.toLowerCase().includes('mac');
       const primaryPressed = isMac ? event.metaKey : event.ctrlKey;
       const key = event.key.toLowerCase();
+      const targetEditable = isEditableTarget(event.target);
 
       if (isSettingsOpen) {
         if (event.key === 'Escape') {
@@ -1687,6 +1688,13 @@ export const App = () => {
       }
 
       if (primaryPressed) {
+        if (targetEditable && !event.altKey && !event.shiftKey) {
+          const passthroughKeys = ['c', 'v', 'x', 'a', 'z', 'y'];
+          if (passthroughKeys.includes(key)) {
+            return;
+          }
+        }
+
         if (!event.altKey) {
           if (key === ',' && !event.shiftKey) {
             event.preventDefault();
