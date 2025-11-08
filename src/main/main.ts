@@ -29,12 +29,14 @@ import {
   loadCardFile,
   loadOutputFile,
   loadTraceFile,
+  saveTraceFile,
   loadSettings,
   loadWorkspaceSnapshot,
   saveCardFileSnapshot,
   saveWorkspaceSnapshot,
   updateSettings,
 } from './workspace';
+import type { TraceFileSaveRequest } from '../shared/traceability';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
@@ -202,6 +204,13 @@ ipcMain.handle('workspace:loadTraceFile', async (_event, args: { leftFile: strin
     logMessage('debug', '対応するトレーサビリティファイルが見つかりませんでした');
   }
   return trace;
+});
+
+ipcMain.handle('workspace:saveTraceFile', async (_event, payload: TraceFileSaveRequest) => {
+  logMessage('info', `トレーサビリティファイルを保存します: left=${payload.leftFile}, right=${payload.rightFile}`);
+  const result = await saveTraceFile(payload);
+  logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
+  return result;
 });
 
 ipcMain.handle('dialog:promptSaveFile', async (_event, options: { defaultFileName?: string } = {}) => {

@@ -64,6 +64,10 @@
     @apply flex items-center gap-1.5 border-r border-slate-200 pr-3 dark:border-slate-700;
   }
 
+  .toolbar-group--trace {
+    @apply relative;
+  }
+
   .toolbar-group:last-of-type {
     @apply border-r-0 pr-0;
   }
@@ -80,8 +84,32 @@
     @apply inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-blue-200 dark:hover:bg-slate-700;
   }
 
+  .toolbar-button--active {
+    @apply bg-blue-500 text-white dark:bg-blue-400 dark:text-slate-900;
+  }
+
   .toolbar-button:disabled {
     @apply cursor-not-allowed opacity-60 hover:bg-blue-100 dark:hover:bg-slate-800;
+  }
+
+  .trace-filter-popover {
+    @apply absolute right-0 top-10 z-40 w-48 rounded-md border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .trace-filter-popover__item {
+    @apply flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200;
+  }
+
+  .trace-filter-popover__item + .trace-filter-popover__item {
+    @apply mt-1;
+  }
+
+  .trace-filter-popover__actions {
+    @apply mt-2 flex justify-end gap-2;
+  }
+
+  .trace-filter-popover__actions button {
+    @apply rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-200 dark:bg-slate-700 dark:text-blue-200;
   }
 
   .workspace {

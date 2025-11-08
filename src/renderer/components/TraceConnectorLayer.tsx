@@ -3,6 +3,7 @@ import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connecto
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
 import { useTraceStore } from '../store/traceStore';
+import { useTracePreferenceStore } from '../store/tracePreferenceStore';
 import type { TraceabilityLink } from '@/shared/traceability';
 
 interface TraceConnectorLayerProps {
@@ -186,6 +187,9 @@ export const TraceConnectorLayer = ({
     shallow,
   );
   const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
+  const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
+  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
+  const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
 
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
 
@@ -230,6 +234,18 @@ export const TraceConnectorLayer = ({
     shallow,
   );
 
+  const filteredLinks = useMemo(() => {
+    return traceLinks.filter((link) => {
+      if (!enabledRelationKinds[link.relation]) {
+        return false;
+      }
+      if (focusSelectionOnly) {
+        return highlightedSet.has(link.sourceCardId) || highlightedSet.has(link.targetCardId);
+      }
+      return true;
+    });
+  }, [traceLinks, enabledRelationKinds, focusSelectionOnly, highlightedSet]);
+
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {
       return [];
@@ -246,7 +262,7 @@ export const TraceConnectorLayer = ({
     const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>
       entries.find((entry) => entry.cardId === cardId && entry.fileName === fileName && leafIds.includes(entry.leafId));
 
-    return traceLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
+    return filteredLinks.reduce<ConnectorPathEntry[]>((acc, link) => {
       // 左側のleafIdsとソースファイル名でソースカードを検索
       let source = findEntry(link.sourceCardId, link.sourceFileName, leftLeafIds);
       // 右側のleafIdsとターゲットファイル名でターゲットカードを検索
@@ -288,9 +304,9 @@ export const TraceConnectorLayer = ({
       acc.push({ id: link.id, path, className });
       return acc;
     }, []);
-  }, [cards, containerRect, direction, highlightedSet, leftLeafIds, rightLeafIds, traceLinks]);
+  }, [cards, containerRect, direction, filteredLinks, highlightedSet, leftLeafIds, rightLeafIds]);
 
-  if (direction !== 'vertical') {
+  if (direction !== 'vertical' || !isTraceVisible) {
     return null;
   }
 

@@ -64,7 +64,9 @@
 #### 2.3.1 コネクタ描画関連コンポーネント（計画）
 | パス | 主な内容 | 備考 | 状況 |
 | --- | --- | --- | --- |
-| `src/renderer/components/TraceConnectorLayer.tsx` | 隣接する左右パネル間のコネクタを SVG で描画するレイヤ。 | SVG `<path>` ベース、パネルごとの仮想化・インタラクション対応。 | ⚠️ |
+| `src/renderer/components/TraceConnectorLayer.tsx` | 隣接する左右パネル間のコネクタを SVG で描画するレイヤ。 | SVG `<path>` ベース、種別フィルタ/選択フォーカス/可視トグルに対応済み。 | ✅ |
+| `src/renderer/store/tracePreferenceStore.ts` | コネクタ表示設定（可視・種別チェックボックス・選択カード限定表示）を保持する Zustand ストア。 | ツールバーのトグルと `TraceConnectorLayer` が同一ソースを参照。 | ✅ |
+| `src/renderer/utils/traceLayout.ts` | 分割ノードツリーから左右葉IDを収集し、アクティブ葉が属する垂直分割ペアを特定する。 | トレース作成/削除操作で左右ファイルの決定に利用。 | ✅ |
 | `src/renderer/store/connectorLayoutStore.ts` | カード要素の位置情報と可視状態を保持するストア。 | ResizeObserver/MutationObserver を用いて DOM 位置をトラッキング。 | ⚠️ |
 | `src/renderer/hooks/useConnectorLayout.ts` | カードコンポーネントから位置情報を登録/更新するフック。 | `CardPanel` 内のカード要素に適用し、アンカー座標を測定。 | ⚠️ |
 | `src/shared/traceability.ts` | コネクタ定義（方向・種類・スタイル）の共通型。 | 後続フェーズでメイン/レンダラ間共有。 | ⚠️ |
@@ -267,3 +269,17 @@ Deprecated --> Draft : 再利用
 - `scripts/trace-benchmark.js` を追加し、100/500/1000/2000 本のコネクタ生成時間を計測する CLI (`npm run perf:trace`) を整備。
 - `src/renderer/components/__tests__/TraceConnectorLayer.test.tsx` で DOMRect モックを用いた描画確認テストを追加し、P2-11a のスタブシナリオを最小構成で実現。
 - メイン/プリロードへ `workspace.loadTraceFile` API を追加し、`traceStore` 経由で左右アクティブタブのペアが切り替わる度にトレーサファイルを読み込み・キャッシュするルートを構築 (P2-10d)。
+
+### 8.6 P5 フィーチャ実装サマリ
+- **P5-01 データモデル/永続化**
+  - `src/shared/traceability.ts` にヘッダ構造 (`TraceabilityHeader`)、relation ID、`TRACEABILITY_FILE_SCHEMA_VERSION`、`relationsToLinks` などを追加し、カード間リンクが JSON で往復できるスキーマを明文化。
+  - メインプロセスの `workspace.saveTraceFile` / `workspace.loadTraceFile` が新スキーマを読み書きし、`preload.ts`・`global.d.ts` を介して `window.app.workspace.saveTraceFile` を公開。
+  - `src/main/__tests__/workspace.traceability.test.ts` と `src/shared/traceability.test.ts` でヘッダ付ファイルの永続化・読み込み・方向スワップ補正を検証。
+- **P5-02 コネクタ作成/削除**
+  - ツールバーに `➡️/⬅️/↔️/💔` ボタンを実装 (`src/renderer/App.tsx:1600-1700` 付近)。左右パネルの選択カードを検出し、`useTraceStore.saveRelationsForPair` が relation の追加/削除と `_out/trace_*.json` 更新を司る。
+  - `workspaceStore` に `setCardTraceFlags` を追加し、relation 変化に応じて各カードの `hasLeftTrace`/`hasRightTrace` を反映。Undo スタックに影響を与えずに dirty フラグのみを立てる。
+  - 垂直分割ペアの探索を `src/renderer/utils/traceLayout.ts` に切り出し、トレース操作と `TraceConnectorLayer` の双方で共通利用。
+- **P5-03 表示フィルタ/可視トグル**
+  - `src/renderer/store/tracePreferenceStore.ts` で可視状態・選択カード限定表示・種別別チェックボックスを管理。`TraceConnectorLayer` はこのストアを購読し、フィルタ条件に合致しないリンクを描画から除外。
+  - グローバルツールバーの `⛓️` トグル、`🧐` 選択カード強調、`🧬` タイプフィルタポップオーバーを実装。ポップオーバーは CSS (`src/renderer/styles.css`) で簡易レイヤーを提供。
+  - `src/renderer/store/__tests__/tracePreferenceStore.test.ts`・`traceStore.test.ts` で設定ストアと relation 永続化の挙動をユニットテストし、Playground なしでも挙動を担保。

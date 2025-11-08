@@ -18,7 +18,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
-import type { LoadedTraceabilityFile } from '../shared/traceability';
+import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
 
 
 /**
@@ -48,6 +48,8 @@ type AppAPI = {
     save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
     /** 編集済みのカードを指定ファイル名で保存する。 */
     saveCardFile: (fileName: string, snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+    /** トレーサビリティファイルを保存する。 */
+    saveTraceFile: (payload: TraceFileSaveRequest) => Promise<TraceFileSaveResult>;
     /** 保存済みスナップショットを読み込む。 */
     load: () => Promise<WorkspaceSnapshot | null>;
     /** _inputディレクトリ内のカードファイル一覧を取得する。 */
@@ -83,6 +85,8 @@ const api: AppAPI = {
     save: async (snapshot: WorkspaceSnapshot) => ipcRenderer.invoke('workspace:save', snapshot),
     saveCardFile: async (fileName: string, snapshot: WorkspaceSnapshot) =>
       ipcRenderer.invoke('workspace:saveCardFile', { fileName, snapshot }),
+    saveTraceFile: async (payload: TraceFileSaveRequest) =>
+      ipcRenderer.invoke('workspace:saveTraceFile', payload),
     load: async () => ipcRenderer.invoke('workspace:load'),
     listCardFiles: async () => ipcRenderer.invoke('workspace:listCardFiles'),
     listOutputFiles: async () => ipcRenderer.invoke('workspace:listOutputFiles'),

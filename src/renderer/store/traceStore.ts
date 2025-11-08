@@ -10,8 +10,13 @@
  * @copyright MIT
  */
 import { create } from 'zustand';
-import type { LoadedTraceabilityFile, TraceabilityLink } from '@/shared/traceability';
-import { normalizeDirection } from '@/shared/traceability';
+import type {
+  LoadedTraceabilityFile,
+  TraceabilityHeader,
+  TraceabilityLink,
+  TraceabilityRelation,
+} from '@/shared/traceability';
+import { TRACEABILITY_FILE_SCHEMA_VERSION, relationsToLinks } from '@/shared/traceability';
 
 
 /**
@@ -24,7 +29,13 @@ interface TraceCacheEntry {
   status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; ///< 現在の状態。
   timestamp: number; ///< 最終更新時刻。
   links: TraceabilityLink[]; ///< トレーサビリティリンク配列。
+  relations: TraceabilityRelation[]; ///< 元となるrelation配列。
+  header?: TraceabilityHeader; ///< ファイルヘッダ。
+  schemaVersion?: number; ///< スキーマバージョン。
+  leftFile: string; ///< 左側ファイル名（UI基準）。
+  rightFile: string; ///< 右側ファイル名（UI基準）。
   sourceFileName?: string; ///< ソースファイル名。
+  fileName?: string; ///< 実際のファイル名。
   error?: string; ///< エラー内容（失敗時のみ）。
 }
 
@@ -36,6 +47,11 @@ interface TraceState {
   cache: Record<string, TraceCacheEntry>; ///< ファイルペアごとのキャッシュ。
   loadTraceForPair: (leftFile: string, rightFile: string) => Promise<TraceCacheEntry>; ///< トレースファイルをロード。
   getCached: (leftFile: string, rightFile: string) => TraceCacheEntry | undefined; ///< キャッシュ取得。
+  saveRelationsForPair: (params: {
+    leftFile: string;
+    rightFile: string;
+    relations: TraceabilityRelation[];
+  }) => Promise<TraceCacheEntry>;
 }
 
 
@@ -60,40 +76,27 @@ const convertLoadedFile = (
   rightFile: string,
   file: LoadedTraceabilityFile,
 ): TraceCacheEntry => {
-  const links: TraceabilityLink[] = [];
   const isSwapped = !(file.payload.left_file === leftFile && file.payload.right_file === rightFile);
-  file.payload.relations.forEach((relation, index) => {
-    const sourceIds = isSwapped ? relation.right_ids : relation.left_ids;
-    const targetIds = isSwapped ? relation.left_ids : relation.right_ids;
+  const links = relationsToLinks(file.payload.relations, { swapOrientation: isSwapped });
 
-    const baseDirection = normalizeDirection(relation.directed);
-    const effectiveDirection = isSwapped
-      ? baseDirection === 'forward'
-        ? 'backward'
-        : baseDirection === 'backward'
-          ? 'forward'
-          : 'bidirectional'
-      : baseDirection;
-
-    sourceIds.forEach((sourceId) => {
-      targetIds.forEach((targetId) => {
-        links.push({
-          id: `${file.fileName}-${index}-${sourceId}-${targetId}`,
-          sourceCardId: sourceId,
-          targetCardId: targetId,
-          relation: relation.type,
-          direction: effectiveDirection,
-        });
-      });
-    });
-  });
+  const relations = file.payload.relations.map((relation) => ({
+    ...relation,
+    left_ids: [...relation.left_ids],
+    right_ids: [...relation.right_ids],
+  }));
 
   return {
     key: toKey(leftFile, rightFile),
     status: 'ready',
     timestamp: Date.now(),
     links,
+    relations,
+    schemaVersion: file.payload.schemaVersion,
+    header: file.payload.header,
+    leftFile,
+    rightFile,
     sourceFileName: file.fileName,
+    fileName: file.fileName,
   } satisfies TraceCacheEntry;
 };
 
@@ -124,6 +127,9 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
           status: 'loading',
           timestamp: Date.now(),
           links: [],
+          relations: [],
+          leftFile,
+          rightFile,
         },
       },
     }));
@@ -136,6 +142,9 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
           status: 'missing',
           timestamp: Date.now(),
           links: [],
+          relations: [],
+          leftFile,
+          rightFile,
         };
         set((state) => ({ cache: { ...state.cache, [key]: entry } }));
         if (window.app?.log) {
@@ -156,6 +165,9 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
         status: 'error',
         timestamp: Date.now(),
         links: [],
+        relations: [],
+        leftFile,
+        rightFile,
         error: message,
       };
       set((state) => ({ cache: { ...state.cache, [key]: entry } }));
@@ -164,6 +176,37 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
       }
       return entry;
     }
+  },
+  saveRelationsForPair: async ({ leftFile, rightFile, relations }) => {
+    const key = toKey(leftFile, rightFile);
+    const cached = get().cache[key];
+    const payload = {
+      fileName: cached?.fileName ?? cached?.sourceFileName,
+      header: cached?.header,
+    };
+
+    const result = await window.app.workspace.saveTraceFile({
+      fileName: payload.fileName,
+      leftFile,
+      rightFile,
+      relations,
+      header: payload.header,
+    });
+
+    const loaded: LoadedTraceabilityFile = {
+      fileName: result.fileName,
+      payload: {
+        schemaVersion: TRACEABILITY_FILE_SCHEMA_VERSION,
+        header: result.header,
+        left_file: leftFile,
+        right_file: rightFile,
+        relations,
+      },
+    };
+
+    const entry = convertLoadedFile(leftFile, rightFile, loaded);
+    set((state) => ({ cache: { ...state.cache, [key]: entry } }));
+    return entry;
   },
 }));
 

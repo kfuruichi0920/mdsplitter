@@ -14,6 +14,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { nanoid } from 'nanoid';
+import { shallow } from 'zustand/shallow';
 
 import {
   useWorkspaceStore,
@@ -21,15 +23,19 @@ import {
   type CardKind,
   type CardStatus,
   type InsertPosition,
+  type WorkspaceStore,
 } from './store/workspaceStore';
 import { useUiStore, type ThemeMode } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import { useSplitStore } from './store/splitStore';
 import type { SplitNode } from './store/splitStore';
+import { useTraceStore } from './store/traceStore';
+import { useTracePreferenceStore } from './store/tracePreferenceStore';
 import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
 import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
+import type { TraceDirection, TraceabilityRelation } from '@/shared/traceability';
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
@@ -37,6 +43,7 @@ import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
+import { findVerticalPairForLeaf } from './utils/traceLayout';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -107,6 +114,65 @@ const applyThemeFromSettings = (
   applyThemeColors(colors);
   applySplitterWidth(themeConfig.splitterWidth);
   return resolved;
+};
+
+type TraceSelection = {
+  fileName: string;
+  cardIds: string[];
+};
+
+type TraceFlagPatch = Partial<Pick<Card, 'hasLeftTrace' | 'hasRightTrace'>>;
+
+const gatherSelectionsForLeafs = (state: WorkspaceStore, leafIds: string[]): TraceSelection[] => {
+  const selections: TraceSelection[] = [];
+  leafIds.forEach((leafId) => {
+    const leaf = state.leafs[leafId];
+    if (!leaf?.activeTabId) {
+      return;
+    }
+    const tab = state.tabs[leaf.activeTabId];
+    if (!tab?.fileName || tab.selectedCardIds.size === 0) {
+      return;
+    }
+    selections.push({ fileName: tab.fileName, cardIds: Array.from(tab.selectedCardIds) });
+  });
+  return selections;
+};
+
+const relationCardSet = (relations: TraceabilityRelation[], side: 'left' | 'right'): Set<string> => {
+  const result = new Set<string>();
+  relations.forEach((relation) => {
+    const ids = side === 'left' ? relation.left_ids : relation.right_ids;
+    ids.forEach((id) => result.add(id));
+  });
+  return result;
+};
+
+const buildTraceFlagUpdates = (
+  prev: Set<string>,
+  next: Set<string>,
+  flag: 'hasLeftTrace' | 'hasRightTrace',
+): Record<string, TraceFlagPatch> => {
+  const updates: Record<string, TraceFlagPatch> = {};
+  prev.forEach((id) => {
+    if (!next.has(id)) {
+      updates[id] = { ...updates[id], [flag]: false } as TraceFlagPatch;
+    }
+  });
+  next.forEach((id) => {
+    updates[id] = { ...updates[id], [flag]: true } as TraceFlagPatch;
+  });
+  return updates;
+};
+
+const toDirectedValue = (direction: TraceDirection): TraceabilityRelation['directed'] => {
+  if (direction === 'forward') {
+    return 'left_to_right';
+  }
+  if (direction === 'backward') {
+    return 'right_to_left';
+  }
+  return 'bidirectional';
 };
 
 interface SettingsModalState {
@@ -210,6 +276,8 @@ export const App = () => {
   const workspaceRef = useRef<HTMLDivElement | null>(null); ///< ワークスペース全体。
   const contentRef = useRef<HTMLDivElement | null>(null); ///< サイドバー+カード領域。
   const searchInputRef = useRef<HTMLInputElement | null>(null); ///< 検索入力フィールド。
+  const traceFilterButtonRef = useRef<HTMLButtonElement | null>(null);
+  const traceFilterPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
@@ -243,6 +311,13 @@ export const App = () => {
   const canUndo = useWorkspaceStore((state) => state.canUndo);
   const canRedo = useWorkspaceStore((state) => state.canRedo);
   const renameTabFile = useWorkspaceStore((state) => state.renameTabFile);
+  const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
+  const toggleTraceVisibility = useTracePreferenceStore((state) => state.toggleVisibility);
+  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
+  const toggleTraceFocus = useTracePreferenceStore((state) => state.toggleFocusOnly);
+  const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
+  const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
+  const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -254,9 +329,12 @@ export const App = () => {
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
   const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
+  const [traceBusy, setTraceBusy] = useState<boolean>(false); ///< トレース操作中フラグ。
+  const [isTraceFilterOpen, setTraceFilterOpen] = useState<boolean>(false);
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
+  const isRelationFilterDirty = useMemo(() => Object.values(enabledRelationKinds).some((value) => !value), [enabledRelationKinds]);
 
   const fallbackLeafId = useMemo(() => findFirstLeafId(splitRoot), [splitRoot]);
   const effectiveLeafId = activeLeafId ?? fallbackLeafId;
@@ -353,6 +431,26 @@ export const App = () => {
     return cards.find((card) => card.id === firstSelectedId) ?? null;
   }, [cards, selectedCardIds]);
 
+  useEffect(() => {
+    if (!isTraceFilterOpen) {
+      return;
+    }
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        traceFilterPopoverRef.current?.contains(target) ||
+        traceFilterButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setTraceFilterOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [isTraceFilterOpen]);
+
   /**
    * @brief ログエントリを追加する。
    * @param entry 追加するログ。
@@ -365,6 +463,149 @@ export const App = () => {
       });
     }
   }, []);
+
+  const handleTraceMutation = useCallback(
+    async (operation: { type: 'create'; direction: TraceDirection } | { type: 'delete' }) => {
+      if (traceBusy) {
+        notify('warning', '別のトレース操作を実行中です。完了をお待ちください。');
+        return;
+      }
+
+      const context = findVerticalPairForLeaf(splitRoot, activeLeafId ?? null);
+      if (!context) {
+        notify('warning', '左右に並んだカードパネルが必要です。');
+        return;
+      }
+
+      const workspaceState = useWorkspaceStore.getState();
+      const leftSelections = gatherSelectionsForLeafs(workspaceState, context.leftLeafIds);
+      const rightSelections = gatherSelectionsForLeafs(workspaceState, context.rightLeafIds);
+
+      if (leftSelections.length !== 1 || rightSelections.length !== 1) {
+        notify('warning', '左右それぞれのパネルでカードを選択してください。');
+        return;
+      }
+
+      const leftSelection = leftSelections[0];
+      const rightSelection = rightSelections[0];
+
+      if (!leftSelection.fileName || !rightSelection.fileName) {
+        notify('warning', '左右のパネルで有効なカードファイルを開いてください。');
+        return;
+      }
+
+      if (leftSelection.fileName === rightSelection.fileName) {
+        notify('warning', '同じファイル同士ではトレースを作成できません。');
+        return;
+      }
+
+      setTraceBusy(true);
+      try {
+        const traceState = useTraceStore.getState();
+        const beforeEntry = await traceState.loadTraceForPair(leftSelection.fileName, rightSelection.fileName);
+        const prevLeftSet = relationCardSet(beforeEntry.relations, 'left');
+        const prevRightSet = relationCardSet(beforeEntry.relations, 'right');
+
+        let nextRelations = beforeEntry.relations.map((relation) => ({
+          ...relation,
+          left_ids: [...relation.left_ids],
+          right_ids: [...relation.right_ids],
+        }));
+        let deltaCount = 0;
+
+        if (operation.type === 'create') {
+          const existingPairs = new Set(beforeEntry.links.map((link) => `${link.sourceCardId}:::${link.targetCardId}`));
+          leftSelection.cardIds.forEach((sourceId) => {
+            rightSelection.cardIds.forEach((targetId) => {
+              const pairKey = `${sourceId}:::${targetId}`;
+              if (existingPairs.has(pairKey)) {
+                return;
+              }
+              nextRelations.push({
+                id: nanoid(),
+                left_ids: [sourceId],
+                right_ids: [targetId],
+                type: 'trace',
+                directed: toDirectedValue(operation.direction),
+              });
+              existingPairs.add(pairKey);
+              deltaCount += 1;
+            });
+          });
+
+          if (deltaCount === 0) {
+            notify('info', '追加できるコネクタがありません。');
+            return;
+          }
+        } else {
+          const leftTargets = new Set(leftSelection.cardIds);
+          const rightTargets = new Set(rightSelection.cardIds);
+          nextRelations = nextRelations.filter((relation) => {
+            const shouldRemove =
+              relation.left_ids.some((id) => leftTargets.has(id)) &&
+              relation.right_ids.some((id) => rightTargets.has(id));
+            if (shouldRemove) {
+              deltaCount += relation.left_ids.length * relation.right_ids.length;
+            }
+            return !shouldRemove;
+          });
+
+          if (deltaCount === 0) {
+            notify('info', '削除対象のコネクタがありません。');
+            return;
+          }
+        }
+
+        const updatedEntry = await traceState.saveRelationsForPair({
+          leftFile: leftSelection.fileName,
+          rightFile: rightSelection.fileName,
+          relations: nextRelations,
+        });
+
+        const nextLeftSet = relationCardSet(updatedEntry.relations, 'left');
+        const nextRightSet = relationCardSet(updatedEntry.relations, 'right');
+        const workspaceActions = useWorkspaceStore.getState();
+        const leftUpdates = buildTraceFlagUpdates(prevLeftSet, nextLeftSet, 'hasRightTrace');
+        const rightUpdates = buildTraceFlagUpdates(prevRightSet, nextRightSet, 'hasLeftTrace');
+
+        if (Object.keys(leftUpdates).length > 0) {
+          workspaceActions.setCardTraceFlags(leftSelection.fileName, leftUpdates);
+        }
+        if (Object.keys(rightUpdates).length > 0) {
+          workspaceActions.setCardTraceFlags(rightSelection.fileName, rightUpdates);
+        }
+
+        const message =
+          operation.type === 'create'
+            ? `${deltaCount}件のコネクタを作成しました。`
+            : `${deltaCount}件のコネクタを削除しました。`;
+        notify('success', message);
+        pushLog({
+          id: `trace-${operation.type}-${Date.now()}`,
+          level: 'INFO',
+          message: `[Trace] ${leftSelection.fileName} ⇔ ${rightSelection.fileName}: ${message}`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error('[renderer] trace operation failed', error);
+        notify('error', 'トレース操作に失敗しました。詳細はコンソールを確認してください。');
+      } finally {
+        setTraceBusy(false);
+      }
+    },
+    [activeLeafId, notify, pushLog, splitRoot, traceBusy],
+  );
+
+  const handleTraceCreate = useCallback(
+    (direction: TraceDirection) => {
+      void handleTraceMutation({ type: 'create', direction });
+    },
+    [handleTraceMutation],
+  );
+
+  const handleTraceDelete = useCallback(() => {
+    void handleTraceMutation({ type: 'delete' });
+  }, [handleTraceMutation]);
 
   const handleSettingsChange = useCallback((next: AppSettings) => {
     setSettingsModalState((prev) => ({
@@ -1666,7 +1907,7 @@ export const App = () => {
       </header>
 
       <section className="top-toolbar" aria-label="グローバルツールバー">
-        <div className="toolbar-group">
+        <div className="toolbar-group toolbar-group--trace">
           <button
             type="button"
             className="toolbar-button"
@@ -1703,8 +1944,96 @@ export const App = () => {
           </button>
         </div>
         <div className="toolbar-group">
-          <button type="button" className="toolbar-button" title="トレーサ表示切替" aria-label="トレーサ表示切替">⛓️</button>
-          <button type="button" className="toolbar-button" title="トレースタイプフィルタ" aria-label="トレースタイプフィルタ">🧬</button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleTraceCreate('forward')}
+            disabled={traceBusy}
+            aria-disabled={traceBusy}
+            title="トレース👉作成"
+            aria-label="トレース👉作成"
+          >
+            ➡️
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleTraceCreate('backward')}
+            disabled={traceBusy}
+            aria-disabled={traceBusy}
+            title="トレース👈作成"
+            aria-label="トレース👈作成"
+          >
+            ⬅️
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleTraceCreate('bidirectional')}
+            disabled={traceBusy}
+            aria-disabled={traceBusy}
+            title="トレース⇔作成"
+            aria-label="トレース⇔作成"
+          >
+            ↔️
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={handleTraceDelete}
+            disabled={traceBusy}
+            aria-disabled={traceBusy}
+            title="トレース削除"
+            aria-label="トレース削除"
+          >
+            💔
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${isTraceVisible ? ' toolbar-button--active' : ''}`}
+            onClick={toggleTraceVisibility}
+            title="トレーサ表示切替"
+            aria-label="トレーサ表示切替"
+          >
+            ⛓️
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${focusSelectionOnly ? ' toolbar-button--active' : ''}`}
+            onClick={toggleTraceFocus}
+            title="選択中カードのみ表示"
+            aria-label="選択中カードのみ表示"
+          >
+            🧐
+          </button>
+          <button
+            type="button"
+            ref={traceFilterButtonRef}
+            className={`toolbar-button${isRelationFilterDirty || isTraceFilterOpen ? ' toolbar-button--active' : ''}`}
+            onClick={() => setTraceFilterOpen((prev) => !prev)}
+            title="トレースタイプフィルタ"
+            aria-label="トレースタイプフィルタ"
+          >
+            🧬
+          </button>
+          {isTraceFilterOpen ? (
+            <div ref={traceFilterPopoverRef} className="trace-filter-popover">
+              {TRACE_RELATION_KINDS.map((kind) => (
+                <label key={kind} className="trace-filter-popover__item">
+                  <input
+                    type="checkbox"
+                    checked={enabledRelationKinds[kind]}
+                    onChange={() => toggleRelationKindPreference(kind)}
+                  />
+                  <span>{kind}</span>
+                </label>
+              ))}
+              <div className="trace-filter-popover__actions">
+                <button type="button" onClick={() => setAllRelationKinds(true)}>全選択</button>
+                <button type="button" onClick={() => setAllRelationKinds(false)}>全解除</button>
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
             className="toolbar-button"

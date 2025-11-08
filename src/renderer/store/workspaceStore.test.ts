@@ -682,4 +682,33 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(state.tabs[tabId]).toBeUndefined();
     expect(state.fileToLeaf['alpha.json']).toBeUndefined();
   });
+
+  it('sets card trace flags without pushing undo entries', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().setCardTraceFlags('alpha.json', {
+        'card-001': { hasRightTrace: true },
+      });
+    });
+
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs[tabId]?.cards[0]?.hasRightTrace).toBe(true);
+    expect(state.undoStack).toHaveLength(0);
+
+    act(() => {
+      useWorkspaceStore.getState().setCardTraceFlags('alpha.json', {
+        'card-001': { hasRightTrace: false },
+      });
+    });
+
+    expect(useWorkspaceStore.getState().tabs[tabId]?.cards[0]?.hasRightTrace).toBe(false);
+  });
 });

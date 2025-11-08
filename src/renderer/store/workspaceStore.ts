@@ -149,6 +149,7 @@ export interface WorkspaceStore {
   pasteClipboard: (leafId: string, tabId: string, options?: { position?: InsertPosition; anchorCardId?: string | null }) => { inserted: number; insertedIds: string[]; anchorId: string | null; position: InsertPosition } | null; ///< クリップボードのカードを貼り付け
   hasClipboard: () => boolean; ///< クリップボードにカードがあるか
   renameTabFile: (tabId: string, fileName: string) => void; ///< タブに紐づくファイル名を変更
+  setCardTraceFlags: (fileName: string, updates: Record<string, Partial<Pick<Card, 'hasLeftTrace' | 'hasRightTrace'>>>) => void; ///< トレースフラグを更新
   undo: () => boolean; ///< Undo実行（成功時true）
   redo: () => boolean; ///< Redo実行（成功時true）
   canUndo: () => boolean; ///< Undo可能か判定
@@ -812,6 +813,59 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         undoStack: trimmedUndoStack,
         redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
       };
+    });
+  },
+
+  setCardTraceFlags: (fileName, updates) => {
+    if (!fileName || Object.keys(updates).length === 0) {
+      return;
+    }
+    set((state) => {
+      const leafId = state.fileToLeaf[fileName];
+      if (!leafId) {
+        return state;
+      }
+      const leaf = state.leafs[leafId];
+      if (!leaf) {
+        return state;
+      }
+      const tabId = leaf.tabIds.find((id) => state.tabs[id]?.fileName === fileName) ?? leaf.activeTabId;
+      if (!tabId) {
+        return state;
+      }
+      const tab = state.tabs[tabId];
+      if (!tab) {
+        return state;
+      }
+
+      let changed = false;
+      const nextCards = tab.cards.map((card) => {
+        const patch = updates[card.id];
+        if (!patch) {
+          return card;
+        }
+        const nextCard = {
+          ...card,
+          hasLeftTrace: patch.hasLeftTrace ?? card.hasLeftTrace,
+          hasRightTrace: patch.hasRightTrace ?? card.hasRightTrace,
+        } satisfies Card;
+        if (nextCard.hasLeftTrace !== card.hasLeftTrace || nextCard.hasRightTrace !== card.hasRightTrace) {
+          changed = true;
+        }
+        return nextCard;
+      });
+
+      if (!changed) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, cards: nextCards, isDirty: true },
+        },
+      } satisfies Pick<WorkspaceStore, 'tabs'>;
     });
   },
 

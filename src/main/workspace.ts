@@ -13,6 +13,7 @@
 import { app } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 import {
   type AppSettings,
@@ -26,11 +27,16 @@ import {
   type WorkspaceSnapshot,
 } from '../shared/workspace';
 import {
+  TRACEABILITY_FILE_SCHEMA_VERSION,
   isTraceabilityFile,
-  normalizeDirection,
+  isTraceabilityHeader,
+  isTraceabilityRelation,
   type LoadedTraceabilityFile,
   type TraceabilityFile,
-  type TraceabilityLink,
+  type TraceabilityHeader,
+  type TraceabilityRelation,
+  type TraceFileSaveRequest,
+  type TraceFileSaveResult,
 } from '../shared/traceability';
 
 export interface WorkspacePaths {
@@ -534,6 +540,79 @@ const isSafeFileToken = (token: string): boolean => {
   return !token.includes('/') && !token.includes('\\') && !token.includes('..');
 };
 
+const sanitizeTraceToken = (token: string): string => token.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+const deriveTraceFileName = (leftFile: string, rightFile: string): string => {
+  const leftBase = sanitizeTraceToken(leftFile.replace(/\.json$/i, ''));
+  const rightBase = sanitizeTraceToken(rightFile.replace(/\.json$/i, ''));
+  return `trace_${leftBase}__${rightBase}.json`;
+};
+
+const resolveTraceFileName = (candidate: string | null | undefined, leftFile: string, rightFile: string): string => {
+  if (candidate && !candidate.includes('/') && !candidate.includes('\\') && !candidate.includes('..')) {
+    const base = sanitizeTraceToken(candidate.replace(/\.json$/i, ''));
+    if (base.length > 0) {
+      return `${base}.json`;
+    }
+  }
+  return deriveTraceFileName(leftFile, rightFile);
+};
+
+const hydrateTraceHeader = (
+  fileName: string,
+  leftFile: string,
+  rightFile: string,
+  existing: TraceabilityHeader | undefined,
+  paths: WorkspacePaths,
+): TraceabilityHeader => {
+  if (existing && isTraceabilityHeader(existing)) {
+    return {
+      ...existing,
+      fileName: existing.fileName ?? fileName,
+      leftFilePath: existing.leftFilePath ?? path.resolve(paths.outputDir, leftFile),
+      rightFilePath: existing.rightFilePath ?? path.resolve(paths.outputDir, rightFile),
+    } satisfies TraceabilityHeader;
+  }
+
+  const timestamp = new Date().toISOString();
+  return {
+    id: randomUUID(),
+    fileName,
+    leftFilePath: path.resolve(paths.outputDir, leftFile),
+    rightFilePath: path.resolve(paths.outputDir, rightFile),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  } satisfies TraceabilityHeader;
+};
+
+const composeTraceHeaderForSave = (
+  fileName: string,
+  leftFile: string,
+  rightFile: string,
+  existing: TraceabilityHeader | undefined,
+  paths: WorkspacePaths,
+): TraceabilityHeader => {
+  const timestamp = new Date().toISOString();
+  if (existing && isTraceabilityHeader(existing)) {
+    return {
+      ...existing,
+      fileName: existing.fileName ?? fileName,
+      leftFilePath: existing.leftFilePath ?? path.resolve(paths.outputDir, leftFile),
+      rightFilePath: existing.rightFilePath ?? path.resolve(paths.outputDir, rightFile),
+      updatedAt: timestamp,
+    } satisfies TraceabilityHeader;
+  }
+
+  return {
+    id: randomUUID(),
+    fileName,
+    leftFilePath: path.resolve(paths.outputDir, leftFile),
+    rightFilePath: path.resolve(paths.outputDir, rightFile),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  } satisfies TraceabilityHeader;
+};
+
 /**
  * @brief 指定されたカードファイルペアに対応するトレーサビリティファイルを読み込む。
  * @param leftFile 左側カードファイル名。
@@ -578,9 +657,21 @@ export const loadTraceFile = async (
         continue;
       }
 
+      const normalizedHeader = hydrateTraceHeader(
+        candidate,
+        parsed.left_file,
+        parsed.right_file,
+        parsed.header,
+        paths,
+      );
+      const normalized: TraceabilityFile = {
+        ...parsed,
+        header: normalizedHeader,
+      } satisfies TraceabilityFile;
+
       return {
         fileName: candidate,
-        payload: parsed,
+        payload: normalized,
       } satisfies LoadedTraceabilityFile;
     } catch (error) {
       console.error('[workspace] failed to load trace file:', candidate, error);
@@ -588,4 +679,43 @@ export const loadTraceFile = async (
   }
 
   return null;
+};
+
+export const saveTraceFile = async (
+  request: TraceFileSaveRequest,
+): Promise<TraceFileSaveResult> => {
+  const { leftFile, rightFile } = request;
+  if (!isSafeFileToken(leftFile) || !isSafeFileToken(rightFile)) {
+    throw new Error('invalid trace file token');
+  }
+
+  if (Array.isArray(request.relations)) {
+    const invalidRelation = request.relations.find((relation) => !isTraceabilityRelation(relation));
+    if (invalidRelation) {
+      throw new Error('invalid trace relation payload');
+    }
+  }
+
+  const paths = resolveWorkspacePaths();
+  await ensureDirectory(paths.outputDir);
+
+  const fileName = resolveTraceFileName(request.fileName ?? null, leftFile, rightFile);
+  const header = composeTraceHeaderForSave(fileName, leftFile, rightFile, request.header, paths);
+  const payload: TraceabilityFile = {
+    schemaVersion: TRACEABILITY_FILE_SCHEMA_VERSION,
+    header,
+    left_file: leftFile,
+    right_file: rightFile,
+    relations: request.relations ?? [],
+  } satisfies TraceabilityFile;
+
+  const filePath = path.join(paths.outputDir, fileName);
+  await fs.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+
+  return {
+    fileName,
+    savedPath: filePath,
+    savedAt: header.updatedAt,
+    header,
+  } satisfies TraceFileSaveResult;
 };

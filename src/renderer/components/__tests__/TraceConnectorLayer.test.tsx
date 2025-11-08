@@ -1,6 +1,7 @@
 import { render, waitFor } from '@testing-library/react';
 import { TraceConnectorLayer } from '../TraceConnectorLayer';
 import { resetConnectorLayoutStore, useConnectorLayoutStore } from '../../store/connectorLayoutStore';
+import { resetTracePreferenceStore } from '../../store/tracePreferenceStore';
 
 class ResizeObserverStub {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +27,7 @@ describe('TraceConnectorLayer', () => {
 
   beforeEach(() => {
     resetConnectorLayoutStore();
+    resetTracePreferenceStore();
   });
 
   it('renders connector paths when anchors exist on both sides', async () => {
