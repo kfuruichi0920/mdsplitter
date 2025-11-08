@@ -55,7 +55,9 @@ const SplitTree = ({
   if (node.type === 'leaf') {
     return (
       <div className="split-leaf" data-leaf-id={node.id} data-testid={`split-leaf-${node.id}`}>
-        {renderLeaf(node.id, { isActive: node.id === activeLeafId })}
+        <div className="split-leaf__viewport">
+          {renderLeaf(node.id, { isActive: node.id === activeLeafId })}
+        </div>
       </div>
     );
   }

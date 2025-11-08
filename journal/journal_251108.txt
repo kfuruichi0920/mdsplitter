@@ -743,3 +743,21 @@ loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
 - 本番ビルド: ✅ 成功
 - _out ファイルのダブルクリック読み込み: ✅ 完了
 - trace ファイルの _out からの読み込み: ✅ 完了
+
+### カード一覧スクロール挙動の再検証 (2025-11-08)
+- 追加調査で、`panels__body` (`src/renderer/styles.css:188-196`) が `display: block` のままなため、直下の `SplitContainer` が自らの高さを確定できず、カード枚数に応じて親が伸びてしまうことを確認。結果として `.panel-cards` の `overflow-y-auto` が効かず、ツールバーごと押し出されていた。
+- `panels__body` をフレックスコンテナ化 (`@apply flex flex-1 min-h-0 overflow-hidden`) し、分割ノード (`split-leaf`/`split-container`) を `flex` アイテムとして 100% 高さで拘束。さらに `split-node` (`src/renderer/styles.css:213-217`) の `h-full` を明示して、タブバー＋ツールバー＋カード一覧の縦フレックスが常にビューポート内で完結するようにした。
+- これにより、カード枚数が多くてもカード一覧領域のみが独立スクロールし、タブバー／ツールバー／ログ領域は設計書 `doc/user_interface_design.md:70-112` に記載の固定表示仕様どおりに保たれる。
+
+### カード一覧スクロール領域の再設計 (2025-11-08)
+- 問題分析: ドキュメント指摘どおりカード一覧が独立スクロールになっておらず、画面全体がスクロールしていた。DOM階層を調査したところ、`workspace` -> `workspace__content` -> `panels` -> `SplitContainer` -> `split-node` の各レイヤーが `min-height: 0` や `overflow-hidden` を持たず、子要素の高さに引きずられて親コンテナ全体が伸長していることが原因と判明。単に `panel-cards` に CSS を当てるだけでは親要素が高さ制約を持たないため効果がなかった。
+- 対策: レイアウトを根本から見直し、以下を実施。
+  1. `workspace` / `workspace__content` / `panels` をすべて `overflow-hidden` + `h-full` + `flex` 化し、グリッド行の高さを固定したまま内部スクロールを許容。
+  2. `panels__body` ラッパーを新設して `SplitContainer` 全体に `min-h-0`/`overflow-hidden` を適用し、カードパネル領域が常に自分のグリッドセル内に収まるようにした。
+  3. `SplitContainer` 側では既存の `split-node`/`split-container` の `flex-1` 設定と組み合わせることで、各 `CardPanel` の `panel-cards` に設定済みの `overflow-y-auto` が正しく機能するようになった。
+- これにより大量カードでもカード一覧だけに垂直スクロールが表示され、ツールバーやログエリアは固定表示のままとなる。
+
+### ビューポート固定と split-leaf 再調整 (2025-11-08 PM)
+- 追加で `body` が `overflow: auto` のままだと `app-shell` が `min-h-screen` によって無制限に伸び、カード枚数が増えるとウィンドウ全体がスクロールしてしまうことを確認。`body` に `overflow-hidden` を設定し、`app-shell` を `h-screen min-h-0`、`workspace` を `h-full` に変更してビューポート内に完全拘束するよう調整。
+- `SplitContainer` の葉ノードに `split-leaf__viewport` を追加し、`CardPanel` には `flex-1 h-full` を適用することで、タブバー/ツールバー/カード一覧の縦フレックス構造が常に葉ノード内に収まり、`panel-cards` の `overflow-y-auto` だけがスクロールを担うようになった。
+- これにより動作ログ領域が再び伸びることなく、分割ノードごとのスクロールバーではなくカード一覧エリア単体にスクロールバーが表示され、ユーザ要求どおりの挙動を再現できた。

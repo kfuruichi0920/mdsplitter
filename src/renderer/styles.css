@@ -26,7 +26,7 @@
   }
 
   body {
-    @apply h-full bg-slate-50 text-sm text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    @apply h-full overflow-hidden bg-slate-50 text-sm text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
   }
 
   #root {
@@ -41,7 +41,7 @@
 
 @layer components {
   .app-shell {
-    @apply grid min-h-screen grid-rows-[28px_36px_minmax(0,1fr)_22px] bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    @apply grid h-screen min-h-0 grid-rows-[28px_36px_minmax(0,1fr)_22px] bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
   }
 
   .menu-bar {
@@ -85,7 +85,7 @@
   }
 
   .workspace {
-    @apply grid min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
+    @apply grid h-full min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
   }
 
   .workspace__content {
@@ -188,7 +188,7 @@
   }
 
   .panels__body {
-    @apply flex-1 min-h-0 overflow-hidden;
+    @apply flex flex-1 min-h-0 overflow-hidden;
   }
 
   .split-grid {
@@ -213,7 +213,7 @@
   }
 
   .split-node {
-    @apply flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900/90;
+    @apply flex flex-1 h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900/90;
   }
 
   .split-node--active {
@@ -639,6 +639,10 @@
 
   .split-leaf {
     @apply flex-1 h-full w-full min-h-0 min-w-0 overflow-hidden;
+  }
+
+  .split-leaf__viewport {
+    @apply flex flex-1 h-full w-full min-h-0 min-w-0 overflow-hidden;
   }
 
   .splitter {
