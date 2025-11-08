@@ -3,7 +3,7 @@ import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connecto
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
 import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from '../store/traceStore';
-import { useTracePreferenceStore } from '../store/tracePreferenceStore';
+import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import type { TraceabilityLink } from '@/shared/traceability';
 
 interface TraceConnectorLayerProps {
@@ -241,7 +241,15 @@ export const TraceConnectorLayer = ({
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
-  const isCardVisible = useTracePreferenceStore((state) => state.isCardVisible);
+  const cardVisibilityMap = useTracePreferenceStore((state) => state.mutedCards, shallow);
+
+  const isCardSideVisible = useCallback(
+    (fileName: string, cardId: string, side: TraceConnectorSide) => {
+      const key = makeCardKey(fileName, cardId, side);
+      return cardVisibilityMap[key] !== false;
+    },
+    [cardVisibilityMap],
+  );
 
   const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
   const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
@@ -274,15 +282,15 @@ export const TraceConnectorLayer = ({
       if (!isFileVisible(link.sourceFileName) || !isFileVisible(link.targetFileName)) {
         return false;
       }
-      if (!isCardVisible(link.sourceFileName, link.sourceCardId, 'right')) {
+      if (!isCardSideVisible(link.sourceFileName, link.sourceCardId, 'right')) {
         return false;
       }
-      if (!isCardVisible(link.targetFileName, link.targetCardId, 'left')) {
+      if (!isCardSideVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
       return true;
     });
-  }, [enabledRelationKinds, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, isCardSideVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

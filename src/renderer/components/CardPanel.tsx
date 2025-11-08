@@ -17,7 +17,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
 import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
-import { useTracePreferenceStore, type TraceConnectorSide } from '../store/tracePreferenceStore';
+import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
 
@@ -128,6 +128,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const hasClipboardItems = Boolean(clipboardData && clipboardData.length > 0);
   const panelFocusState = usePanelEngagementStore((state) => state.states[leafId] ?? (isActive ? 'active' : 'inactive'));
   const panelSelectionTransition = usePanelEngagementStore((state) => state.handleSelectionTransition);
+  const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
 
   const activeTab = useMemo<PanelTabState | null>(() => {
     if (!activeTabId) {
@@ -138,10 +139,23 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
   const activeFileIdentifier = activeTab ? activeTab.fileName ?? `unsaved-${activeTab.id}` : '';
   const activeFileName = activeTab?.fileName ?? null;
+  const openFileNames = useMemo(() => {
+    const names = new Set<string>();
+    Object.values(tabsSnapshot).forEach((tab) => {
+      if (tab?.fileName) {
+        names.add(tab.fileName);
+      }
+    });
+    return names;
+  }, [tabsSnapshot]);
+
   const traceCounts = useTraceStore(
     useCallback(
-      (state) => (activeFileName ? aggregateCountsForFile(state.cache, activeFileName) : { left: {}, right: {} }),
-      [activeFileName],
+      (state) =>
+        activeFileName
+          ? aggregateCountsForFile(state.cache, activeFileName, { restrictToFiles: openFileNames })
+          : { left: {}, right: {} },
+      [activeFileName, openFileNames],
     ),
     shallow,
   );
@@ -179,10 +193,20 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   );
   const toggleFileTraceVisibility = useTracePreferenceStore((state) => state.toggleFileVisibility);
   const toggleCardTraceVisibility = useTracePreferenceStore((state) => state.toggleCardVisibility);
-  const isCardTraceVisible = useTracePreferenceStore((state) => state.isCardVisible);
+  const cardVisibilityMap = useTracePreferenceStore((state) => state.mutedCards, shallow);
   const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
 
-  const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
+  const getCardSideVisibility = useCallback(
+    (cardId: string, side: TraceConnectorSide) => {
+      if (!activeFileName) {
+        return true;
+      }
+      const key = makeCardKey(activeFileName, cardId, side);
+      return cardVisibilityMap[key] !== false;
+    },
+    [activeFileName, cardVisibilityMap],
+  );
+
   const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
   const globalSelections = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -909,8 +933,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             traceHighlightIds={traceHighlightIds ?? undefined}
             leftTraceCount={activeFileName ? leftTraceCounts[card.id] ?? 0 : 0}
             rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
-            leftConnectorVisible={!activeFileName ? true : isCardTraceVisible(activeFileName, card.id, 'left')}
-            rightConnectorVisible={!activeFileName ? true : isCardTraceVisible(activeFileName, card.id, 'right')}
+            leftConnectorVisible={getCardSideVisibility(card.id, 'left')}
+            rightConnectorVisible={getCardSideVisibility(card.id, 'right')}
             onToggleLeftConnector={
               activeFileName && (leftTraceCounts[card.id] ?? 0) > 0
                 ? () => toggleCardTraceVisibility(activeFileName, card.id, 'left')

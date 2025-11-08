@@ -140,6 +140,19 @@ const mergeCounts = (target: Record<string, number>, source: Record<string, numb
   });
 };
 
+const shouldIncludeCounterpart = (
+  allowed: ReadonlySet<string> | undefined,
+  counterpart?: string,
+): boolean => {
+  if (!allowed || allowed.size === 0) {
+    return true;
+  }
+  if (!counterpart) {
+    return false;
+  }
+  return allowed.has(counterpart);
+};
+
 const buildAdjacency = (cache: Record<string, TraceCacheEntry>): Map<string, Set<string>> => {
   const adjacency = new Map<string, Set<string>>();
   const addEdge = (a: string, b: string) => {
@@ -195,9 +208,14 @@ const collectRelatedNodeKeys = (cache: Record<string, TraceCacheEntry>, seeds: T
   return visited;
 };
 
+export interface AggregateCountsOptions {
+  restrictToFiles?: ReadonlySet<string>;
+}
+
 export const aggregateCountsForFile = (
   cache: Record<string, TraceCacheEntry>,
   fileName: string,
+  options?: AggregateCountsOptions,
 ): { left: Record<string, number>; right: Record<string, number> } => {
   const aggregated = { left: {} as Record<string, number>, right: {} as Record<string, number> };
   if (!fileName) {
@@ -205,10 +223,10 @@ export const aggregateCountsForFile = (
   }
 
   Object.values(cache).forEach((entry) => {
-    if (entry.leftFile === fileName) {
+    if (entry.leftFile === fileName && shouldIncludeCounterpart(options?.restrictToFiles, entry.rightFile)) {
       mergeCounts(aggregated.right, entry.counts.left);
     }
-    if (entry.rightFile === fileName) {
+    if (entry.rightFile === fileName && shouldIncludeCounterpart(options?.restrictToFiles, entry.leftFile)) {
       mergeCounts(aggregated.left, entry.counts.right);
     }
   });
