@@ -230,23 +230,19 @@ export const TraceConnectorLayer = ({
   );
 
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
-  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
   const isCardVisible = useTracePreferenceStore((state) => state.isCardVisible);
 
   const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
   const highlightedNodeKeys = useMemo(() => {
-    const keys = new Set<string>();
-    selectionSeeds.forEach((seed) => {
-      keys.add(toTraceNodeKey(seed.fileName, seed.cardId));
-    });
-    if (focusSelectionOnly && selectionSeeds.length > 0) {
-      const related = useTraceStore.getState().getRelatedNodeKeys(selectionSeeds);
-      related.forEach((key) => keys.add(key));
+    if (selectionSeeds.length === 0) {
+      return new Set<string>();
     }
-    return keys;
-  }, [focusSelectionOnly, selectionSeeds, traceCacheSnapshot]);
+    const related = useTraceStore.getState().getRelatedNodeKeys(selectionSeeds);
+    selectionSeeds.forEach((seed) => related.add(toTraceNodeKey(seed.fileName, seed.cardId)));
+    return related;
+  }, [selectionSeeds, traceCacheSnapshot]);
 
   const filteredLinks = useMemo(() => {
     if (!isTraceVisible) {
@@ -265,14 +261,9 @@ export const TraceConnectorLayer = ({
       if (!isCardVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
-      if (focusSelectionOnly) {
-        const sourceKey = toTraceNodeKey(link.sourceFileName, link.sourceCardId);
-        const targetKey = toTraceNodeKey(link.targetFileName, link.targetCardId);
-        return highlightedNodeKeys.has(sourceKey) || highlightedNodeKeys.has(targetKey);
-      }
       return true;
     });
-  }, [enabledRelationKinds, focusSelectionOnly, highlightedNodeKeys, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

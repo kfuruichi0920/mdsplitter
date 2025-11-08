@@ -200,13 +200,14 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   }, [globalSelections]);
 
   const traceHighlightIds = useMemo(() => {
-    if (!focusSelectionOnly || !activeFileName || selectionSeeds.length === 0) {
+    if (!activeFileName || selectionSeeds.length === 0) {
       return null;
     }
     const related = useTraceStore.getState().getRelatedCards(selectionSeeds);
-    const forFile = related[activeFileName];
-    return forFile ?? null;
-  }, [activeFileName, focusSelectionOnly, selectionSeeds, traceCacheSnapshot]);
+    const set = new Set<string>(related[activeFileName] ?? []);
+    globalSelections[activeFileName]?.forEach((cardId) => set.add(cardId));
+    return set.size > 0 ? set : null;
+  }, [activeFileName, globalSelections, selectionSeeds, traceCacheSnapshot]);
 
   const handlePanelTraceToggle = useCallback(() => {
     if (!activeFileName) {
@@ -250,8 +251,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       }
     });
 
+    if (focusSelectionOnly && traceHighlightIds && traceHighlightIds.size > 0) {
+      return result.filter((card) => traceHighlightIds.has(card.id));
+    }
+    if (focusSelectionOnly && (!traceHighlightIds || traceHighlightIds.size === 0)) {
+      return result.filter((card) => selectedCardIds.has(card.id));
+    }
+
     return result;
-  }, [cards, expandedCardIds]);
+  }, [cards, expandedCardIds, focusSelectionOnly, selectedCardIds, traceHighlightIds]);
 
   /**
    * @brief アクティブタブを変更する。

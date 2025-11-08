@@ -169,8 +169,13 @@ const collectRelatedNodeKeys = (cache: Record<string, TraceCacheEntry>, seeds: T
   const adjacency = buildAdjacency(cache);
   const visited = new Set<string>();
   const queue: string[] = [];
+  const seedMap = new Map<string, Set<string>>();
 
   seeds.forEach(({ fileName, cardId }) => {
+    if (!seedMap.has(fileName)) {
+      seedMap.set(fileName, new Set<string>());
+    }
+    seedMap.get(fileName)?.add(cardId);
     const key = toTraceNodeKey(fileName, cardId);
     if (!visited.has(key)) {
       visited.add(key);
@@ -192,7 +197,20 @@ const collectRelatedNodeKeys = (cache: Record<string, TraceCacheEntry>, seeds: T
     });
   }
 
-  return visited;
+  const filtered = new Set<string>();
+  visited.forEach((nodeKey) => {
+    const { fileName, cardId } = splitTraceNodeKey(nodeKey);
+    const seedsForFile = fileName ? seedMap.get(fileName) : undefined;
+    if (seedsForFile) {
+      if (seedsForFile.has(cardId)) {
+        filtered.add(nodeKey);
+      }
+    } else {
+      filtered.add(nodeKey);
+    }
+  });
+
+  return filtered;
 };
 
 export const aggregateCountsForFile = (
