@@ -326,6 +326,8 @@ export const App = () => {
   const setCreationRelationKind = useTracePreferenceStore((state) => state.setCreationRelationKind);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
+  const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
+  const toggleMarkdownPreviewGlobal = useUiStore((state) => state.toggleMarkdownPreviewGlobal);
   const notify = useNotificationStore((state) => state.add);
   const splitRoot = useSplitStore((state) => state.root);
   const splitLeaf = useSplitStore((state) => state.splitLeaf);
@@ -2046,6 +2048,15 @@ export const App = () => {
             aria-label="スクロール外カードのコネクタ表示"
           >
             🛰️
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${markdownPreviewGlobalEnabled ? ' toolbar-button--active' : ''}`}
+            onClick={toggleMarkdownPreviewGlobal}
+            title="Markdownプレビュー一括切替"
+            aria-label="Markdownプレビュー一括切替"
+          >
+            🅼
           </button>
           <button
             type="button"

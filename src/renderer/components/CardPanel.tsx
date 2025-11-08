@@ -20,6 +20,7 @@ import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/
 import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
+import { renderMarkdownToHtml } from '../utils/markdown';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -125,9 +126,11 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const updateCard = useWorkspaceStore((state) => state.updateCard);
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
   const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
+  const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
   const hasClipboardItems = Boolean(clipboardData && clipboardData.length > 0);
   const panelFocusState = usePanelEngagementStore((state) => state.states[leafId] ?? (isActive ? 'active' : 'inactive'));
   const panelSelectionTransition = usePanelEngagementStore((state) => state.handleSelectionTransition);
+  const toggleCardMarkdownPreview = useWorkspaceStore((state) => state.toggleCardMarkdownPreview);
   const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
 
   const activeTab = useMemo<PanelTabState | null>(() => {
@@ -253,6 +256,20 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     const cardIds = cards.map((card) => card.id);
     toggleFileTraceVisibility(activeFileName, cardIds);
   }, [activeFileName, cards, toggleFileTraceVisibility]);
+
+  const handleCardMarkdownToggle = useCallback(
+    (cardId: string) => {
+      if (!activeTabId) {
+        return;
+      }
+      const card = cards.find((c) => c.id === cardId);
+      toggleCardMarkdownPreview(leafId, activeTabId, cardId);
+      if (card) {
+        onLog?.('INFO', `カード「${card.title}」のMarkdownプレビューを${card.markdownPreviewEnabled ? 'OFF' : 'ON'}にしました。`);
+      }
+    },
+    [activeTabId, cards, leafId, onLog, toggleCardMarkdownPreview],
+  );
 
   /**
    * @brief 階層構造を考慮して表示すべきカードをフィルタリングする。
@@ -936,6 +953,9 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
             leftConnectorVisible={getCardSideVisibility(card.id, 'left')}
             rightConnectorVisible={getCardSideVisibility(card.id, 'right')}
+            markdownPreviewEnabled={card.markdownPreviewEnabled}
+            isMarkdownPreviewGlobalEnabled={markdownPreviewGlobalEnabled}
+            onToggleMarkdownPreview={() => handleCardMarkdownToggle(card.id)}
             onToggleLeftConnector={
               activeFileName && (leftTraceCounts[card.id] ?? 0) > 0
                 ? () => toggleCardTraceVisibility(activeFileName, card.id, 'left')
@@ -1089,6 +1109,7 @@ const EditableCard = ({ card, onSave, onCancel }: EditableCardProps) => {
         placeholder="カード本文"
         rows={5}
       />
+      <p className="card__markdown-hint">Markdown記法に対応しています（例: **強調**, `コード`, - リスト）。</p>
       <footer className="card__footer card__footer--editing">
         <button type="button" className="card__button card__button--save" onClick={handleSave} title="保存 (Ctrl+Enter)">
           ✓ 保存
@@ -1107,6 +1128,8 @@ interface CardListItemProps {
   isExpanded: boolean; ///< 展開状態（子を持つカードのみ有効）。
   hasChildren: boolean; ///< 子カードを持つかどうか。
   isEditing: boolean; ///< 編集モード中かどうか。
+  markdownPreviewEnabled: boolean;
+  isMarkdownPreviewGlobalEnabled: boolean;
   leafId: string;
   fileName: string; ///< カードが属するファイル識別子（ファイル名またはタブID）。
   panelFocusState: PanelVisualState;
@@ -1133,6 +1156,7 @@ interface CardListItemProps {
   rightConnectorVisible: boolean;
   onToggleLeftConnector?: () => void;
   onToggleRightConnector?: () => void;
+  onToggleMarkdownPreview: () => void;
 }
 
 const CardListItem = ({
@@ -1141,6 +1165,8 @@ const CardListItem = ({
   isExpanded,
   hasChildren,
   isEditing,
+  markdownPreviewEnabled,
+  isMarkdownPreviewGlobalEnabled,
   leafId,
   fileName,
   panelFocusState,
@@ -1167,6 +1193,7 @@ const CardListItem = ({
   rightConnectorVisible,
   onToggleLeftConnector,
   onToggleRightConnector,
+  onToggleMarkdownPreview,
 }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
 
@@ -1209,6 +1236,23 @@ const CardListItem = ({
 
   const leftConnectorNode = renderConnector('left', card.hasLeftTrace, leftTraceCount, leftConnectorVisible, onToggleLeftConnector);
   const rightConnectorNode = renderConnector('right', card.hasRightTrace, rightTraceCount, rightConnectorVisible, onToggleRightConnector);
+  const shouldRenderMarkdown = markdownPreviewEnabled && isMarkdownPreviewGlobalEnabled;
+  const markdownHtml = useMemo(() => (shouldRenderMarkdown ? renderMarkdownToHtml(card.body) : null), [card.body, shouldRenderMarkdown]);
+
+  const markdownButton = (
+    <button
+      type="button"
+      className={`card__markdown-button${markdownPreviewEnabled ? ' card__markdown-button--active' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggleMarkdownPreview();
+      }}
+      aria-pressed={markdownPreviewEnabled}
+      title="Markdownプレビュー切替"
+    >
+      MD
+    </button>
+  );
 
   //! 編集モードの場合はEditableCardを表示
   if (isEditing) {
@@ -1305,6 +1349,7 @@ const CardListItem = ({
           <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
           <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
           <span className="card__title card__title--truncate">{card.title}</span>
+          {markdownButton}
           {rightConnectorNode}
         </>
       )
@@ -1316,9 +1361,14 @@ const CardListItem = ({
             <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
             <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
             <span className="card__title">{card.title}</span>
+            {markdownButton}
             {rightConnectorNode}
           </header>
-          <p className="card__body">{card.body}</p>
+          {shouldRenderMarkdown ? (
+            <div className="card__body card__body--markdown" dangerouslySetInnerHTML={{ __html: markdownHtml ?? '' }} />
+          ) : (
+            <p className="card__body">{card.body}</p>
+          )}
           <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
         </>
       );

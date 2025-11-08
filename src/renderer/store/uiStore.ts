@@ -31,10 +31,12 @@ export type CardDisplayMode = 'detailed' | 'compact';
 export interface UiStoreState {
   theme: ThemeMode; ///< 現在のテーマモード。
   cardDisplayMode: CardDisplayMode; ///< カード表示モード（詳細/コンパクト）。
+  markdownPreviewGlobalEnabled: boolean; ///< Markdownプレビューを一括で許可するか。
   toggleTheme: () => void; ///< テーマをトグルする。
   setTheme: (mode: ThemeMode) => void; ///< テーマを明示的に設定する。
   toggleCardDisplayMode: () => void; ///< カード表示モードをトグルする。
   setCardDisplayMode: (mode: CardDisplayMode) => void; ///< カード表示モードを明示的に設定する。
+  toggleMarkdownPreviewGlobal: () => void; ///< Markdownプレビューを一括で切り替える。
   reset: () => void; ///< テーマ状態を初期値に戻す。
 }
 
@@ -48,6 +50,7 @@ const DEFAULT_THEME: ThemeMode = 'dark';
  * @brief デフォルトカード表示モード。
  */
 const DEFAULT_CARD_DISPLAY_MODE: CardDisplayMode = 'detailed';
+const DEFAULT_MARKDOWN_PREVIEW_GLOBAL = true;
 
 /**
  * @brief UIストア本体。
@@ -57,6 +60,7 @@ const DEFAULT_CARD_DISPLAY_MODE: CardDisplayMode = 'detailed';
 export const useUiStore = create<UiStoreState>()((set) => ({
   theme: DEFAULT_THEME,
   cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE,
+  markdownPreviewGlobalEnabled: DEFAULT_MARKDOWN_PREVIEW_GLOBAL,
   /**
    * @brief テーマをトグルする。
    * @details
@@ -87,11 +91,14 @@ export const useUiStore = create<UiStoreState>()((set) => ({
   setCardDisplayMode: (mode: CardDisplayMode) => {
     set({ cardDisplayMode: mode });
   },
+  toggleMarkdownPreviewGlobal: () => {
+    set((state) => ({ markdownPreviewGlobalEnabled: !state.markdownPreviewGlobalEnabled }));
+  },
   /**
    * @brief テーマ状態を初期値にリセット。
    */
   reset: () => {
-    set({ theme: DEFAULT_THEME, cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE });
+    set({ theme: DEFAULT_THEME, cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE, markdownPreviewGlobalEnabled: DEFAULT_MARKDOWN_PREVIEW_GLOBAL });
   },
 }));
 

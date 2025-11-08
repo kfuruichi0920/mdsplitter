@@ -48,6 +48,7 @@ interface ClipboardCardData {
   kind: CardKind;
   hasLeftTrace: boolean;
   hasRightTrace: boolean;
+  markdownPreviewEnabled: boolean;
 }
 
 /**
@@ -143,6 +144,7 @@ export interface WorkspaceStore {
   toggleCardExpanded: (leafId: string, tabId: string, cardId: string) => void; ///< カードの展開/折畳をトグル
   expandAll: (leafId: string, tabId: string) => void; ///< 全カードを展開
   collapseAll: (leafId: string, tabId: string) => void; ///< 全カードを折畳
+  toggleCardMarkdownPreview: (leafId: string, tabId: string, cardId: string) => void; ///< MarkdownプレビューのON/OFF
   moveCards: (leafId: string, tabId: string, cardIds: string[], targetCardId: string, position: 'before' | 'after' | 'child') => boolean; ///< カード移動（階層構造を維持）
   setEditingCard: (leafId: string, tabId: string, cardId: string | null) => void; ///< 編集中カードを設定
   copySelection: (leafId: string, tabId: string) => number; ///< 選択カードをコピー
@@ -624,6 +626,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         kind: 'paragraph',
         hasLeftTrace: false,
         hasRightTrace: false,
+        markdownPreviewEnabled: true,
         updatedAt: new Date().toISOString(),
         parent_id: parentId,
         child_ids: [],
@@ -982,6 +985,38 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           [tabId]: { ...tab, expandedCardIds: nextExpandedIds },
         },
       };
+    });
+  },
+
+  toggleCardMarkdownPreview: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const cards = tab.cards.map((card) => {
+        if (card.id !== cardId) {
+          return card;
+        }
+        return {
+          ...card,
+          markdownPreviewEnabled: !card.markdownPreviewEnabled,
+          updatedAt: new Date().toISOString(),
+        } satisfies Card;
+      });
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards,
+            isDirty: true,
+          },
+        },
+      } satisfies Pick<WorkspaceStore, 'tabs'>;
     });
   },
 
@@ -1576,6 +1611,7 @@ function buildClipboardTree(cardId: string, cardMap: Map<string, Card>): Clipboa
       kind: card.kind,
       hasLeftTrace: card.hasLeftTrace,
       hasRightTrace: card.hasRightTrace,
+      markdownPreviewEnabled: card.markdownPreviewEnabled,
     },
     children: card.child_ids.map((childId) => buildClipboardTree(childId, cardMap)),
   } satisfies ClipboardCardNode;
@@ -1586,14 +1622,16 @@ function normalizeCardOrder(cards: Card[]): Card[] {
     return [];
   }
 
-  const cardMap = new Map<string, Card>(cards.map((card) => [card.id, card]));
+  const cardsWithDefaults = cards.map((card) => ensureCardDefaults(card));
+
+  const cardMap = new Map<string, Card>(cardsWithDefaults.map((card) => [card.id, card]));
   const indexMap = new Map<string, number>();
-  cards.forEach((card, index) => {
+  cardsWithDefaults.forEach((card, index) => {
     indexMap.set(card.id, index);
   });
 
   const childrenByParent = new Map<string, string[]>();
-  cards.forEach((card) => {
+  cardsWithDefaults.forEach((card) => {
     if (card.parent_id) {
       if (!childrenByParent.has(card.parent_id)) {
         childrenByParent.set(card.parent_id, []);
@@ -1619,7 +1657,7 @@ function normalizeCardOrder(cards: Card[]): Card[] {
       return;
     }
     visited.add(card.id);
-    const copy: Card = { ...card, level };
+    const copy: Card = { ...ensureCardDefaults(card), level };
     result.push(copy);
     levelMap.set(card.id, level);
     const children = getChildIds(card);
@@ -1658,6 +1696,7 @@ function materializeClipboardNode(node: ClipboardCardNode, parentId: string | nu
     kind: node.data.kind,
     hasLeftTrace: node.data.hasLeftTrace,
     hasRightTrace: node.data.hasRightTrace,
+    markdownPreviewEnabled: node.data.markdownPreviewEnabled,
     updatedAt: now,
     parent_id: parentId,
     child_ids: [],
@@ -1673,6 +1712,13 @@ function materializeClipboardNode(node: ClipboardCardNode, parentId: string | nu
     cards: [current, ...childCards],
     rootId: newId,
   };
+}
+
+function ensureCardDefaults(card: Card): Card {
+  return {
+    ...card,
+    markdownPreviewEnabled: card.markdownPreviewEnabled ?? true,
+  } satisfies Card;
 }
 
 function determineInsertPoint(cards: Card[], anchorCard: Card | null, position: InsertPosition): { insertIndex: number; parentId: string | null; level: number } {

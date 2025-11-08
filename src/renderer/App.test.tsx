@@ -30,6 +30,7 @@ describe('App', () => {
       kind: 'heading',
       hasLeftTrace: true,
       hasRightTrace: true,
+      markdownPreviewEnabled: true,
       updatedAt: '2020-10-19T05:30:00.000Z',
     },
     {
@@ -40,6 +41,7 @@ describe('App', () => {
       kind: 'paragraph',
       hasLeftTrace: false,
       hasRightTrace: true,
+      markdownPreviewEnabled: true,
       updatedAt: '2025-10-18T00:15:00.000Z',
     },
     {
@@ -50,6 +52,7 @@ describe('App', () => {
       kind: 'bullet',
       hasLeftTrace: true,
       hasRightTrace: false,
+      markdownPreviewEnabled: true,
       updatedAt: '2025-10-17T11:05:00.000Z',
     },
   ] as const;

@@ -192,6 +192,7 @@ Deprecated --> Draft : 再利用
       "kind": "heading",
       "hasLeftTrace": true,
       "hasRightTrace": true,
+      "markdownPreviewEnabled": true,
       "updatedAt": "2025-11-03T09:15:00.000Z"
     }
   ],
@@ -297,3 +298,5 @@ Deprecated --> Draft : 再利用
   - `connectorLayoutStore` ではアンカー登録時に「スクロールビューポート内に表示されているか」を判定して `isVisible` を保持し、`TraceConnectorLayer` はこのフラグが真のアンカー同士に限定して線を描画することで、スクロールアウトしたカードのコネクタを自動的に抑制する。
   - 新設した `showOffscreenConnectors` フラグ（🛰️ トグル）は `tracePreferenceStore` で管理し、ON の場合は `TraceConnectorLayer` が `isVisible` 判定をスキップしてビューポート外カード間のコネクタも描画する。
   - カードパネルツールバーの ⛓️ トグルは、対象ファイル内の全カードIDを取得して `toggleFileVisibility(fileName, cardIds)` を呼び出し、左右接合点の `mutedCards` 状態を一括で書き換える。これにより、UI 上でも各トレース接合点ボタンの状態が即時反映され、仕様どおり「トレース接合点のコネクタ表示の有無」を通じてファイル全体の表示を制御する。
+  - `Card` モデルに `markdownPreviewEnabled` を追加し、カード単位で Markdown プレビューのON/OFFを保持する。`normalizeCardOrder` で既存ファイルを読み込む際もデフォルト値（true）を適用。
+  - `renderer/utils/markdown.ts` に簡易Markdownレンダラを実装し、危険なHTMLをエスケープしたうえで `CardPanel` が `dangerouslySetInnerHTML` に渡す。ヘッダの `MD` ボタンと上部ツールバーの 🅼 トグルで `markdownPreviewEnabled` と `uiStore.markdownPreviewGlobalEnabled` を参照し、描画可否を決定する。

@@ -609,6 +609,14 @@
     @apply absolute -top-1 -right-1 min-w-[14px] rounded-full bg-blue-500 px-1 text-[0.55rem] font-bold leading-3 text-white dark:bg-blue-300 dark:text-slate-900;
   }
 
+  .card__markdown-button {
+    @apply inline-flex h-6 min-w-[32px] items-center justify-center rounded-md border border-slate-300 bg-white px-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .card__markdown-button--active {
+    @apply border-blue-400 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100;
+  }
+
   .card--trace-related {
     @apply ring-1 ring-offset-1 ring-blue-300/50 ring-offset-blue-50 dark:ring-blue-400/40 dark:ring-offset-slate-900/50;
   }
@@ -653,12 +661,49 @@
     @apply mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm leading-relaxed text-slate-800 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400;
   }
 
+  .card__markdown-hint {
+    @apply mt-1 text-[0.65rem] text-slate-400 dark:text-slate-500;
+  }
+
   .card__title--truncate {
     @apply overflow-hidden text-ellipsis whitespace-nowrap;
   }
 
   .card__body {
     @apply whitespace-pre-wrap text-xs leading-relaxed text-slate-600 dark:text-slate-200;
+  }
+
+  .card__body--markdown {
+    @apply text-xs leading-relaxed text-slate-700 dark:text-slate-200;
+  }
+
+  .card__body--markdown p {
+    @apply mb-2;
+  }
+
+  .card__body--markdown ul,
+  .card__body--markdown ol {
+    @apply mb-2 pl-5;
+  }
+
+  .card__body--markdown ul {
+    @apply list-disc;
+  }
+
+  .card__body--markdown ol {
+    @apply list-decimal;
+  }
+
+  .card__body--markdown code {
+    @apply rounded bg-slate-200 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-slate-700 dark:text-slate-100;
+  }
+
+  .card__body--markdown pre {
+    @apply overflow-auto rounded-md bg-slate-900/80 px-3 py-2 text-[0.75rem] text-slate-100 dark:bg-slate-800;
+  }
+
+  .card__body--markdown a {
+    @apply text-blue-600 underline dark:text-blue-300;
   }
 
   .card__footer {
