@@ -43,6 +43,7 @@ export interface WorkspacePaths {
 
 const SAMPLE_INPUT_NAME = 'SampleDocument.md';
 const SAMPLE_OUTPUT_NAME = 'SampleCards.json';
+const JSON_EXTENSION = '.json';
 let cachedSettings: AppSettings | null = null;
 let cachedPaths: WorkspacePaths | null = null;
 
@@ -340,6 +341,25 @@ export const saveWorkspaceSnapshot = async (snapshot: WorkspaceSnapshot): Promis
   const paths = resolveWorkspacePaths();
   const filePath = path.join(paths.outputDir, WORKSPACE_SNAPSHOT_FILENAME);
   //! スナップショットをJSON形式で保存
+  await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf8');
+  return filePath;
+};
+
+const normalizeOutputFileName = (fileName: string): string => {
+  const trimmed = fileName?.trim?.() ?? '';
+  if (!trimmed) {
+    throw new Error('保存ファイル名が指定されていません。');
+  }
+  if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
+    throw new Error('ファイル名に使用できない文字が含まれています。');
+  }
+  return trimmed.toLowerCase().endsWith(JSON_EXTENSION) ? trimmed : `${trimmed}${JSON_EXTENSION}`;
+};
+
+export const saveCardFileSnapshot = async (fileName: string, snapshot: WorkspaceSnapshot): Promise<string> => {
+  const safeName = normalizeOutputFileName(fileName);
+  const paths = resolveWorkspacePaths();
+  const filePath = path.join(paths.outputDir, safeName);
   await fs.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf8');
   return filePath;
 };

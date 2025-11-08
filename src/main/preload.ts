@@ -46,6 +46,8 @@ type AppAPI = {
   workspace: {
     /** カードスナップショットを保存する。 */
     save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+    /** 編集済みのカードを指定ファイル名で保存する。 */
+    saveCardFile: (fileName: string, snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
     /** 保存済みスナップショットを読み込む。 */
     load: () => Promise<WorkspaceSnapshot | null>;
     /** _inputディレクトリ内のカードファイル一覧を取得する。 */
@@ -72,6 +74,8 @@ const api: AppAPI = {
   log: async (level: LogLevel, message: string) => ipcRenderer.invoke('log:write', { level, message }),
   workspace: {
     save: async (snapshot: WorkspaceSnapshot) => ipcRenderer.invoke('workspace:save', snapshot),
+    saveCardFile: async (fileName: string, snapshot: WorkspaceSnapshot) =>
+      ipcRenderer.invoke('workspace:saveCardFile', { fileName, snapshot }),
     load: async () => ipcRenderer.invoke('workspace:load'),
     listCardFiles: async () => ipcRenderer.invoke('workspace:listCardFiles'),
     loadCardFile: async (fileName: string) => ipcRenderer.invoke('workspace:loadCardFile', fileName),

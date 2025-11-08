@@ -306,12 +306,16 @@
   }
 
   .card__drop-indicator {
-    @apply h-1 rounded-full bg-blue-300/80 transition-all duration-150 ease-out dark:bg-blue-500/70;
+    @apply relative h-1 rounded-full bg-blue-300/80 transition-all duration-150 ease-out dark:bg-blue-500/70;
   }
 
   .card__drop-indicator--before,
   .card__drop-indicator--after {
     @apply mx-3;
+  }
+
+  .card__drop-indicator-label {
+    @apply absolute -top-5 rounded-full bg-white px-2 py-0.5 text-[0.65rem] font-semibold text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-200;
   }
 
   .card--dragging {
@@ -320,6 +324,14 @@
 
   .card--drop-child {
     @apply ring-2 ring-blue-400/60 dark:ring-blue-500/70;
+  }
+
+  .card__drop-child-overlay {
+    @apply pointer-events-none absolute inset-2 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-400/70 bg-blue-50/80 text-sm font-semibold text-blue-700 dark:border-blue-400/60 dark:bg-blue-900/40 dark:text-blue-100;
+  }
+
+  .card__drop-child-label {
+    @apply text-[0.75rem] tracking-wide;
   }
 
   .card--highlighted {
@@ -473,7 +485,7 @@
   }
 
   .card {
-    @apply flex cursor-pointer select-none flex-col gap-2 rounded-lg border border-transparent bg-white/80 p-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-900/80;
+    @apply relative flex cursor-pointer select-none flex-col gap-2 rounded-lg border border-transparent bg-white/80 p-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-900/80;
   }
 
   .card--active {

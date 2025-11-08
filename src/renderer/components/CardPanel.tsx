@@ -10,7 +10,7 @@
  * @copyright MIT
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
 import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
@@ -286,7 +286,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       }
       setContextMenu(null);
     };
-    const handleEsc = (event: KeyboardEvent) => {
+    const handleEsc = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         setContextMenu(null);
       }
@@ -368,7 +368,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
    * @param card 対象カード。
    */
   const handleCardKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLElement>, card: Card) => {
+    (event: ReactKeyboardEvent<HTMLElement>, card: Card) => {
       if (event.key !== 'Enter' && event.key !== ' ') {
         return; //! 対象キー以外は無視
       }
@@ -860,7 +860,7 @@ const EditableCard = ({ card, onSave, onCancel }: EditableCardProps) => {
   }, [body, card.body, card.id, card.title, onSave, title]);
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (e: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         onCancel();
@@ -920,7 +920,7 @@ interface CardListItemProps {
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
-  onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>, card: Card) => void;
   onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
   onDoubleClick: (card: Card) => void; ///< ダブルクリックハンドラ（編集モード移行）。
   onUpdateCard: (cardId: string, patch: { title?: string; body?: string }) => void; ///< カード更新ハンドラ。
@@ -1067,7 +1067,11 @@ const CardListItem = ({
 
   return (
     <div className="card-list-item" data-card-id={card.id}>
-      {dropBefore ? <div className="card__drop-indicator card__drop-indicator--before" aria-hidden /> : null}
+      {dropBefore ? (
+        <div className="card__drop-indicator card__drop-indicator--before" role="presentation">
+          <span className="card__drop-indicator-label">ここに挿入（前）</span>
+        </div>
+      ) : null}
       <article
         className={articleClassName}
         style={indentStyle}
@@ -1093,8 +1097,17 @@ const CardListItem = ({
         }}
       >
         {articleContent}
+        {dropChild ? (
+          <div className="card__drop-child-overlay" role="presentation">
+            <span className="card__drop-child-label">子として追加</span>
+          </div>
+        ) : null}
       </article>
-      {dropAfter ? <div className="card__drop-indicator card__drop-indicator--after" aria-hidden /> : null}
+      {dropAfter ? (
+        <div className="card__drop-indicator card__drop-indicator--after" role="presentation">
+          <span className="card__drop-indicator-label">ここに挿入（後）</span>
+        </div>
+      ) : null}
     </div>
   );
 };

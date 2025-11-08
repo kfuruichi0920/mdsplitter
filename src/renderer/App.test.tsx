@@ -55,7 +55,9 @@ describe('App', () => {
   ] as const;
   let currentSettings = cloneSettings();
   let saveWorkspaceMock: jest.Mock;
+  let saveCardFileMock: jest.Mock;
   let loadWorkspaceMock: jest.Mock;
+  let loadCardFileMock: jest.Mock;
 
   /**
    * @brief 各テスト前の初期化処理。
@@ -65,7 +67,12 @@ describe('App', () => {
   beforeEach(() => {
     currentSettings = cloneSettings();
     saveWorkspaceMock = jest.fn().mockResolvedValue({ path: '/tmp/workspace.snapshot.json' });
+    saveCardFileMock = jest.fn().mockResolvedValue({ path: '/tmp/cards.output.json' });
     loadWorkspaceMock = jest.fn().mockResolvedValue({
+      cards: snapshotCards,
+      savedAt: '2025-10-20T09:00:00.000Z',
+    });
+    loadCardFileMock = jest.fn().mockResolvedValue({
       cards: snapshotCards,
       savedAt: '2025-10-20T09:00:00.000Z',
     });
@@ -81,12 +88,10 @@ describe('App', () => {
       log: jest.fn().mockResolvedValue(undefined),
       workspace: {
         save: saveWorkspaceMock,
+        saveCardFile: saveCardFileMock,
         load: loadWorkspaceMock,
         listCardFiles: jest.fn().mockResolvedValue(['test_cards.json']),
-        loadCardFile: jest.fn().mockResolvedValue({
-          cards: snapshotCards,
-          savedAt: '2025-10-20T09:00:00.000Z',
-        }),
+        loadCardFile: loadCardFileMock,
       },
     };
 
@@ -110,7 +115,9 @@ describe('App', () => {
     });
     delete (window as any).app;
     saveWorkspaceMock.mockReset?.();
+    saveCardFileMock.mockReset?.();
     loadWorkspaceMock.mockReset?.();
+    loadCardFileMock?.mockReset?.();
   });
 
   /**
@@ -149,6 +156,8 @@ describe('App', () => {
 
     // ダブルクリックしてファイルを読み込む
     fireEvent.doubleClick(fileItem);
+
+    await waitFor(() => expect((window as any).app.workspace.loadCardFile).toHaveBeenCalled(), { timeout: 5000 });
 
     // カードが読み込まれて表示されるまで待機
     await waitFor(() => {
@@ -217,8 +226,8 @@ describe('App', () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(saveWorkspaceMock).toHaveBeenCalledTimes(1), { timeout: 5000 });
-    expect(saveWorkspaceMock.mock.calls[0][0]).toMatchObject({
+    await waitFor(() => expect(saveCardFileMock).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    expect(saveCardFileMock.mock.calls[0][1]).toMatchObject({
       cards: expect.any(Array),
       savedAt: expect.any(String),
     });
@@ -260,37 +269,50 @@ describe('App', () => {
    * @brief スナップショットロード時に無効カードが除去される警告を検証。
    */
   it('warns when invalid cards are removed during snapshot load', async () => {
-    // loadCardFileモックを無効なカードを含むデータで上書き
-    (window as any).app.workspace.loadCardFile = jest.fn().mockResolvedValue({
-      cards: [
-        { ...snapshotCards[0] },
-        {
-          id: 'invalid-card',
-          title: '',
-          body: 'invalid',
-          status: 'deprecated',
-          kind: 'heading',
-          hasLeftTrace: true,
-          hasRightTrace: false,
-          updatedAt: 'invalid-date',
-        },
-      ],
-      savedAt: '2025-11-03T09:00:00.000Z',
+    // 無効データ用のファイルエントリを追加
+    (window as any).app.workspace.listCardFiles = jest.fn().mockResolvedValue(['test_cards.json', 'invalid_cards.json']);
+    (window as any).app.workspace.loadCardFile.mockImplementation(async (fileName: string) => {
+      if (fileName === 'invalid_cards.json') {
+        return {
+          cards: [
+            { ...snapshotCards[0] },
+            {
+              id: 'invalid-card',
+              title: '',
+              body: 'invalid',
+              status: 'deprecated',
+              kind: 'heading',
+              hasLeftTrace: true,
+              hasRightTrace: false,
+              updatedAt: 'invalid-date',
+            },
+          ],
+          savedAt: '2025-11-03T09:00:00.000Z',
+        };
+      }
+      return {
+        cards: snapshotCards,
+        savedAt: '2025-10-20T09:00:00.000Z',
+      };
     });
 
     render(<App />);
 
     // カードファイル一覧が表示されるまで待機
     await waitFor(() => {
-      const items = screen.queryAllByText(/test_cards\.json/);
+      const items = screen.queryAllByText(/invalid_cards\.json/);
       return items.length > 0;
     }, { timeout: 5000 });
 
-    const fileItems = screen.getAllByText(/test_cards\.json/);
+    const fileItems = screen.getAllByText(/invalid_cards\.json/);
     const fileItem = fileItems[0];
 
     // ダブルクリックしてファイルを読み込む
     fireEvent.doubleClick(fileItem);
+
+    await waitFor(() => expect((window as any).app.workspace.loadCardFile).toHaveBeenCalledWith('invalid_cards.json'), {
+      timeout: 5000,
+    });
 
     // 無効なカードが除外され、有効なカード1枚のみが表示されることを確認
     await waitFor(() => {

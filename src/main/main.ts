@@ -27,6 +27,7 @@ import {
   loadTraceFile,
   loadSettings,
   loadWorkspaceSnapshot,
+  saveCardFileSnapshot,
   saveWorkspaceSnapshot,
   updateSettings,
 } from './workspace';
@@ -129,6 +130,20 @@ ipcMain.handle('workspace:save', async (_event, snapshot) => {
   const path = await saveWorkspaceSnapshot(snapshot);
   logMessage('info', `ワークスペースを保存しました: ${path}`);
   return { path };
+});
+
+ipcMain.handle('workspace:saveCardFile', async (_event, payload) => {
+  const { fileName, snapshot } = payload ?? {};
+  if (typeof fileName !== 'string') {
+    throw new Error('保存ファイル名が無効です');
+  }
+  if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.cards)) {
+    throw new Error('カードスナップショットが無効です');
+  }
+
+  const savedPath = await saveCardFileSnapshot(fileName, snapshot);
+  logMessage('info', `カードファイルを保存しました: ${savedPath}`);
+  return { path: savedPath };
 });
 
 ipcMain.handle('workspace:load', async () => {

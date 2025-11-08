@@ -182,6 +182,22 @@ const findFirstLeafId = (node: SplitNode | null): string | null => {
   return findFirstLeafId(node.first) ?? findFirstLeafId(node.second);
 };
 
+const normalizeOutputFileName = (input: string | null | undefined): string | null => {
+  if (typeof input !== 'string') {
+    return null;
+  }
+  const trimmed = input.trim();
+  if (!trimmed || /[/\\]/.test(trimmed) || trimmed.includes('..')) {
+    return null;
+  }
+  return trimmed.endsWith('.json') ? trimmed : `${trimmed}.json`;
+};
+
+const buildDefaultExportName = (): string => {
+  const stamp = new Date().toISOString().replace(/[:]/g, '').split('.')[0];
+  return `cards_export_${stamp}.json`;
+};
+
 /**
  * @brief React レンダラーメインコンポーネント。
  * @details
@@ -223,6 +239,7 @@ export const App = () => {
   const redo = useWorkspaceStore((state) => state.redo);
   const canUndo = useWorkspaceStore((state) => state.canUndo);
   const canRedo = useWorkspaceStore((state) => state.canRedo);
+  const renameTabFile = useWorkspaceStore((state) => state.renameTabFile);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -377,7 +394,7 @@ export const App = () => {
 
   const handleSettingsOpen = useCallback(async () => {
     if (!window.app?.settings) {
-      notify('warn', '設定APIが利用できません。');
+      notify('warning', '設定APIが利用できません。');
       return;
     }
     setSettingsModalState({
@@ -432,7 +449,7 @@ export const App = () => {
 
   const handleSettingsSave = useCallback(async () => {
     if (!window.app?.settings) {
-      notify('warn', '設定APIが利用できません。');
+      notify('warning', '設定APIが利用できません。');
       return;
     }
     const draft = settingsModalState.draft;
@@ -790,7 +807,7 @@ export const App = () => {
     applyThemeFromSettings(previewTheme, nextThemeModeSetting, setThemeStore);
 
     if (!window.app?.settings) {
-      notify('warn', '設定APIが利用できません。');
+      notify('warning', '設定APIが利用できません。');
       return;
     }
 
@@ -824,83 +841,139 @@ export const App = () => {
     }
   }, [appSettings, notify, pushLog, setThemeStore, theme]);
 
+  const promptExportFileName = useCallback(
+    (initialName?: string | null) => {
+      const fallback = buildDefaultExportName();
+      const suggestion = normalizeOutputFileName(initialName ?? '') ?? fallback;
+      const input = window.prompt('保存するカードファイル名 (.json)', suggestion);
+      if (input === null) {
+        return null;
+      }
+      const normalized = normalizeOutputFileName(input);
+      if (!normalized) {
+        notify('error', 'ファイル名に使用できない文字が含まれています。');
+        return null;
+      }
+      return normalized;
+    },
+    [notify],
+  );
+
+  const saveActiveTab = useCallback(
+    async (options?: { explicitFileName?: string; renameTab?: boolean; force?: boolean }) => {
+      const targetLeafId = effectiveLeafId;
+      if (!activeTab || !activeTabId || !targetLeafId) {
+        notify('warning', '保存対象のパネルが選択されていません。');
+        pushLog({
+          id: `save-no-target-${Date.now()}`,
+          level: 'WARN',
+          message: '保存対象のタブが存在しないため、保存をスキップしました。',
+          timestamp: new Date(),
+        });
+        return false;
+      }
+
+      if (isSaving) {
+        notify('info', '保存処理が進行中です。');
+        return false;
+      }
+
+      if (!options?.force && !isDirty) {
+        const now = new Date();
+        notify('info', '保存対象の変更はありません。');
+        pushLog({
+          id: `save-skip-${now.valueOf()}`,
+          level: 'INFO',
+          message: '保存操作を実行しましたが未保存の変更はありませんでした。',
+          timestamp: now,
+        });
+        return false;
+      }
+
+      const saveApi = window.app?.workspace?.saveCardFile;
+      if (!saveApi) {
+        const now = new Date();
+        notify('error', 'カード保存APIが利用できません。再起動後に再試行してください。');
+        pushLog({
+          id: `save-missing-${now.valueOf()}`,
+          level: 'ERROR',
+          message: 'workspace.saveCardFile API が未定義のため保存を実行できませんでした。',
+          timestamp: now,
+        });
+        return false;
+      }
+
+      let targetFileName: string | null = options?.explicitFileName ?? activeTab.fileName ?? null;
+      if (!targetFileName) {
+        targetFileName = promptExportFileName(activeTab.title ?? null);
+        if (!targetFileName) {
+          return false;
+        }
+      }
+
+      const normalized = normalizeOutputFileName(targetFileName);
+      if (!normalized) {
+        notify('error', 'ファイル名に使用できない文字が含まれています。');
+        return false;
+      }
+
+      const startedAt = new Date();
+      setSaving(true);
+      try {
+        const snapshot: WorkspaceSnapshot = {
+          cards,
+          savedAt: startedAt.toISOString(),
+        };
+        const result = await saveApi(normalized, snapshot);
+        markSaved(activeTabId, snapshot.savedAt);
+        if (!activeTab.fileName || activeTab.fileName !== normalized || options?.renameTab) {
+          renameTabFile(activeTab.id, normalized);
+        }
+        notify('success', `カードファイルを保存しました: ${normalized}`);
+        pushLog({
+          id: `save-${startedAt.valueOf()}`,
+          level: 'INFO',
+          message: `カードファイルを保存しました (出力: ${result?.path ?? normalized})。`,
+          timestamp: startedAt,
+        });
+        return true;
+      } catch (error) {
+        console.error('[renderer] failed to save card file', error);
+        const failedAt = new Date();
+        notify('error', 'カードファイルの保存に失敗しました。ログを確認してください。');
+        pushLog({
+          id: `save-failed-${failedAt.valueOf()}`,
+          level: 'ERROR',
+          message: 'カードファイルの保存に失敗しました。コンソールログを確認してください。',
+          timestamp: failedAt,
+        });
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [activeTab, activeTabId, cards, effectiveLeafId, isDirty, isSaving, markSaved, notify, promptExportFileName, pushLog, renameTabFile],
+  );
+
   /**
-   * @brief ワークスペースを保存する。
+   * @brief ワークスペースを上書き保存する。
    */
   const handleSave = useCallback(async () => {
-    const targetLeafId = effectiveLeafId;
-    if (!activeTabId || !targetLeafId) {
-      notify('warning', '保存対象のパネルが選択されていません。');
-      pushLog({
-        id: `save-no-target-${Date.now()}`,
-        level: 'WARN',
-        message: '保存対象のタブが存在しないため、保存をスキップしました。',
-        timestamp: new Date(),
-      });
+    await saveActiveTab();
+  }, [saveActiveTab]);
+
+  /**
+   * @brief 別名保存する。
+   */
+  const handleSaveAs = useCallback(async () => {
+    const suggested = activeTab?.fileName ?? activeTab?.title ?? buildDefaultExportName();
+    const requested = promptExportFileName(suggested);
+    if (!requested) {
+      notify('info', '保存をキャンセルしました。');
       return;
     }
-
-    if (isSaving) {
-      notify('info', '保存処理が進行中です。');
-      return;
-    }
-
-    if (!isDirty) {
-      const now = new Date();
-      notify('info', '保存対象の変更はありません。');
-      pushLog({
-        id: `save-skip-${now.valueOf()}`,
-        level: 'INFO',
-        message: '保存操作を実行しましたが未保存の変更はありませんでした。',
-        timestamp: now,
-      });
-      return;
-    }
-
-    const saveApi = window.app?.workspace?.save;
-    if (!saveApi) {
-      const now = new Date();
-      notify('error', '保存APIが利用できません。再起動後に再試行してください。');
-      pushLog({
-        id: `save-missing-${now.valueOf()}`,
-        level: 'ERROR',
-        message: 'workspace.save API が未定義のため保存を実行できませんでした。',
-        timestamp: now,
-      });
-      return;
-    }
-
-    const startedAt = new Date();
-    setSaving(true);
-    try {
-      const snapshot: WorkspaceSnapshot = {
-        cards,
-        savedAt: startedAt.toISOString(),
-      };
-
-      const result = await saveApi(snapshot);
-      markSaved(activeTabId, startedAt.toISOString());
-      notify('success', 'ワークスペースを保存しました。');
-      pushLog({
-        id: `save-${startedAt.valueOf()}`,
-        level: 'INFO',
-        message: `ワークスペースを保存しました (出力: ${result?.path ?? '不明'})。`,
-        timestamp: startedAt,
-      });
-    } catch (error) {
-      console.error('[renderer] failed to save workspace', error);
-      const failedAt = new Date();
-      notify('error', 'ワークスペースの保存に失敗しました。ログを確認してください。');
-      pushLog({
-        id: `save-failed-${failedAt.valueOf()}`,
-        level: 'ERROR',
-        message: 'ワークスペースの保存に失敗しました。コンソールログを確認してください。',
-        timestamp: failedAt,
-      });
-    } finally {
-      setSaving(false);
-    }
-  }, [activeTabId, cards, effectiveLeafId, isDirty, isSaving, markSaved, notify, pushLog]);
+    await saveActiveTab({ explicitFileName: requested, renameTab: true, force: true });
+  }, [activeTab?.fileName, activeTab?.title, notify, promptExportFileName, saveActiveTab]);
 
   /**
    * @brief パネル分割を実行する。
@@ -1117,7 +1190,7 @@ export const App = () => {
   const addCardViaShortcut = useCallback(
     (position: InsertPosition) => {
       if (!effectiveLeafId || !activeTabId) {
-        notify('warn', 'カードを追加できるアクティブタブがありません。');
+        notify('warning', 'カードを追加できるアクティブタブがありません。');
         return;
       }
       const created = addCard(effectiveLeafId, activeTabId, { position });
@@ -1131,7 +1204,7 @@ export const App = () => {
           timestamp: new Date(),
         });
       } else {
-        notify('warn', 'カードを追加できませんでした。');
+        notify('warning', 'カードを追加できませんでした。');
       }
     },
     [activeTabId, addCard, effectiveLeafId, notify, pushLog],
@@ -1181,7 +1254,7 @@ export const App = () => {
           if (key === 'c' && !event.shiftKey) {
             event.preventDefault();
             if (!effectiveLeafId || !activeTabId) {
-              notify('warn', 'コピーできるアクティブタブがありません。');
+              notify('warning', 'コピーできるアクティブタブがありません。');
               return;
             }
             const count = copySelection(effectiveLeafId, activeTabId);
@@ -1202,7 +1275,7 @@ export const App = () => {
           if (key === 'v' && !event.shiftKey) {
             event.preventDefault();
             if (!effectiveLeafId || !activeTabId) {
-              notify('warn', '貼り付けできるアクティブタブがありません。');
+              notify('warning', '貼り付けできるアクティブタブがありません。');
               return;
             }
             if (!hasClipboard()) {
@@ -1260,9 +1333,13 @@ export const App = () => {
             return;
           }
 
-          if (key === 's' && !event.shiftKey) {
+          if (key === 's') {
             event.preventDefault();
-            void handleSave();
+            if (event.shiftKey) {
+              void handleSaveAs();
+            } else {
+              void handleSave();
+            }
             return;
           }
 
@@ -1323,7 +1400,7 @@ export const App = () => {
       if (event.key === 'Delete') {
         event.preventDefault();
         if (!effectiveLeafId || !activeTabId) {
-          notify('warn', '削除できるカードがありません。');
+          notify('warning', '削除できるカードがありません。');
           return;
         }
         if (selectedCount === 0) {
@@ -1357,6 +1434,7 @@ export const App = () => {
     deleteCards,
     effectiveLeafId,
     handleSave,
+    handleSaveAs,
     handleSettingsOpen,
     handleSplit,
     hasClipboard,
@@ -1410,6 +1488,17 @@ export const App = () => {
             aria-disabled={isSaving}
           >
             💾 保存
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => {
+              void handleSaveAs();
+            }}
+            disabled={isSaving}
+            aria-disabled={isSaving}
+          >
+            📝 別名保存
           </button>
         </div>
         <div className="toolbar-group">

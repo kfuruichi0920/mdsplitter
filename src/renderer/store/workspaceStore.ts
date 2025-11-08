@@ -146,6 +146,7 @@ export interface WorkspaceStore {
   copySelection: (leafId: string, tabId: string) => number; ///< 選択カードをコピー
   pasteClipboard: (leafId: string, tabId: string, options?: { position?: InsertPosition; anchorCardId?: string | null }) => { inserted: number; insertedIds: string[]; anchorId: string | null; position: InsertPosition } | null; ///< クリップボードのカードを貼り付け
   hasClipboard: () => boolean; ///< クリップボードにカードがあるか
+  renameTabFile: (tabId: string, fileName: string) => void; ///< タブに紐づくファイル名を変更
   undo: () => boolean; ///< Undo実行（成功時true）
   redo: () => boolean; ///< Redo実行（成功時true）
   canUndo: () => boolean; ///< Undo可能か判定
@@ -1194,6 +1195,39 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   hasClipboard: () => {
     const clipboard = get().clipboard;
     return Boolean(clipboard && clipboard.length > 0);
+  },
+
+  renameTabFile: (tabId, fileName) => {
+    if (!fileName) {
+      return;
+    }
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.fileName === fileName) {
+        return state;
+      }
+
+      const nextTabs = {
+        ...state.tabs,
+        [tabId]: {
+          ...tab,
+          fileName,
+          title: fileName,
+        },
+      } satisfies WorkspaceStore['tabs'];
+
+      const nextFileToLeaf = { ...state.fileToLeaf } as WorkspaceStore['fileToLeaf'];
+      if (tab.fileName && nextFileToLeaf[tab.fileName] === tab.leafId) {
+        delete nextFileToLeaf[tab.fileName];
+      }
+      nextFileToLeaf[fileName] = tab.leafId;
+
+      return {
+        ...state,
+        tabs: nextTabs,
+        fileToLeaf: nextFileToLeaf,
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'fileToLeaf'>;
+    });
   },
 
   undo: () => {

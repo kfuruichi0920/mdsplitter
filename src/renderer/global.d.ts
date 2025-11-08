@@ -26,6 +26,7 @@ declare global {
       log: (level: LogLevel, message: string) => Promise<void>;
       workspace: {
         save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
+        saveCardFile: (fileName: string, snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
         load: () => Promise<WorkspaceSnapshot | null>;
         listCardFiles: () => Promise<string[]>;
         loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
