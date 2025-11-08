@@ -27,6 +27,18 @@ export { CARD_STATUS_SEQUENCE, getNextCardStatus };
 export type { Card, CardKind, CardPatch, CardStatus };
 
 /**
+ * @brief Undo/Redoスタックのエントリー。
+ * @details
+ * カードの変更履歴を保持し、Undo/Redoを実現する。
+ */
+export interface UndoRedoEntry {
+  type: 'update' | 'move' | 'add' | 'delete'; ///< 操作種別
+  tabId: string; ///< 対象タブID
+  cards: Card[]; ///< 変更前のカード配列
+  description: string; ///< 操作の説明（ログ用）
+}
+
+/**
  * @brief タブの状態。
  * @details
  * パネル内で開かれているカードファイルの状態を保持。
@@ -41,6 +53,7 @@ export interface PanelTabState {
   isDirty: boolean;
   lastSavedAt: string | null;
   expandedCardIds: Set<string>; ///< 展開状態のカードIDセット（子を持つカードのみ）
+  editingCardId: string | null; ///< 編集中のカードID（インライン編集時）
 }
 
 /**
@@ -73,6 +86,8 @@ export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
   leafs: Record<string, LeafWorkspaceState>;
   fileToLeaf: Record<string, string>;
+  undoStack: UndoRedoEntry[]; ///< Undoスタック（最大100件）
+  redoStack: UndoRedoEntry[]; ///< Redoスタック（最大100件）
   openTab: (leafId: string, fileName: string, cards: Card[], options?: { savedAt?: string; title?: string }) => OpenTabResult;
   closeTab: (leafId: string, tabId: string) => void;
   closeLeaf: (leafId: string) => void;
@@ -89,6 +104,11 @@ export interface WorkspaceStore {
   expandAll: (leafId: string, tabId: string) => void; ///< 全カードを展開
   collapseAll: (leafId: string, tabId: string) => void; ///< 全カードを折畳
   moveCards: (leafId: string, tabId: string, cardIds: string[], targetCardId: string, position: 'before' | 'after' | 'child') => boolean; ///< カード移動（階層構造を維持）
+  setEditingCard: (leafId: string, tabId: string, cardId: string | null) => void; ///< 編集中カードを設定
+  undo: () => boolean; ///< Undo実行（成功時true）
+  redo: () => boolean; ///< Redo実行（成功時true）
+  canUndo: () => boolean; ///< Undo可能か判定
+  canRedo: () => boolean; ///< Redo可能か判定
   reset: () => void;
 }
 
@@ -102,10 +122,12 @@ const createLeafState = (leafId: string): LeafWorkspaceState => ({ leafId, tabId
 /**
  * @brief 初期ストア状態。
  */
-const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'> = {
+const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf' | 'undoStack' | 'redoStack'> = {
   tabs: {},
   leafs: {},
   fileToLeaf: {},
+  undoStack: [],
+  redoStack: [],
 };
 
 /**
@@ -153,6 +175,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           isDirty: false,
           lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
           expandedCardIds: updatedExpandedIds,
+          editingCardId: null,
         } satisfies PanelTabState;
 
         outcome = { status: 'activated', tabId: existingTabId, leafId } satisfies OpenTabResult;
@@ -184,6 +207,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         isDirty: false,
         lastSavedAt: options?.savedAt ?? null,
         expandedCardIds: initialExpandedIds,
+        editingCardId: null,
       } satisfies PanelTabState;
 
       const nextLeaf: LeafWorkspaceState = {
@@ -446,6 +470,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      //! Undoスタックに現在の状態を保存
+      const undoEntry: UndoRedoEntry = {
+        type: 'update',
+        tabId,
+        cards: [...tab.cards],
+        description: `カード「${tab.cards.find((c) => c.id === cardId)?.title ?? cardId}」を編集`,
+      };
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      //! Undoスタックは最大100件
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
       const nextCards = tab.cards.map((card) => {
         if (card.id !== cardId) {
           return card;
@@ -460,6 +496,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           ...state.tabs,
           [tabId]: { ...tab, cards: nextCards, isDirty: true },
         },
+        undoStack: trimmedUndoStack,
+        redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
       };
     });
   },
@@ -637,6 +675,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      //! Undoスタックに現在の状態を保存
+      const undoEntry: UndoRedoEntry = {
+        type: 'move',
+        tabId,
+        cards: [...tab.cards],
+        description: `${cardIds.length}件のカードを移動`,
+      };
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      //! Undoスタックは最大100件
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
       //! 移動対象カードのバリデーション
       const moveCardsSet = new Set(cardIds);
       for (const cardId of cardIds) {
@@ -730,10 +780,131 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           ...state.tabs,
           [tabId]: { ...tab, cards: rebuiltCards, isDirty: true },
         },
+        undoStack: trimmedUndoStack,
+        redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
       };
     });
 
     return success;
+  },
+
+  setEditingCard: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, editingCardId: cardId },
+        },
+      };
+    });
+  },
+
+  undo: () => {
+    let success = false;
+
+    set((state) => {
+      if (state.undoStack.length === 0) {
+        return state;
+      }
+
+      const entry = state.undoStack[state.undoStack.length - 1];
+      const tab = state.tabs[entry.tabId];
+
+      if (!tab) {
+        return state;
+      }
+
+      //! 現在の状態をRedoスタックに保存
+      const redoEntry: UndoRedoEntry = {
+        type: entry.type,
+        tabId: entry.tabId,
+        cards: [...tab.cards],
+        description: `Redo: ${entry.description}`,
+      };
+
+      const nextRedoStack = [...state.redoStack, redoEntry];
+      //! Redoスタックは最大100件
+      const trimmedRedoStack = nextRedoStack.length > 100 ? nextRedoStack.slice(-100) : nextRedoStack;
+
+      //! Undoスタックから取り出した状態に戻す
+      const nextUndoStack = state.undoStack.slice(0, -1);
+
+      success = true;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [entry.tabId]: { ...tab, cards: [...entry.cards], isDirty: true },
+        },
+        undoStack: nextUndoStack,
+        redoStack: trimmedRedoStack,
+      };
+    });
+
+    return success;
+  },
+
+  redo: () => {
+    let success = false;
+
+    set((state) => {
+      if (state.redoStack.length === 0) {
+        return state;
+      }
+
+      const entry = state.redoStack[state.redoStack.length - 1];
+      const tab = state.tabs[entry.tabId];
+
+      if (!tab) {
+        return state;
+      }
+
+      //! 現在の状態をUndoスタックに保存
+      const undoEntry: UndoRedoEntry = {
+        type: entry.type,
+        tabId: entry.tabId,
+        cards: [...tab.cards],
+        description: `Undo: ${entry.description}`,
+      };
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      //! Undoスタックは最大100件
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
+      //! Redoスタックから取り出した状態に戻す
+      const nextRedoStack = state.redoStack.slice(0, -1);
+
+      success = true;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [entry.tabId]: { ...tab, cards: [...entry.cards], isDirty: true },
+        },
+        undoStack: trimmedUndoStack,
+        redoStack: nextRedoStack,
+      };
+    });
+
+    return success;
+  },
+
+  canUndo: () => {
+    const state = get();
+    return state.undoStack.length > 0;
+  },
+
+  canRedo: () => {
+    const state = get();
+    return state.redoStack.length > 0;
   },
 
   reset: () => {

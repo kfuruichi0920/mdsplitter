@@ -195,3 +195,85 @@
 
 - src/renderer/store/workspaceStore.ts - moveCardsメソッドと階層検証ロジック
 - src/renderer/components/CardPanel.tsx - ドラッグ&ドロップUI
+
+### P2-16: カード編集UI（ダブルクリックによるインライン編集）とUndo/Redo（実装中）
+
+#### 実装内容（進行中）
+
+1. **Undo/Redoスタックのデータ構造追加** (完了)
+   - `UndoRedoEntry`インターフェース定義:
+     - `type`: 操作種別（'update' | 'move' | 'add' | 'delete'）
+     - `tabId`: 対象タブID
+     - `cards`: 変更前のカード配列
+     - `description`: 操作の説明
+   - `PanelTabState`に`editingCardId: string | null`を追加
+   - `WorkspaceStore`に`undoStack`と`redoStack`を追加（最大100件）
+
+2. **Undo/Redoアクションメソッド実装** (完了)
+   - `undo()`: Undoスタックから取り出して状態を復元、Redoスタックに現在の状態を保存
+   - `redo()`: Redoスタックから取り出して状態を復元、Undoスタックに現在の状態を保存
+   - `canUndo()`: Undoスタックが空でないか判定
+   - `canRedo()`: Redoスタックが空でないか判定
+   - `setEditingCard()`: 編集中カードIDを設定
+
+3. **カード編集メソッドのUndo/Redo対応** (完了)
+   - `updateCard()`: カード更新前にUndoスタックに保存、Redoスタックをクリア
+   - `moveCards()`: カード移動前にUndoスタックに保存、Redoスタックをクリア
+
+4. **未実装事項**
+   - CardPanelのダブルクリックハンドラ
+   - EditableCardコンポーネント（インライン編集UI）
+   - 編集確定/キャンセル処理
+   - Undo/Redoショートカットキー（Ctrl+Z/Ctrl+Y）
+   - 型エラーの修正
+   - 単体テスト
+
+#### 決定事項と根拠
+
+1. **Undoスタックの最大件数**
+   - 根拠: メモリ使用量を制限しつつ、十分な履歴を保持
+   - 実装: 100件までの履歴を保持、超えた分は古い順に削除
+   - メリット: メモリリークを防止
+
+2. **Redoスタックのクリア**
+   - 根拠: 新しい操作を行った場合、分岐したRedoは無効
+   - 実装: updateCard/moveCards実行時にRedoスタックをクリア
+   - メリット: 一般的なエディタの挙動と一致
+
+3. **カード配列の深いコピー**
+   - 根拠: Undoスタックに保存する際、参照ではなく値のコピーが必要
+   - 実装: `[...tab.cards]`でシャローコピー
+   - 制約: カードオブジェクト自体はシャローコピー（現状問題なし）
+
+#### テスト結果
+
+- TypeScriptの型チェック: **一部エラーあり**（既存の型エラーと、循環参照エラーを修正済み）
+
+#### 制約・注意事項
+
+1. **型エラー**
+   - App.tsx, CardPanel.tsx, TraceConnectorLayer.tsxで型エラーが残存
+   - 既存のコードに起因するエラーも含む
+   - 次回セッションで修正予定
+
+2. **インライン編集UI**
+   - EditableCardコンポーネント未実装
+   - ダブルクリックハンドラ未実装
+   - 編集確定/キャンセルロジック未実装
+
+3. **ショートカットキー**
+   - Ctrl+Z/Ctrl+Y未実装
+   - 次回セッションで実装予定
+
+#### 今後の拡張
+
+1. EditableCardコンポーネントの実装
+2. CardPanelへのダブルクリックハンドラ追加
+3. 編集確定/キャンセル処理
+4. Undo/Redoショートカットキー
+5. 型エラーの修正
+6. 単体テストの追加
+
+#### ファイル変更
+
+- src/renderer/store/workspaceStore.ts - Undo/Redoスタックとメソッド、editingCardId追加
