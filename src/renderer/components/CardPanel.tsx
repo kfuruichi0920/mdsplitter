@@ -10,8 +10,8 @@
  * @copyright MIT
  */
 
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react';
-import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react';
+import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
@@ -82,6 +82,9 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const [draggedCardIds, setDraggedCardIds] = useState<string[]>([]);
   const [dropTarget, setDropTarget] = useState<{ cardId: string; position: 'before' | 'after' | 'child' } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ card: Card; x: number; y: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
 
   const leafTabs = useWorkspaceStore(
     useCallback((state) => {
@@ -193,13 +196,13 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     if (!activeTabId) {
       return;
     }
-    const created = addCard(leafId, activeTabId);
+    const created = addCard(leafId, activeTabId, { position: toolbarInsertMode });
     if (!created) {
       onLog?.('WARN', 'カードを追加できませんでした。');
       return;
     }
-    onLog?.('INFO', `カード「${created.title || '新規カード'}」を追加しました。`);
-  }, [activeTabId, addCard, leafId, onLog]);
+    onLog?.('INFO', `カード「${created.title || '新規カード'}」を追加しました。（${toolbarInsertMode === 'before' ? '前' : toolbarInsertMode === 'child' ? '子' : '後'}に挿入）`);
+  }, [activeTabId, addCard, leafId, onLog, toolbarInsertMode]);
 
   const handleDeleteCards = useCallback(() => {
     if (!activeTabId || selectedCardIds.size === 0) {
@@ -216,6 +219,58 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
       onLog?.('WARN', 'カードを削除できませんでした。');
     }
   }, [activeTabId, deleteCards, leafId, onLog, selectedCardIds]);
+
+  const handleCardContextMenu = useCallback(
+    (card: Card, event: React.MouseEvent) => {
+      if (!activeTabId) {
+        return;
+      }
+      if (!selectedCardIds.has(card.id)) {
+        selectCard(leafId, activeTabId, card.id);
+      }
+      setContextMenu({ card, x: event.clientX, y: event.clientY });
+    },
+    [activeTabId, leafId, selectCard, selectedCardIds],
+  );
+
+  const handleContextAction = useCallback(
+    (position: InsertPosition) => {
+      if (!activeTabId || !contextMenu) {
+        return;
+      }
+      const created = addCard(leafId, activeTabId, { anchorCardId: contextMenu.card.id, position });
+      if (created) {
+        onLog?.('INFO', `カード「${created.title || '新規カード'}」を${position === 'before' ? '前' : position === 'child' ? '子' : '後'}に追加しました。`);
+      }
+      setContextMenu(null);
+    },
+    [activeTabId, addCard, contextMenu, leafId, onLog],
+  );
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+    const handleClose = (event: MouseEvent) => {
+      if (contextMenuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setContextMenu(null);
+    };
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener('mousedown', handleClose);
+    window.addEventListener('contextmenu', handleClose);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('mousedown', handleClose);
+      window.removeEventListener('contextmenu', handleClose);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [contextMenu]);
 
   /**
    * @brief パネルクリック時の処理。
@@ -515,10 +570,23 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             onClick={handleAddCard}
             disabled={!activeTabId}
             aria-disabled={!activeTabId}
-            title="選択中カードの直下に追加"
+            title={`選択中カードの${toolbarInsertMode === 'before' ? '前' : toolbarInsertMode === 'child' ? '子' : '後'}に追加`}
           >
             ➕ 追加
           </button>
+          <label className="panel-toolbar__select-wrapper">
+            <span className="sr-only">挿入モード</span>
+            <select
+              className="panel-toolbar__select"
+              value={toolbarInsertMode}
+              onChange={(event) => setToolbarInsertMode(event.target.value as InsertPosition)}
+              aria-label="挿入モード"
+            >
+              <option value="before">前に追加</option>
+              <option value="after">後に追加</option>
+              <option value="child">子として追加</option>
+            </select>
+          </label>
           <button
             type="button"
             className="panel-toolbar__button"
@@ -586,6 +654,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragEnd={handleDragEnd}
+            onContextMenu={handleCardContextMenu}
             panelScrollRef={panelScrollRef}
           />
         ))}
@@ -600,6 +669,24 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
           </div>
         )}
       </div>
+      {contextMenu ? (
+        <div
+          ref={contextMenuRef}
+          className="panel-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          role="menu"
+        >
+          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('before')}>
+            ⬆︎ 選択カードの前に追加
+          </button>
+          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('after')}>
+            ⬇︎ 選択カードの後に追加
+          </button>
+          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('child')}>
+            ➡︎ 子として追加
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -712,9 +799,10 @@ interface CardListItemProps {
   onDragOver?: (cardId: string, position: 'before' | 'after' | 'child') => void; ///< ドラッグオーバーハンドラ。
   onDrop?: () => void; ///< ドロップハンドラ。
   onDragEnd?: () => void; ///< ドラッグ終了ハンドラ。
+  onContextMenu?: (card: Card, event: React.MouseEvent) => void; ///< コンテキストメニューハンドラ。
 }
 
-const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDoubleClick, onUpdateCard, onCancelEdit, onDragStart, onDragOver, onDrop, onDragEnd }: CardListItemProps) => {
+const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDoubleClick, onUpdateCard, onCancelEdit, onDragStart, onDragOver, onDrop, onDragEnd, onContextMenu }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
@@ -758,6 +846,12 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, le
         onClick={(event) => onSelect(card, event)}
         onDoubleClick={() => onDoubleClick(card)}
         onKeyDown={(event) => onKeyDown(event, card)}
+        onContextMenu={(event) => {
+          if (onContextMenu) {
+            event.preventDefault();
+            onContextMenu(card, event);
+          }
+        }}
       >
         {expandButton}
         <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
@@ -781,6 +875,12 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, le
       onClick={(event) => onSelect(card, event)}
       onDoubleClick={() => onDoubleClick(card)}
       onKeyDown={(event) => onKeyDown(event, card)}
+      onContextMenu={(event) => {
+        if (onContextMenu) {
+          event.preventDefault();
+          onContextMenu(card, event);
+        }
+      }}
     >
       <header className="card__header">
         {expandButton}

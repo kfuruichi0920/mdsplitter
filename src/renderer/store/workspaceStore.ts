@@ -82,6 +82,8 @@ export type OpenTabResult =
  * @details
  * タブ・パネル・ファイルの紐付けと各種操作を管理。
  */
+export type InsertPosition = 'before' | 'after' | 'child';
+
 export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
   leafs: Record<string, LeafWorkspaceState>;
@@ -96,7 +98,7 @@ export interface WorkspaceStore {
   clearSelection: (leafId: string, tabId: string) => void; ///< 選択をクリア
   toggleCardSelection: (leafId: string, tabId: string, cardId: string) => void; ///< カード選択をトグル（Ctrl+クリック）
   selectCardRange: (leafId: string, tabId: string, cardId: string) => void; ///< 範囲選択（Shift+クリック）
-  addCard: (leafId: string, tabId: string) => Card | null; ///< 選択中カードの直下に同階層カードを追加
+  addCard: (leafId: string, tabId: string, options?: { anchorCardId?: string | null; position?: InsertPosition }) => Card | null; ///< 挿入位置を指定してカードを追加
   deleteCards: (leafId: string, tabId: string, cardIds?: string[]) => number; ///< 指定または選択中カードを削除
   updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
   cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
@@ -465,7 +467,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     });
   },
 
-  addCard: (leafId, tabId) => {
+  addCard: (leafId, tabId, options) => {
     let createdCard: Card | null = null;
 
     set((state) => {
@@ -474,11 +476,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      const position: InsertPosition = options?.position ?? 'after';
+
       const undoEntry: UndoRedoEntry = {
         type: 'add',
         tabId,
         cards: [...tab.cards],
-        description: 'カードを追加',
+        description: `カードを${position === 'before' ? '前' : position === 'child' ? '子' : '後'}に追加`,
       };
 
       const nextUndoStack = [...state.undoStack, undoEntry];
@@ -486,10 +490,41 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       const selectionOrder = Array.from(tab.selectedCardIds);
       const fallbackAnchorId = tab.cards[tab.cards.length - 1]?.id ?? null;
-      const anchorId = selectionOrder[selectionOrder.length - 1] ?? fallbackAnchorId;
+      const anchorId = options?.anchorCardId ?? selectionOrder[selectionOrder.length - 1] ?? fallbackAnchorId;
       const anchorCard = anchorId ? tab.cards.find((card) => card.id === anchorId) ?? null : null;
-      const targetLevel = anchorCard?.level ?? 0;
-      const parentId = anchorCard?.parent_id ?? null;
+
+      let parentId: string | null = anchorCard?.parent_id ?? null;
+      let insertIndex = tab.cards.length;
+      let newLevel = anchorCard?.level ?? 0;
+
+      if (anchorCard) {
+        const anchorIndex = tab.cards.findIndex((card) => card.id === anchorCard.id);
+        if (anchorIndex !== -1) {
+          const subtreeEndIndex = getSubtreeEndIndex(tab.cards, anchorIndex);
+          switch (position) {
+            case 'before':
+              insertIndex = anchorIndex;
+              parentId = anchorCard.parent_id ?? null;
+              newLevel = anchorCard.level;
+              break;
+            case 'child':
+              insertIndex = subtreeEndIndex;
+              parentId = anchorCard.id;
+              newLevel = anchorCard.level + 1;
+              break;
+            case 'after':
+            default:
+              insertIndex = subtreeEndIndex;
+              parentId = anchorCard.parent_id ?? null;
+              newLevel = anchorCard.level;
+              break;
+          }
+        }
+      } else {
+        parentId = null;
+        insertIndex = tab.cards.length;
+        newLevel = 0;
+      }
 
       const newCard: Card = {
         id: nanoid(),
@@ -504,23 +539,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         child_ids: [],
         prev_id: null,
         next_id: null,
-        level: anchorCard ? anchorCard.level : 0,
+        level: newLevel,
       } satisfies Card;
-
-      let insertIndex = tab.cards.length;
-      if (anchorCard) {
-        const anchorIndex = tab.cards.findIndex((card) => card.id === anchorCard.id);
-        if (anchorIndex !== -1) {
-          insertIndex = anchorIndex + 1;
-          for (let i = anchorIndex + 1; i < tab.cards.length; i += 1) {
-            if (tab.cards[i].level <= targetLevel) {
-              insertIndex = i;
-              break;
-            }
-            insertIndex = i + 1;
-          }
-        }
-      }
 
       const insertedCards = [
         ...tab.cards.slice(0, insertIndex),
@@ -530,7 +550,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const rebuiltCards = rebuildSiblingLinks(insertedCards);
 
       const nextExpandedIds = new Set(tab.expandedCardIds);
-      if (parentId) {
+      if (position === 'child' && anchorCard) {
+        nextExpandedIds.add(anchorCard.id);
+      } else if (parentId) {
         nextExpandedIds.add(parentId);
       }
 
@@ -1166,6 +1188,24 @@ function rebuildSiblingLinks(cards: Card[]): Card[] {
   });
 
   return finalCards;
+}
+
+/**
+ * @brief 指定カードのサブツリー終端インデックスを取得。
+ * @param cards カードリスト。
+ * @param startIndex サブツリーの先頭インデックス。
+ * @return サブツリー終端（末尾の次）インデックス。
+ */
+function getSubtreeEndIndex(cards: Card[], startIndex: number): number {
+  if (startIndex < 0 || startIndex >= cards.length) {
+    return cards.length;
+  }
+  const baseLevel = cards[startIndex].level;
+  let index = startIndex + 1;
+  while (index < cards.length && cards[index].level > baseLevel) {
+    index += 1;
+  }
+  return index;
 }
 
 /**

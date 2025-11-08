@@ -217,6 +217,53 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(reverted?.cards).toHaveLength(2);
   });
 
+  it('inserts a card before the anchor when position is before', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    let created: Card | null = null;
+    act(() => {
+      created = useWorkspaceStore.getState().addCard('leaf-A', tabId, { anchorCardId: 'card-001', position: 'before' });
+    });
+
+    expect(created).not.toBeNull();
+    const createdCard = created!;
+    const cards = (useWorkspaceStore.getState().tabs[tabId]?.cards ?? []) as Card[];
+    expect(cards[0].id).toBe(createdCard.id);
+    expect(cards[1].id).toBe('card-001');
+    expect(createdCard.parent_id).toBeNull();
+  });
+
+  it('adds a child card and expands the parent', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    let created: Card | null = null;
+    act(() => {
+      created = useWorkspaceStore.getState().addCard('leaf-A', tabId, { anchorCardId: 'card-001', position: 'child' });
+    });
+
+    expect(created).not.toBeNull();
+    const createdCard = created!;
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs[tabId];
+    expect(createdCard.parent_id).toBe('card-001');
+    expect(createdCard.level).toBe(1);
+    expect(tab?.expandedCardIds.has('card-001')).toBe(true);
+  });
+
   it('deletes selected cards (including descendants) and restores via undo', () => {
     let tabId = '';
     act(() => {
