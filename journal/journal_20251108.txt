@@ -196,9 +196,9 @@
 - src/renderer/store/workspaceStore.ts - moveCardsメソッドと階層検証ロジック
 - src/renderer/components/CardPanel.tsx - ドラッグ&ドロップUI
 
-### P2-16: カード編集UI（ダブルクリックによるインライン編集）とUndo/Redo（実装中）
+### P2-16: カード編集UI（ダブルクリックによるインライン編集）とUndo/Redo（実装完了）
 
-#### 実装内容（進行中）
+#### 実装内容
 
 1. **Undo/Redoスタックのデータ構造追加** (完了)
    - `UndoRedoEntry`インターフェース定義:
@@ -220,13 +220,28 @@
    - `updateCard()`: カード更新前にUndoスタックに保存、Redoスタックをクリア
    - `moveCards()`: カード移動前にUndoスタックに保存、Redoスタックをクリア
 
-4. **未実装事項**
-   - CardPanelのダブルクリックハンドラ
-   - EditableCardコンポーネント（インライン編集UI）
-   - 編集確定/キャンセル処理
-   - Undo/Redoショートカットキー（Ctrl+Z/Ctrl+Y）
-   - 型エラーの修正
-   - 単体テスト
+4. **ダブルクリック編集UI実装** (完了)
+   - CardPanel.tsxにダブルクリックハンドラを追加
+   - `handleCardDoubleClick()`: カードをダブルクリックして編集モードに移行
+   - `handleUpdateCard()`: カード編集を確定してストアを更新
+   - `handleCancelEdit()`: カード編集をキャンセル
+
+5. **EditableCardコンポーネント実装** (完了)
+   - インライン編集用のUIコンポーネント
+   - タイトル入力フィールド（input要素）
+   - 本文入力フィールド（textarea要素、5行）
+   - 保存ボタン（✓ 保存）
+   - キャンセルボタン（✕ キャンセル）
+   - キーボードショートカット:
+     - Ctrl+Enter: 保存
+     - Escape: キャンセル
+   - 階層インデントを維持
+
+6. **Undo/Redoショートカットキー実装** (完了) - App.tsx
+   - Ctrl+Z: Undo（操作を取り消す）
+   - Ctrl+Y / Ctrl+Shift+Z: Redo（操作をやり直す）
+   - 通知とログ記録を追加
+   - canUndo/canRedoでボタンの有効/無効を制御
 
 #### 決定事項と根拠
 
@@ -245,35 +260,55 @@
    - 実装: `[...tab.cards]`でシャローコピー
    - 制約: カードオブジェクト自体はシャローコピー（現状問題なし）
 
+#### 決定事項（追加）
+
+4. **EditableCardのキーボード操作**
+   - 根拠: 一般的なエディタの操作感を踏襲
+   - Ctrl+Enter: 保存（通常のEnterは改行）
+   - Escape: キャンセル
+   - メリット: 直感的な操作が可能
+
+5. **編集中カードの表示切替**
+   - 根拠: 編集中は通常のカード表示を置き換える
+   - 実装: CardListItemで`isEditing`をチェックしてEditableCardを表示
+   - メリット: 画面がシンプルで編集フォーカスが明確
+
 #### テスト結果
 
-- TypeScriptの型チェック: **一部エラーあり**（既存の型エラーと、循環参照エラーを修正済み）
+- TypeScriptの型チェック: **合格** (全ての型エラーを修正済み)
+- 単体テスト: 未実施（次回セッションで実装予定）
 
 #### 制約・注意事項
 
-1. **型エラー**
-   - App.tsx, CardPanel.tsx, TraceConnectorLayer.tsxで型エラーが残存
-   - 既存のコードに起因するエラーも含む
-   - 次回セッションで修正予定
+1. **単体テスト未実施**
+   - Undo/Redo機能の単体テスト未実装
+   - 編集機能の単体テスト未実装
+   - 次回セッションで追加予定
 
-2. **インライン編集UI**
-   - EditableCardコンポーネント未実装
-   - ダブルクリックハンドラ未実装
-   - 編集確定/キャンセルロジック未実装
+2. **編集中の状態管理**
+   - 編集中カードIDはタブごとに管理
+   - 同時に複数カードの編集は不可（1タブにつき1カード）
+   - タブ切替時に編集状態は維持される
 
-3. **ショートカットキー**
-   - Ctrl+Z/Ctrl+Y未実装
-   - 次回セッションで実装予定
+3. **Undo/Redo対象操作**
+   - 現在対応: updateCard, moveCards
+   - 未対応: addCard, deleteCard（将来実装予定）
 
 #### 今後の拡張
 
-1. EditableCardコンポーネントの実装
-2. CardPanelへのダブルクリックハンドラ追加
-3. 編集確定/キャンセル処理
-4. Undo/Redoショートカットキー
-5. 型エラーの修正
-6. 単体テストの追加
+1. 単体テストの追加:
+   - Undo/Redoスタックのテスト
+   - EditableCardコンポーネントのテスト
+   - キーボードショートカットのテスト
+
+2. カード追加/削除のUndo/Redo対応
+
+3. Undo/Redoボタンの追加（ツールバー）
+
+4. 編集履歴の詳細表示機能
 
 #### ファイル変更
 
-- src/renderer/store/workspaceStore.ts - Undo/Redoスタックとメソッド、editingCardId追加
+- src/renderer/store/workspaceStore.ts - Undo/Redoスタックとメソッド、editingCardId追加、循環参照修正
+- src/renderer/components/CardPanel.tsx - EditableCardコンポーネント、ダブルクリックハンドラ、編集関連ハンドラ
+- src/renderer/App.tsx - Undo/Redoショートカットキー実装

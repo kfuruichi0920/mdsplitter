@@ -136,6 +136,10 @@ export const App = () => {
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
+  const undo = useWorkspaceStore((state) => state.undo);
+  const redo = useWorkspaceStore((state) => state.redo);
+  const canUndo = useWorkspaceStore((state) => state.canUndo);
+  const canRedo = useWorkspaceStore((state) => state.canRedo);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -919,6 +923,46 @@ export const App = () => {
 
       const key = event.key.toLowerCase();
 
+      //! Ctrl+Z: Undo
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        if (canUndo()) {
+          const success = undo();
+          if (success) {
+            notify('info', '操作を取り消しました。');
+            pushLog({
+              id: `undo-${Date.now()}`,
+              level: 'INFO',
+              message: '操作を取り消しました。',
+              timestamp: new Date(),
+            });
+          }
+        } else {
+          notify('info', '取り消す操作がありません。');
+        }
+        return;
+      }
+
+      //! Ctrl+Y or Ctrl+Shift+Z: Redo
+      if (key === 'y' || (key === 'z' && event.shiftKey)) {
+        event.preventDefault();
+        if (canRedo()) {
+          const success = redo();
+          if (success) {
+            notify('info', '操作をやり直しました。');
+            pushLog({
+              id: `redo-${Date.now()}`,
+              level: 'INFO',
+              message: '操作をやり直しました。',
+              timestamp: new Date(),
+            });
+          }
+        } else {
+          notify('info', 'やり直す操作がありません。');
+        }
+        return;
+      }
+
       if (key === 's' && !event.shiftKey) {
         event.preventDefault();
         void handleSave();
@@ -945,7 +989,7 @@ export const App = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSplit, openSearchPanel]);
+  }, [canRedo, canUndo, handleSave, handleSplit, notify, openSearchPanel, pushLog, redo, undo]);
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>

@@ -10,7 +10,7 @@
  * @copyright MIT
  */
 
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react';
 import type { Card, CardKind, CardStatus, PanelTabState } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
@@ -101,6 +101,8 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
   const moveCards = useWorkspaceStore((state) => state.moveCards);
+  const setEditingCard = useWorkspaceStore((state) => state.setEditingCard);
+  const updateCard = useWorkspaceStore((state) => state.updateCard);
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
   const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
 
@@ -114,6 +116,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const cards = activeTab?.cards ?? [];
   const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
   const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
+  const editingCardId = activeTab?.editingCardId ?? null;
   const cardCount = cards.length;
 
   /**
@@ -351,6 +354,49 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     setDropTarget(null);
   }, []);
 
+  /**
+   * @brief カードをダブルクリックして編集モードに移行する。
+   * @param card 対象カード。
+   */
+  const handleCardDoubleClick = useCallback(
+    (card: Card) => {
+      if (!activeTabId) {
+        return;
+      }
+      setEditingCard(leafId, activeTabId, card.id);
+      onLog?.('INFO', `カード「${card.title}」を編集モードにしました。`);
+    },
+    [activeTabId, leafId, onLog, setEditingCard],
+  );
+
+  /**
+   * @brief カードの編集を確定する。
+   * @param cardId 対象カードID。
+   * @param patch カードの変更内容。
+   */
+  const handleUpdateCard = useCallback(
+    (cardId: string, patch: { title?: string; body?: string }) => {
+      if (!activeTabId) {
+        return;
+      }
+      updateCard(leafId, activeTabId, cardId, patch);
+      setEditingCard(leafId, activeTabId, null);
+      onLog?.('INFO', 'カードの編集を保存しました。');
+    },
+    [activeTabId, leafId, onLog, setEditingCard, updateCard],
+  );
+
+  /**
+   * @brief カードの編集をキャンセルする。
+   */
+  const handleCancelEdit = useCallback(() => {
+    if (!activeTabId) {
+      return;
+    }
+    setEditingCard(leafId, activeTabId, null);
+    onLog?.('INFO', 'カードの編集をキャンセルしました。');
+  }, [activeTabId, leafId, onLog, setEditingCard]);
+
   return (
     <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
       {/* タブバー: 各カードファイルのタブを表示 */}
@@ -472,6 +518,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             isSelected={selectedCardIds.has(card.id)}
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
+            isEditing={editingCardId === card.id}
             displayMode={cardDisplayMode}
             onSelect={handleCardSelect}
             onKeyDown={handleCardKeyDown}
@@ -480,6 +527,9 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
                 useWorkspaceStore.getState().toggleCardExpanded(leafId, activeTabId, card.id);
               }
             }}
+            onDoubleClick={handleCardDoubleClick}
+            onUpdateCard={handleUpdateCard}
+            onCancelEdit={handleCancelEdit}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
@@ -502,11 +552,100 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   );
 };
 
+/**
+ * @brief 編集可能なカードコンポーネントのプロパティ。
+ */
+interface EditableCardProps {
+  card: Card;
+  onSave: (cardId: string, patch: { title?: string; body?: string }) => void;
+  onCancel: () => void;
+}
+
+/**
+ * @brief 編集可能なカードコンポーネント。
+ * @details
+ * カードをインライン編集するためのUI。
+ * タイトルと本文を編集可能で、Enter/Escapeキーによる確定/キャンセルに対応。
+ */
+const EditableCard = ({ card, onSave, onCancel }: EditableCardProps) => {
+  const [title, setTitle] = useState(card.title);
+  const [body, setBody] = useState(card.body);
+
+  const handleTitleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
+  }, []);
+
+  const handleBodyChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
+    setBody(e.target.value);
+  }, []);
+
+  const handleSave = useCallback(() => {
+    const patch: { title?: string; body?: string } = {};
+    if (title !== card.title) {
+      patch.title = title;
+    }
+    if (body !== card.body) {
+      patch.body = body;
+    }
+    onSave(card.id, patch);
+  }, [body, card.body, card.id, card.title, onSave, title]);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        handleSave();
+      }
+    },
+    [handleSave, onCancel],
+  );
+
+  //! 階層インデントのスタイル
+  const indentStyle = { paddingLeft: `${12 + card.level * 24}px` };
+
+  return (
+    <article className="card card--editing" style={indentStyle} role="listitem">
+      <header className="card__header">
+        <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+        <input
+          type="text"
+          className="card__title-input"
+          value={title}
+          onChange={handleTitleChange}
+          onKeyDown={handleKeyDown}
+          placeholder="カードタイトル"
+          autoFocus
+        />
+      </header>
+      <textarea
+        className="card__body-input"
+        value={body}
+        onChange={handleBodyChange}
+        onKeyDown={handleKeyDown}
+        placeholder="カード本文"
+        rows={5}
+      />
+      <footer className="card__footer card__footer--editing">
+        <button type="button" className="card__button card__button--save" onClick={handleSave} title="保存 (Ctrl+Enter)">
+          ✓ 保存
+        </button>
+        <button type="button" className="card__button card__button--cancel" onClick={onCancel} title="キャンセル (Escape)">
+          ✕ キャンセル
+        </button>
+      </footer>
+    </article>
+  );
+};
+
 interface CardListItemProps {
   card: Card;
   isSelected: boolean; ///< 選択状態（複数選択対応）。
   isExpanded: boolean; ///< 展開状態（子を持つカードのみ有効）。
   hasChildren: boolean; ///< 子カードを持つかどうか。
+  isEditing: boolean; ///< 編集モード中かどうか。
   leafId: string;
   fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
@@ -514,16 +653,24 @@ interface CardListItemProps {
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
   onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
+  onDoubleClick: (card: Card) => void; ///< ダブルクリックハンドラ（編集モード移行）。
+  onUpdateCard: (cardId: string, patch: { title?: string; body?: string }) => void; ///< カード更新ハンドラ。
+  onCancelEdit: () => void; ///< 編集キャンセルハンドラ。
   onDragStart?: (cardId: string) => void; ///< ドラッグ開始ハンドラ。
   onDragOver?: (cardId: string, position: 'before' | 'after' | 'child') => void; ///< ドラッグオーバーハンドラ。
   onDrop?: () => void; ///< ドロップハンドラ。
   onDragEnd?: () => void; ///< ドラッグ終了ハンドラ。
 }
 
-const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDragStart, onDragOver, onDrop, onDragEnd }: CardListItemProps) => {
+const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDoubleClick, onUpdateCard, onCancelEdit, onDragStart, onDragOver, onDrop, onDragEnd }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+
+  //! 編集モードの場合はEditableCardを表示
+  if (isEditing) {
+    return <EditableCard card={card} onSave={onUpdateCard} onCancel={onCancelEdit} />;
+  }
 
   //! 階層インデントのスタイル
   const indentStyle = { paddingLeft: `${12 + card.level * 24}px` };
@@ -557,6 +704,7 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileN
         tabIndex={0}
         ref={anchorRef}
         onClick={(event) => onSelect(card, event)}
+        onDoubleClick={() => onDoubleClick(card)}
         onKeyDown={(event) => onKeyDown(event, card)}
       >
         {expandButton}
@@ -579,6 +727,7 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileN
       tabIndex={0}
       ref={anchorRef}
       onClick={(event) => onSelect(card, event)}
+      onDoubleClick={() => onDoubleClick(card)}
       onKeyDown={(event) => onKeyDown(event, card)}
     >
       <header className="card__header">
