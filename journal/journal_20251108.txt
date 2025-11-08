@@ -368,3 +368,7 @@
 - 原因: `moveCards` がターゲットカードを `isDescendant(targetCard, movingCard)` で検証していたため、祖先カードをドロップ先に選ぶと「ターゲットは移動対象の子孫」と誤判定し移動を拒否していた。またサブツリー全体のID集合を `movedCardIds` として保持していたが、実際にはルートのみしか含まず子孫処理で不整合が生じる余地があった。
 - 対応: 循環チェックを `isDescendant(movingCard, targetCard)` に変更し、自己ドロップも禁止。さらに `rootMoveIds` と `allMovedIds` を明確に分離して、階層更新時に根と子孫を正しく扱うよう整理。これにより祖先階層への移動やルートへの昇格が可能に戻った (`src/renderer/store/workspaceStore.ts:950-1015`)。
 - テスト: 1) 親→他のルート手前への移動で `parent_id`/`level` が更新されるケース、2) 自身の子孫へ移動しようとした場合 false を返し構造が変わらないケースを追加 (`src/renderer/store/workspaceStore.test.ts:240-320`)。`npm run test -- workspaceStore.test.ts` で 17 件全て緑を確認。
+### 分割ノードのアクティブ表示追加 (2025-11-08)
+- `CardPanel` で `useSplitStore` を参照し、アクティブ葉IDと一致するパネルに `split-node--active` クラス／`data-active` 属性を付けることで視覚状態を取得できるようにした (`src/renderer/components/CardPanel.tsx:9-45,520-540`)。
+- `styles.css` に `.split-node--active` を追加し、青系ボーダー＋リングで現在パネルを強調表示するようデザインを更新 (`src/renderer/styles.css:208-216`)。
+- UI設計書へアクティブパネルのハイライト仕様を追記し、ドキュメントと実装を同期 (`doc/user_interface_design.md:206-214`)。

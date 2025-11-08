@@ -28,7 +28,7 @@ const collectLeafIds = (node: SplitNode): string[] => {
  */
 export interface SplitContainerProps {
   node: SplitNode; ///< 描画対象のノード。
-  renderLeaf: (leafId: string) => ReactNode; ///< 葉ノードを描画する関数。
+  renderLeaf: (leafId: string, meta: { isActive: boolean }) => ReactNode; ///< 葉ノードを描画する関数。
 }
 
 /**
@@ -38,17 +38,30 @@ export interface SplitContainerProps {
  * 分割ノードの場合は Splitter で区切られた2つの SplitContainer を描画する。
  */
 export const SplitContainer = ({ node, renderLeaf }: SplitContainerProps) => {
+  const activeLeafId = useSplitStore((state) => state.activeLeafId);
+  return <SplitTree node={node} renderLeaf={renderLeaf} activeLeafId={activeLeafId} />;
+};
+
+const SplitTree = ({
+  node,
+  renderLeaf,
+  activeLeafId,
+}: {
+  node: SplitNode;
+  renderLeaf: (leafId: string, meta: { isActive: boolean }) => ReactNode;
+  activeLeafId: string | null;
+}) => {
   //! 葉ノードの場合は renderLeaf で描画
   if (node.type === 'leaf') {
     return (
       <div className="split-leaf" data-leaf-id={node.id} data-testid={`split-leaf-${node.id}`}>
-        {renderLeaf(node.id)}
+        {renderLeaf(node.id, { isActive: node.id === activeLeafId })}
       </div>
     );
   }
 
   //! 分割ノードの場合は SplitContainerNode で再帰描画
-  return <SplitContainerNode node={node} renderLeaf={renderLeaf} />;
+  return <SplitContainerNode node={node} renderLeaf={renderLeaf} activeLeafId={activeLeafId} />;
 };
 
 /**
@@ -57,9 +70,11 @@ export const SplitContainer = ({ node, renderLeaf }: SplitContainerProps) => {
 const SplitContainerNode = ({
   node,
   renderLeaf,
+  activeLeafId,
 }: {
   node: SplitContainerNodeType;
-  renderLeaf: (leafId: string) => ReactNode;
+  renderLeaf: (leafId: string, meta: { isActive: boolean }) => ReactNode;
+  activeLeafId: string | null;
 }) => {
   const updateSplitRatio = useSplitStore((state) => state.updateSplitRatio);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -114,13 +129,13 @@ const SplitContainerNode = ({
       data-split-id={node.id}
       ref={containerRef}
     >
-      <SplitContainer node={node.first} renderLeaf={renderLeaf} />
+      <SplitTree node={node.first} renderLeaf={renderLeaf} activeLeafId={activeLeafId} />
       <Splitter
         direction={node.direction}
         splitRatio={node.splitRatio}
         onRatioChange={handleRatioChange}
       />
-      <SplitContainer node={node.second} renderLeaf={renderLeaf} />
+      <SplitTree node={node.second} renderLeaf={renderLeaf} activeLeafId={activeLeafId} />
       <TraceConnectorLayer
         containerRef={containerRef}
         direction={node.direction}

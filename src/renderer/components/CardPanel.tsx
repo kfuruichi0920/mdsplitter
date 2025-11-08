@@ -68,6 +68,7 @@ const formatUpdatedAt = (value: string): string => {
  */
 export interface CardPanelProps {
   leafId: string; ///< 葉ノードID。
+  isActive?: boolean; ///< アクティブ葉ノードかどうか。
   onLog?: (level: 'INFO' | 'WARN' | 'ERROR', message: string) => void; ///< ログ出力コールバック。
   onPanelClick?: (leafId: string) => void; ///< パネルクリック時のコールバック。
   onPanelClose?: (leafId: string) => void; ///< パネルクローズ時のコールバック。
@@ -78,7 +79,7 @@ export interface CardPanelProps {
  * @details
  * タブバー、ツールバー、カード一覧を含むカードパネルを描画する。
  */
-export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
+export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPanelClose }: CardPanelProps) => {
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const [draggedCardIds, setDraggedCardIds] = useState<string[]>([]);
   const [dropTarget, setDropTarget] = useState<{ cardId: string; position: 'before' | 'after' | 'child' } | null>(null);
@@ -558,7 +559,12 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   }, [activeTabId, leafId, onLog, setEditingCard]);
 
   return (
-    <div className="split-node" data-leaf-id={leafId} onClick={handlePanelClick}>
+    <div
+      className={`split-node${isActive ? ' split-node--active' : ''}`}
+      data-leaf-id={leafId}
+      data-active={isActive ? 'true' : 'false'}
+      onClick={handlePanelClick}
+    >
       {/* タブバー: 各カードファイルのタブを表示 */}
       <div className="tab-bar" role="tablist" aria-label="カードファイルタブ">
         {leafTabs.length === 0 ? (

@@ -209,6 +209,10 @@
     @apply flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900/90;
   }
 
+  .split-node--active {
+    @apply border-blue-400 shadow-lg ring-2 ring-blue-300/40 dark:border-blue-400 dark:ring-blue-500/40;
+  }
+
   .tab-bar {
     @apply flex flex-shrink-0 items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
   }
