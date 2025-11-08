@@ -317,6 +317,8 @@ export const App = () => {
   const toggleTraceVisibility = useTracePreferenceStore((state) => state.toggleVisibility);
   const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
   const toggleTraceRecirculation = useTracePreferenceStore((state) => state.toggleExcludeSelfTrace);
+  const showOffscreenConnectors = useTracePreferenceStore((state) => state.showOffscreenConnectors);
+  const toggleOffscreenConnectors = useTracePreferenceStore((state) => state.toggleOffscreenConnectors);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
   const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
@@ -2014,8 +2016,8 @@ export const App = () => {
             type="button"
             className={`toolbar-button${isTraceVisible ? ' toolbar-button--active' : ''}`}
             onClick={toggleTraceVisibility}
-            title="トレーサ表示切替"
-            aria-label="トレーサ表示切替"
+            title="トレース表示切替"
+            aria-label="トレース表示切替"
           >
             ⛓️
           </button>
@@ -2027,6 +2029,15 @@ export const App = () => {
             aria-label="トレース強調の還流許可"
           >
             🔁
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${showOffscreenConnectors ? ' toolbar-button--active' : ''}`}
+            onClick={toggleOffscreenConnectors}
+            title="スクロール外カードのコネクタ表示"
+            aria-label="スクロール外カードのコネクタ表示"
+          >
+            🛰️
           </button>
           <button
             type="button"

@@ -242,6 +242,7 @@ export const TraceConnectorLayer = ({
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
   const cardVisibilityMap = useTracePreferenceStore((state) => state.mutedCards, shallow);
+  const showOffscreenConnectors = useTracePreferenceStore((state) => state.showOffscreenConnectors);
 
   const isCardSideVisible = useCallback(
     (fileName: string, cardId: string, side: TraceConnectorSide) => {
@@ -302,7 +303,7 @@ export const TraceConnectorLayer = ({
       return [];
     }
 
-    const entries = Object.values(cards).filter((entry) => entry.isVisible);
+    const entries = Object.values(cards).filter((entry) => showOffscreenConnectors || entry.isVisible);
 
     // ファイル名とleafIdsでエントリを検索するヘルパー
     const findEntry = (cardId: string, fileName: string, leafIds: string[]): CardAnchorEntry | undefined =>
@@ -352,7 +353,7 @@ export const TraceConnectorLayer = ({
       acc.push({ id: link.id, path, className });
       return acc;
     }, []);
-  }, [cards, containerRect, direction, filteredLinks, highlightedNodeKeys, leftLeafIds, rightLeafIds]);
+  }, [cards, containerRect, direction, filteredLinks, highlightedNodeKeys, leftLeafIds, rightLeafIds, showOffscreenConnectors]);
 
   if (direction !== 'vertical' || !isTraceVisible) {
     return null;

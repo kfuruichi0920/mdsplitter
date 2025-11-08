@@ -14,12 +14,14 @@ const makeCardKey = (fileName: string, cardId: string, side: TraceConnectorSide)
 interface TracePreferenceState {
   isVisible: boolean;
   excludeSelfTrace: boolean;
+  showOffscreenConnectors: boolean;
   creationRelationKind: TraceRelationKind;
   enabledKinds: RelationKindMap;
   fileVisibility: Record<string, boolean>;
   mutedCards: Record<string, boolean>;
   toggleVisibility: () => void;
   toggleExcludeSelfTrace: () => void;
+  toggleOffscreenConnectors: () => void;
   setCreationRelationKind: (kind: TraceRelationKind) => void;
   toggleRelationKind: (kind: TraceRelationKind) => void;
   setAllKinds: (value: boolean) => void;
@@ -33,12 +35,14 @@ interface TracePreferenceState {
 export const useTracePreferenceStore = create<TracePreferenceState>()((set, get) => ({
   isVisible: true,
   excludeSelfTrace: false,
+  showOffscreenConnectors: false,
   creationRelationKind: 'trace',
   enabledKinds: createInitialKindMap(),
   fileVisibility: {},
   mutedCards: {},
   toggleVisibility: () => set((state) => ({ isVisible: !state.isVisible })),
   toggleExcludeSelfTrace: () => set((state) => ({ excludeSelfTrace: !state.excludeSelfTrace })),
+  toggleOffscreenConnectors: () => set((state) => ({ showOffscreenConnectors: !state.showOffscreenConnectors })),
   setCreationRelationKind: (kind) => set(() => ({ creationRelationKind: kind })),
   toggleRelationKind: (kind) =>
     set((state) => ({
@@ -93,6 +97,7 @@ export const resetTracePreferenceStore = (): void => {
   useTracePreferenceStore.setState({
     isVisible: true,
     excludeSelfTrace: false,
+    showOffscreenConnectors: false,
     creationRelationKind: 'trace',
     enabledKinds: createInitialKindMap(),
     fileVisibility: {},

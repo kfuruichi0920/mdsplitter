@@ -6,15 +6,17 @@ describe('tracePreferenceStore', () => {
     resetTracePreferenceStore();
   });
 
-  it('toggles visibility and exclude-self flag', () => {
+  it('toggles visibility, exclude-self flag, and offscreen connectors flag', () => {
     act(() => {
       useTracePreferenceStore.getState().toggleVisibility();
       useTracePreferenceStore.getState().toggleExcludeSelfTrace();
+      useTracePreferenceStore.getState().toggleOffscreenConnectors();
     });
 
     const state = useTracePreferenceStore.getState();
     expect(state.isVisible).toBe(false);
     expect(state.excludeSelfTrace).toBe(true);
+    expect(state.showOffscreenConnectors).toBe(true);
   });
 
   it('disables individual relation kinds', () => {
