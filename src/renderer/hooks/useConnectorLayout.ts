@@ -123,6 +123,16 @@ export const useCardConnectorAnchor = ({
     };
   }, [scheduleMeasure]);
 
+  useEffect(() => {
+    const handleLayoutChanged = () => {
+      scheduleMeasure();
+    };
+    window.addEventListener('mdsplitter:card-layout-changed', handleLayoutChanged as EventListener);
+    return () => {
+      window.removeEventListener('mdsplitter:card-layout-changed', handleLayoutChanged as EventListener);
+    };
+  }, [scheduleMeasure]);
+
   // 分割境界移動時のレイアウトバージョン変更を監視
   const layoutVersion = useSplitStore((state) => state.layoutVersion);
   useEffect(() => {

@@ -85,6 +85,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const [contextMenu, setContextMenu] = useState<{ card: Card; x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
+  const [previewIndicator, setPreviewIndicator] = useState<{ cardId: string | null; position: InsertPosition; highlightIds: string[] } | null>(null);
 
   const leafTabs = useWorkspaceStore(
     useCallback((state) => {
@@ -106,10 +107,17 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const moveCards = useWorkspaceStore((state) => state.moveCards);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
+  const copySelection = useWorkspaceStore((state) => state.copySelection);
+  const pasteClipboard = useWorkspaceStore((state) => state.pasteClipboard);
+  const clipboardData = useWorkspaceStore((state) => state.clipboard);
+  const lastInsertPreview = useWorkspaceStore(
+    useCallback((state) => state.lastInsertPreview, []),
+  );
   const setEditingCard = useWorkspaceStore((state) => state.setEditingCard);
   const updateCard = useWorkspaceStore((state) => state.updateCard);
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
   const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
+  const hasClipboardItems = Boolean(clipboardData && clipboardData.length > 0);
 
   const activeTab = useMemo<PanelTabState | null>(() => {
     if (!activeTabId) {
@@ -118,11 +126,32 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     return leafTabs.find((tab) => tab.id === activeTabId) ?? null;
   }, [activeTabId, leafTabs]);
 
+  useEffect(() => {
+    if (!lastInsertPreview || !activeTabId) {
+      return;
+    }
+    if (lastInsertPreview.leafId !== leafId || lastInsertPreview.tabId !== activeTabId) {
+      return;
+    }
+    setPreviewIndicator({
+      cardId: lastInsertPreview.cardId,
+      position: lastInsertPreview.position,
+      highlightIds: lastInsertPreview.highlightIds,
+    });
+    const timer = window.setTimeout(() => {
+      setPreviewIndicator(null);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [lastInsertPreview, leafId, activeTabId]);
+
   const cards = activeTab?.cards ?? [];
   const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
   const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
   const editingCardId = activeTab?.editingCardId ?? null;
   const cardCount = cards.length;
+  const hasSelection = selectedCardIds.size > 0;
+  const visualDropTarget = dropTarget ?? previewIndicator;
+  const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
 
   /**
    * @brief 階層構造を考慮して表示すべきカードをフィルタリングする。
@@ -384,6 +413,52 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     onLog?.('INFO', 'すべてのカードを折畳みました。');
   }, [activeTabId, leafId, onLog]);
 
+  const handleCopySelected = useCallback(() => {
+    if (!activeTabId) {
+      return;
+    }
+    const count = copySelection(leafId, activeTabId);
+    if (count > 0) {
+      onLog?.('INFO', `${count}件のカードをコピーしました。`);
+    } else {
+      onLog?.('WARN', 'コピーするカードが選択されていません。');
+    }
+    setContextMenu(null);
+  }, [activeTabId, copySelection, leafId, onLog]);
+
+  const handlePasteIntoSelection = useCallback(() => {
+    if (!activeTabId) {
+      return;
+    }
+    if (!hasClipboardItems) {
+      onLog?.('WARN', '貼り付け可能なカードがありません。');
+      return;
+    }
+    const result = pasteClipboard(leafId, activeTabId, { position: toolbarInsertMode });
+    if (result && result.inserted > 0) {
+      onLog?.('INFO', `${result.inserted}件のカードを貼り付けました。`);
+    }
+  }, [activeTabId, hasClipboardItems, leafId, onLog, pasteClipboard, toolbarInsertMode]);
+
+  const handleContextPaste = useCallback(
+    (position: InsertPosition, anchorId: string) => {
+      if (!activeTabId) {
+        setContextMenu(null);
+        return;
+      }
+      if (!hasClipboardItems) {
+        onLog?.('WARN', '貼り付け可能なカードがありません。');
+        return;
+      }
+      const result = pasteClipboard(leafId, activeTabId, { position, anchorCardId: anchorId });
+      if (result && result.inserted > 0) {
+        onLog?.('INFO', `${result.inserted}件のカードを貼り付けました。`);
+      }
+      setContextMenu(null);
+    },
+    [activeTabId, hasClipboardItems, leafId, onLog, pasteClipboard],
+  );
+
   /**
    * @brief ドラッグ開始時の処理。
    * @param cardId ドラッグ開始したカードID。
@@ -597,6 +672,26 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
           >
             🗑️ 削除
           </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleCopySelected}
+            disabled={!activeTabId || !hasSelection}
+            aria-disabled={!activeTabId || !hasSelection}
+            title="選択中カードをコピー (Ctrl+C)"
+          >
+            📋 コピー
+          </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handlePasteIntoSelection}
+            disabled={!activeTabId || !hasClipboardItems}
+            aria-disabled={!activeTabId || !hasClipboardItems}
+            title="クリップボードを貼り付け (Ctrl+V)"
+          >
+            📥 ペースト
+          </button>
         </div>
         <div className="panel-toolbar__group">
           <input className="panel-toolbar__input" placeholder="� 文字列フィルタ" />
@@ -656,6 +751,9 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             onDragEnd={handleDragEnd}
             onContextMenu={handleCardContextMenu}
             panelScrollRef={panelScrollRef}
+            currentDropTarget={visualDropTarget}
+            draggedCardIds={draggedCardIds}
+            highlightIds={highlightedIds}
           />
         ))}
         {visibleCards.length === 0 && cards.length > 0 && (
@@ -676,15 +774,47 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
           style={{ top: contextMenu.y, left: contextMenu.x }}
           role="menu"
         >
-          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('before')}>
-            ⬆︎ 選択カードの前に追加
-          </button>
-          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('after')}>
-            ⬇︎ 選択カードの後に追加
-          </button>
-          <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('child')}>
-            ➡︎ 子として追加
-          </button>
+          <div className="panel-context-menu__section">
+            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('before')}>
+              ⬆︎ 選択カードの前に追加
+            </button>
+            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('after')}>
+              ⬇︎ 選択カードの後に追加
+            </button>
+            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('child')}>
+              ➡︎ 子として追加
+            </button>
+          </div>
+          <div className="panel-context-menu__divider" />
+          <div className="panel-context-menu__section">
+            <button type="button" className="panel-context-menu__item" onClick={handleCopySelected}>
+              📋 選択中カードをコピー
+            </button>
+            <button
+              type="button"
+              className="panel-context-menu__item"
+              onClick={() => handleContextPaste('before', contextMenu.card.id)}
+              disabled={!hasClipboardItems}
+            >
+              ⬆︎ ここに貼り付け (前)
+            </button>
+            <button
+              type="button"
+              className="panel-context-menu__item"
+              onClick={() => handleContextPaste('after', contextMenu.card.id)}
+              disabled={!hasClipboardItems}
+            >
+              ⬇︎ ここに貼り付け (後)
+            </button>
+            <button
+              type="button"
+              className="panel-context-menu__item"
+              onClick={() => handleContextPaste('child', contextMenu.card.id)}
+              disabled={!hasClipboardItems}
+            >
+              ➡︎ 子として貼り付け
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -800,9 +930,36 @@ interface CardListItemProps {
   onDrop?: () => void; ///< ドロップハンドラ。
   onDragEnd?: () => void; ///< ドラッグ終了ハンドラ。
   onContextMenu?: (card: Card, event: React.MouseEvent) => void; ///< コンテキストメニューハンドラ。
+  currentDropTarget?: { cardId: string | null; position: InsertPosition } | null;
+  draggedCardIds?: string[];
+  highlightIds?: Set<string>;
 }
 
-const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand, onDoubleClick, onUpdateCard, onCancelEdit, onDragStart, onDragOver, onDrop, onDragEnd, onContextMenu }: CardListItemProps) => {
+const CardListItem = ({
+  card,
+  isSelected,
+  isExpanded,
+  hasChildren,
+  isEditing,
+  leafId,
+  fileName,
+  displayMode,
+  panelScrollRef,
+  onSelect,
+  onKeyDown,
+  onToggleExpand,
+  onDoubleClick,
+  onUpdateCard,
+  onCancelEdit,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onContextMenu,
+  currentDropTarget,
+  draggedCardIds,
+  highlightIds,
+}: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
@@ -814,6 +971,55 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, le
 
   //! 階層インデントのスタイル
   const indentStyle = { paddingLeft: `${12 + card.level * 24}px` };
+  const dropBefore = currentDropTarget?.cardId === card.id && currentDropTarget.position === 'before';
+  const dropAfter = currentDropTarget?.cardId === card.id && currentDropTarget.position === 'after';
+  const dropChild = currentDropTarget?.cardId === card.id && currentDropTarget.position === 'child';
+  const isDragging = draggedCardIds?.includes(card.id) ?? false;
+  const isHighlighted = highlightIds?.has(card.id) ?? false;
+  const baseClass = displayMode === 'compact' ? 'card card--compact' : 'card';
+  const articleClassName = [
+    baseClass,
+    isSelected ? 'card--active' : '',
+    isDragging ? 'card--dragging' : '',
+    dropChild ? 'card--drop-child' : '',
+    isHighlighted ? 'card--highlighted' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const handleDragStartInternal = (event: React.DragEvent<HTMLElement>) => {
+    if (!onDragStart) {
+      return;
+    }
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    onDragStart(card.id);
+  };
+
+  const handleDragOverInternal = (event: React.DragEvent<HTMLElement>) => {
+    if (!onDragOver) {
+      return;
+    }
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const offsetY = event.clientY - rect.top;
+    const threshold = rect.height * 0.25;
+    let position: InsertPosition = 'child';
+    if (offsetY < threshold) {
+      position = 'before';
+    } else if (offsetY > rect.height - threshold) {
+      position = 'after';
+    }
+    onDragOver(card.id, position);
+  };
+
+  const handleDropInternal = (event: React.DragEvent<HTMLElement>) => {
+    if (!onDrop) {
+      return;
+    }
+    event.preventDefault();
+    onDrop();
+  };
 
   //! 展開/折畳ボタン
   const expandButton = hasChildren ? (
@@ -833,16 +1039,49 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, le
     <span className="card__expand-placeholder" />
   );
 
-  //! コンパクト表示の場合は1行のみ表示
-  if (displayMode === 'compact') {
-    return (
+  const articleContent = displayMode === 'compact'
+    ? (
+        <>
+          {expandButton}
+          <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+          <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+          <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+          <span className="card__title card__title--truncate">{card.title}</span>
+          <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+        </>
+      )
+    : (
+        <>
+          <header className="card__header">
+            {expandButton}
+            <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+            <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
+            <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+            <span className="card__title">{card.title}</span>
+            <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+          </header>
+          <p className="card__body">{card.body}</p>
+          <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
+        </>
+      );
+
+  return (
+    <div className="card-list-item" data-card-id={card.id}>
+      {dropBefore ? <div className="card__drop-indicator card__drop-indicator--before" aria-hidden /> : null}
       <article
-        className={`card card--compact${isSelected ? ' card--active' : ''}`}
+        className={articleClassName}
         style={indentStyle}
         aria-selected={isSelected}
         role="listitem"
         tabIndex={0}
         ref={anchorRef}
+        draggable={Boolean(onDragStart)}
+        onDragStart={handleDragStartInternal}
+        onDragOver={handleDragOverInternal}
+        onDrop={handleDropInternal}
+        onDragEnd={() => {
+          onDragEnd?.();
+        }}
         onClick={(event) => onSelect(card, event)}
         onDoubleClick={() => onDoubleClick(card)}
         onKeyDown={(event) => onKeyDown(event, card)}
@@ -853,45 +1092,9 @@ const CardListItem = ({ card, isSelected, isExpanded, hasChildren, isEditing, le
           }
         }}
       >
-        {expandButton}
-        <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
-        <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
-        <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-        <span className="card__title card__title--truncate">{card.title}</span>
-        <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+        {articleContent}
       </article>
-    );
-  }
-
-  //! 詳細表示
-  return (
-    <article
-      className={`card${isSelected ? ' card--active' : ''}`}
-      style={indentStyle}
-      aria-selected={isSelected}
-      role="listitem"
-      tabIndex={0}
-      ref={anchorRef}
-      onClick={(event) => onSelect(card, event)}
-      onDoubleClick={() => onDoubleClick(card)}
-      onKeyDown={(event) => onKeyDown(event, card)}
-      onContextMenu={(event) => {
-        if (onContextMenu) {
-          event.preventDefault();
-          onContextMenu(card, event);
-        }
-      }}
-    >
-      <header className="card__header">
-        {expandButton}
-        <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
-        <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
-        <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-        <span className="card__title">{card.title}</span>
-        <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
-      </header>
-      <p className="card__body">{card.body}</p>
-      <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>
-    </article>
+      {dropAfter ? <div className="card__drop-indicator card__drop-indicator--after" aria-hidden /> : null}
+    </div>
   );
 };

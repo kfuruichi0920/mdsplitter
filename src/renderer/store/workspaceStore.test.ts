@@ -11,6 +11,7 @@ import {
   resetWorkspaceStore,
   useWorkspaceStore,
   type Card,
+  type InsertPosition,
   type OpenTabResult,
 } from './workspaceStore';
 
@@ -262,6 +263,101 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(createdCard.parent_id).toBe('card-001');
     expect(createdCard.level).toBe(1);
     expect(tab?.expandedCardIds.has('card-001')).toBe(true);
+  });
+
+  it('copies selected root subtree and pastes after the anchor', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().selectCard('leaf-A', tabId, 'card-001');
+    });
+
+    let copied = 0;
+    act(() => {
+      copied = useWorkspaceStore.getState().copySelection('leaf-A', tabId);
+    });
+    expect(copied).toBe(1);
+
+    let pasteResult: { inserted: number; insertedIds: string[]; anchorId: string | null; position: InsertPosition } | null = null;
+    act(() => {
+      pasteResult = useWorkspaceStore.getState().pasteClipboard('leaf-A', tabId, { position: 'after' });
+    });
+
+    expect(pasteResult).not.toBeNull();
+    const result = pasteResult!;
+    expect(result.inserted).toBe(1);
+    const cards = useWorkspaceStore.getState().tabs[tabId]?.cards ?? [];
+    expect(cards).toHaveLength(4);
+    const pastedId = result.insertedIds[0];
+    const pastedCard = cards.find((card) => card.id === pastedId);
+    expect(pastedCard?.title).toBe('カード1');
+    const pastedChildren = cards.filter((card) => card.parent_id === pastedId);
+    expect(pastedChildren).toHaveLength(1);
+  });
+
+  it('pastes clipboard as child when specifying anchor and position', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().selectCard('leaf-A', tabId, 'card-002');
+    });
+
+    act(() => {
+      const copied = useWorkspaceStore.getState().copySelection('leaf-A', tabId);
+      expect(copied).toBe(1);
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().pasteClipboard('leaf-A', tabId, { position: 'child', anchorCardId: 'card-001' });
+    });
+
+    const cards = useWorkspaceStore.getState().tabs[tabId]?.cards ?? [];
+    const children = cards.filter((card) => card.parent_id === 'card-001');
+    expect(children.length).toBeGreaterThan(1);
+  });
+
+  it('ignores nested selections when copying multiple cards', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().selectCard('leaf-A', tabId, 'card-001');
+      useWorkspaceStore.getState().selectCard('leaf-A', tabId, 'card-002', { multi: true });
+    });
+
+    let copied = 0;
+    act(() => {
+      copied = useWorkspaceStore.getState().copySelection('leaf-A', tabId);
+    });
+    expect(copied).toBe(1);
+
+    act(() => {
+      useWorkspaceStore.getState().pasteClipboard('leaf-A', tabId, { position: 'after' });
+    });
+
+    const cards = useWorkspaceStore.getState().tabs[tabId]?.cards ?? [];
+    const childrenOfRoot = cards.filter((card) => card.parent_id === 'card-001');
+    expect(childrenOfRoot.length).toBeGreaterThan(1);
   });
 
   it('deletes selected cards (including descendants) and restores via undo', () => {

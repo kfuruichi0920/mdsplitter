@@ -32,10 +32,42 @@ export type { Card, CardKind, CardPatch, CardStatus };
  * カードの変更履歴を保持し、Undo/Redoを実現する。
  */
 export interface UndoRedoEntry {
-  type: 'update' | 'move' | 'add' | 'delete'; ///< 操作種別
+  type: 'update' | 'move' | 'add' | 'delete' | 'paste'; ///< 操作種別
   tabId: string; ///< 対象タブID
   cards: Card[]; ///< 変更前のカード配列
   description: string; ///< 操作の説明（ログ用）
+}
+
+/**
+ * @brief クリップボードに格納するカード情報。
+ */
+interface ClipboardCardData {
+  title: string;
+  body: string;
+  status: CardStatus;
+  kind: CardKind;
+  hasLeftTrace: boolean;
+  hasRightTrace: boolean;
+}
+
+/**
+ * @brief クリップボード用カードツリー。
+ */
+interface ClipboardCardNode {
+  data: ClipboardCardData;
+  children: ClipboardCardNode[];
+}
+
+/**
+ * @brief 直近の挿入位置ハイライト情報。
+ */
+interface InsertPreview {
+  leafId: string;
+  tabId: string;
+  cardId: string | null;
+  position: InsertPosition;
+  highlightIds: string[];
+  timestamp: number;
 }
 
 /**
@@ -90,6 +122,8 @@ export interface WorkspaceStore {
   fileToLeaf: Record<string, string>;
   undoStack: UndoRedoEntry[]; ///< Undoスタック（最大100件）
   redoStack: UndoRedoEntry[]; ///< Redoスタック（最大100件）
+  clipboard: ClipboardCardNode[] | null; ///< コピー済みカードツリー
+  lastInsertPreview: InsertPreview | null; ///< 直近の挿入ハイライト
   openTab: (leafId: string, fileName: string, cards: Card[], options?: { savedAt?: string; title?: string }) => OpenTabResult;
   closeTab: (leafId: string, tabId: string) => void;
   closeLeaf: (leafId: string) => void;
@@ -109,6 +143,9 @@ export interface WorkspaceStore {
   collapseAll: (leafId: string, tabId: string) => void; ///< 全カードを折畳
   moveCards: (leafId: string, tabId: string, cardIds: string[], targetCardId: string, position: 'before' | 'after' | 'child') => boolean; ///< カード移動（階層構造を維持）
   setEditingCard: (leafId: string, tabId: string, cardId: string | null) => void; ///< 編集中カードを設定
+  copySelection: (leafId: string, tabId: string) => number; ///< 選択カードをコピー
+  pasteClipboard: (leafId: string, tabId: string, options?: { position?: InsertPosition; anchorCardId?: string | null }) => { inserted: number; insertedIds: string[]; anchorId: string | null; position: InsertPosition } | null; ///< クリップボードのカードを貼り付け
+  hasClipboard: () => boolean; ///< クリップボードにカードがあるか
   undo: () => boolean; ///< Undo実行（成功時true）
   redo: () => boolean; ///< Redo実行（成功時true）
   canUndo: () => boolean; ///< Undo可能か判定
@@ -126,12 +163,14 @@ const createLeafState = (leafId: string): LeafWorkspaceState => ({ leafId, tabId
 /**
  * @brief 初期ストア状態。
  */
-const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf' | 'undoStack' | 'redoStack'> = {
+const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf' | 'undoStack' | 'redoStack' | 'clipboard' | 'lastInsertPreview'> = {
   tabs: {},
   leafs: {},
   fileToLeaf: {},
   undoStack: [],
   redoStack: [],
+  clipboard: null,
+  lastInsertPreview: null,
 };
 
 /**
@@ -573,8 +612,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
         undoStack: trimmedUndoStack,
         redoStack: [],
-      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack'>;
+        lastInsertPreview: {
+          leafId,
+          tabId,
+          cardId: anchorCard?.id ?? resolvedNewCard.id,
+          position,
+          highlightIds: [resolvedNewCard.id],
+          timestamp: Date.now(),
+        },
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack' | 'lastInsertPreview'>;
     });
+
+    if (createdCard) {
+      emitCardLayoutChanged();
+    }
 
     return createdCard;
   },
@@ -664,8 +715,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
         undoStack: trimmedUndoStack,
         redoStack: [],
-      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack'>;
+        lastInsertPreview: null,
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack' | 'lastInsertPreview'>;
     });
+
+    if (deletedCount > 0) {
+      emitCardLayoutChanged();
+    }
 
     return deletedCount;
   },
@@ -989,8 +1045,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
         undoStack: trimmedUndoStack,
         redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
+        lastInsertPreview: null,
       };
     });
+
+    if (success) {
+      emitCardLayoutChanged();
+    }
 
     return success;
   },
@@ -1010,6 +1071,127 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
       };
     });
+  },
+
+  copySelection: (leafId, tabId) => {
+    let copied = 0;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const rootIds = getRootSelection(tab.selectedCardIds, tab.cards);
+      if (rootIds.length === 0) {
+        return state;
+      }
+
+      const cardMap = new Map<string, Card>(tab.cards.map((card) => [card.id, card]));
+      const clipboardNodes = rootIds.map((id) => buildClipboardTree(id, cardMap));
+      copied = clipboardNodes.length;
+
+      return {
+        ...state,
+        clipboard: clipboardNodes,
+      } satisfies Pick<WorkspaceStore, 'clipboard'>;
+    });
+
+    return copied;
+  },
+
+  pasteClipboard: (leafId, tabId, options) => {
+    let outcome: { inserted: number; insertedIds: string[]; anchorId: string | null; position: InsertPosition } | null = null;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const clipboard = state.clipboard;
+      if (!clipboard || clipboard.length === 0) {
+        return state;
+      }
+
+      const position: InsertPosition = options?.position ?? 'after';
+      const selectionOrder = Array.from(tab.selectedCardIds);
+      const fallbackAnchorId = tab.cards[tab.cards.length - 1]?.id ?? null;
+      const anchorId = options?.anchorCardId ?? selectionOrder[selectionOrder.length - 1] ?? fallbackAnchorId;
+      const cardMap = new Map<string, Card>(tab.cards.map((card) => [card.id, card]));
+      const anchorCard = anchorId ? cardMap.get(anchorId) ?? null : null;
+
+      const { insertIndex, parentId, level } = determineInsertPoint(tab.cards, anchorCard, position);
+
+      const newCards: Card[] = [];
+      const newRootIds: string[] = [];
+      clipboard.forEach((node) => {
+        const materialized = materializeClipboardNode(node, parentId, level);
+        newRootIds.push(materialized.rootId);
+        newCards.push(...materialized.cards);
+      });
+
+      if (newCards.length === 0) {
+        return state;
+      }
+
+      const undoEntry: UndoRedoEntry = {
+        type: 'paste',
+        tabId,
+        cards: [...tab.cards],
+        description: `${newRootIds.length}件のカードを貼り付け`,
+      } satisfies UndoRedoEntry;
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
+      const insertedCards = [...tab.cards.slice(0, insertIndex), ...newCards, ...tab.cards.slice(insertIndex)];
+      const rebuiltCards = rebuildSiblingLinks(insertedCards);
+
+      const nextExpandedIds = new Set(tab.expandedCardIds);
+      if (position === 'child' && anchorCard) {
+        nextExpandedIds.add(anchorCard.id);
+      } else if (parentId) {
+        nextExpandedIds.add(parentId);
+      }
+
+      outcome = { inserted: newRootIds.length, insertedIds: newRootIds, anchorId: anchorCard?.id ?? null, position };
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards: rebuiltCards,
+            selectedCardIds: new Set(newRootIds),
+            expandedCardIds: nextExpandedIds,
+            isDirty: true,
+          },
+        },
+        undoStack: trimmedUndoStack,
+        redoStack: [],
+        lastInsertPreview: {
+          leafId,
+          tabId,
+          cardId: anchorCard?.id ?? (newRootIds[0] ?? null),
+          position,
+          highlightIds: newRootIds,
+          timestamp: Date.now(),
+        },
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack' | 'lastInsertPreview'>;
+    });
+
+    if (outcome) {
+      emitCardLayoutChanged();
+    }
+
+    return outcome;
+  },
+
+  hasClipboard: () => {
+    const clipboard = get().clipboard;
+    return Boolean(clipboard && clipboard.length > 0);
   },
 
   undo: () => {
@@ -1052,6 +1234,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
         undoStack: nextUndoStack,
         redoStack: trimmedRedoStack,
+        lastInsertPreview: null,
       };
     });
 
@@ -1098,6 +1281,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
         undoStack: trimmedUndoStack,
         redoStack: nextRedoStack,
+        lastInsertPreview: null,
       };
     });
 
@@ -1214,3 +1398,117 @@ function getSubtreeEndIndex(cards: Card[], startIndex: number): number {
 export const resetWorkspaceStore = (): void => {
   useWorkspaceStore.getState().reset();
 };
+
+const emitCardLayoutChanged = (): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('mdsplitter:card-layout-changed'));
+};
+
+function getRootSelection(selectedIds: Set<string>, cards: Card[]): string[] {
+  if (selectedIds.size === 0) {
+    return [];
+  }
+  const roots: string[] = [];
+  cards.forEach((card) => {
+    if (!selectedIds.has(card.id)) {
+      return;
+    }
+    if (card.parent_id && selectedIds.has(card.parent_id)) {
+      return;
+    }
+    roots.push(card.id);
+  });
+  return roots;
+}
+
+function buildClipboardTree(cardId: string, cardMap: Map<string, Card>): ClipboardCardNode {
+  const card = cardMap.get(cardId);
+  if (!card) {
+    throw new Error(`Card ${cardId} not found`);
+  }
+
+  return {
+    data: {
+      title: card.title,
+      body: card.body,
+      status: card.status,
+      kind: card.kind,
+      hasLeftTrace: card.hasLeftTrace,
+      hasRightTrace: card.hasRightTrace,
+    },
+    children: card.child_ids.map((childId) => buildClipboardTree(childId, cardMap)),
+  } satisfies ClipboardCardNode;
+}
+
+function materializeClipboardNode(node: ClipboardCardNode, parentId: string | null, level: number): { cards: Card[]; rootId: string } {
+  const newId = nanoid();
+  const now = new Date().toISOString();
+  const current: Card = {
+    id: newId,
+    title: node.data.title,
+    body: node.data.body,
+    status: node.data.status,
+    kind: node.data.kind,
+    hasLeftTrace: node.data.hasLeftTrace,
+    hasRightTrace: node.data.hasRightTrace,
+    updatedAt: now,
+    parent_id: parentId,
+    child_ids: [],
+    prev_id: null,
+    next_id: null,
+    level,
+  } satisfies Card;
+
+  const childResults = node.children.map((child) => materializeClipboardNode(child, newId, level + 1));
+  const childCards = childResults.flatMap((result) => result.cards);
+
+  return {
+    cards: [current, ...childCards],
+    rootId: newId,
+  };
+}
+
+function determineInsertPoint(cards: Card[], anchorCard: Card | null, position: InsertPosition): { insertIndex: number; parentId: string | null; level: number } {
+  if (!anchorCard) {
+    return {
+      insertIndex: cards.length,
+      parentId: null,
+      level: 0,
+    };
+  }
+
+  const anchorIndex = cards.findIndex((card) => card.id === anchorCard.id);
+  if (anchorIndex === -1) {
+    return {
+      insertIndex: cards.length,
+      parentId: null,
+      level: 0,
+    };
+  }
+
+  const subtreeEndIndex = getSubtreeEndIndex(cards, anchorIndex);
+
+  switch (position) {
+    case 'before':
+      return {
+        insertIndex: anchorIndex,
+        parentId: anchorCard.parent_id ?? null,
+        level: anchorCard.level,
+      };
+    case 'child':
+      return {
+        insertIndex: subtreeEndIndex,
+        parentId: anchorCard.id,
+        level: anchorCard.level + 1,
+      };
+    case 'after':
+    default:
+      return {
+        insertIndex: subtreeEndIndex,
+        parentId: anchorCard.parent_id ?? null,
+        level: anchorCard.level,
+      };
+  }
+}

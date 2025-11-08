@@ -139,6 +139,9 @@ export const App = () => {
   const markSaved = useWorkspaceStore((state) => state.markSaved);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
+  const copySelection = useWorkspaceStore((state) => state.copySelection);
+  const pasteClipboard = useWorkspaceStore((state) => state.pasteClipboard);
+  const hasClipboard = useWorkspaceStore((state) => state.hasClipboard);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
   const canUndo = useWorkspaceStore((state) => state.canUndo);
@@ -962,6 +965,50 @@ export const App = () => {
 
       if (primaryPressed) {
         if (!event.altKey) {
+          if (key === 'c' && !event.shiftKey) {
+            event.preventDefault();
+            if (!effectiveLeafId || !activeTabId) {
+              notify('warn', 'コピーできるアクティブタブがありません。');
+              return;
+            }
+            const count = copySelection(effectiveLeafId, activeTabId);
+            if (count > 0) {
+              notify('info', `${count}件のカードをコピーしました。`);
+              pushLog({
+                id: `copy-${Date.now()}`,
+                level: 'INFO',
+                message: `${count}件のカードをコピーしました。`,
+                timestamp: new Date(),
+              });
+            } else {
+              notify('info', 'コピーするカードが選択されていません。');
+            }
+            return;
+          }
+
+          if (key === 'v' && !event.shiftKey) {
+            event.preventDefault();
+            if (!effectiveLeafId || !activeTabId) {
+              notify('warn', '貼り付けできるアクティブタブがありません。');
+              return;
+            }
+            if (!hasClipboard()) {
+              notify('info', 'クリップボードにカードがありません。');
+              return;
+            }
+            const result = pasteClipboard(effectiveLeafId, activeTabId, { position: 'after' });
+            if (result && result.inserted > 0) {
+              notify('info', `${result.inserted}件のカードを貼り付けました。`);
+              pushLog({
+                id: `paste-${Date.now()}`,
+                level: 'INFO',
+                message: `${result.inserted}件のカードを貼り付けました。`,
+                timestamp: new Date(),
+              });
+            }
+            return;
+          }
+
           if (key === 'z' && !event.shiftKey) {
             event.preventDefault();
             if (canUndo()) {
@@ -1092,12 +1139,15 @@ export const App = () => {
     addCardViaShortcut,
     canRedo,
     canUndo,
+    copySelection,
     deleteCards,
     effectiveLeafId,
     handleSave,
     handleSplit,
+    hasClipboard,
     notify,
     openSearchPanel,
+    pasteClipboard,
     pushLog,
     redo,
     selectedCount,
