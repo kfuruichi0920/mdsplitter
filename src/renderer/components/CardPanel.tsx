@@ -21,6 +21,7 @@ import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '.
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
+import { CARD_KIND_VALUES } from '@/shared/workspace';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -47,6 +48,13 @@ const CARD_KIND_ICON: Record<CardKind, string> = {
   table: '📅',
   test: '🧪',
   qa: '💬',
+};
+
+const createKindFilterState = (): Record<CardKind, boolean> => {
+  return CARD_KIND_VALUES.reduce<Record<CardKind, boolean>>((acc, kind) => {
+    acc[kind] = true;
+    return acc;
+  }, {} as Record<CardKind, boolean>);
 };
 
 /**
@@ -93,6 +101,26 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
   const [previewIndicator, setPreviewIndicator] = useState<{ cardId: string | null; position: InsertPosition; highlightIds: string[] } | null>(null);
+  const [filterText, setFilterText] = useState('');
+  const [kindFilter, setKindFilter] = useState<Record<CardKind, boolean>>(() => createKindFilterState());
+  const [isKindFilterOpen, setKindFilterOpen] = useState(false);
+  const kindFilterButtonRef = useRef<HTMLButtonElement | null>(null);
+  const kindFilterPopoverRef = useRef<HTMLDivElement | null>(null);
+  const handleFilterTextChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setFilterText(event.target.value);
+  }, []);
+  const toggleKindFilterValue = useCallback((kind: CardKind) => {
+    setKindFilter((prev) => ({ ...prev, [kind]: !prev[kind] }));
+  }, []);
+  const applyKindFilterAll = useCallback((value: boolean) => {
+    setKindFilter(() => {
+      const next: Record<CardKind, boolean> = {} as Record<CardKind, boolean>;
+      CARD_KIND_VALUES.forEach((kind) => {
+        next[kind] = value;
+      });
+      return next;
+    });
+  }, []);
 
   const leafTabs = useWorkspaceStore(
     useCallback((state) => {
@@ -184,6 +212,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   }, [lastInsertPreview, leafId, activeTabId]);
 
   const cards = activeTab?.cards ?? [];
+  const dirtyCardIds = activeTab?.dirtyCardIds ?? new Set<string>();
   const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
   const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
   const editingCardId = activeTab?.editingCardId ?? null;
@@ -277,7 +306,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * 親が折畳まれている場合、その子カードは表示しない。
    * @return 表示対象のカードリスト。
    */
-  const visibleCards = useMemo(() => {
+  const treeVisibleCards = useMemo(() => {
     const result: Card[] = [];
     const cardMap = new Map(cards.map((c) => [c.id, c]));
 
@@ -308,6 +337,57 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
     return result;
   }, [cards, expandedCardIds]);
+
+  const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES.filter((kind) => kindFilter[kind])), [kindFilter]);
+  const kindFilterActive = allowedKinds.size !== CARD_KIND_VALUES.length;
+  const filterTextNormalized = filterText.trim().toLowerCase();
+  const filterActive = filterTextNormalized.length > 0 || kindFilterActive;
+
+  const filteredCardIds = useMemo(() => {
+    if (!filterActive) {
+      return null;
+    }
+    const cardMap = new Map(cards.map((card) => [card.id, card]));
+    const matches = new Set<string>();
+    cards.forEach((card) => {
+      if (!allowedKinds.has(card.kind)) {
+        return;
+      }
+      if (filterTextNormalized) {
+        const haystack = `${card.title ?? ''}\n${card.body ?? ''}`.toLowerCase();
+        if (!haystack.includes(filterTextNormalized)) {
+          return;
+        }
+      }
+      matches.add(card.id);
+    });
+    if (matches.size === 0) {
+      return new Set<string>();
+    }
+    const visible = new Set(matches);
+    const addAncestors = (id: string) => {
+      let current = cardMap.get(id);
+      while (current?.parent_id) {
+        if (visible.has(current.parent_id)) {
+          break;
+        }
+        visible.add(current.parent_id);
+        current = cardMap.get(current.parent_id);
+      }
+    };
+    matches.forEach(addAncestors);
+    return visible;
+  }, [allowedKinds, cards, filterActive, filterTextNormalized]);
+
+  const visibleCards = useMemo(() => {
+    if (!filterActive) {
+      return treeVisibleCards;
+    }
+    if (!filteredCardIds || filteredCardIds.size === 0) {
+      return [] as Card[];
+    }
+    return treeVisibleCards.filter((card) => filteredCardIds.has(card.id));
+  }, [filterActive, filteredCardIds, treeVisibleCards]);
 
   /**
    * @brief アクティブタブを変更する。
@@ -437,6 +517,23 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       window.removeEventListener('keydown', handleEsc);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    if (!isKindFilterOpen) {
+      return;
+    }
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (kindFilterPopoverRef.current?.contains(target) || kindFilterButtonRef.current?.contains(target)) {
+        return;
+      }
+      setKindFilterOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [isKindFilterOpen]);
 
   /**
    * @brief パネルクリック時の処理。
@@ -878,10 +975,46 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           </button>
         </div>
         <div className="panel-toolbar__group">
-          <input className="panel-toolbar__input" placeholder="🔍 文字列フィルタ" aria-label="文字列フィルタ" />
-          <button type="button" className="panel-toolbar__button" title="カード種別フィルタ" aria-label="カード種別フィルタ">
-            📚
-          </button>
+          <input
+            className={`panel-toolbar__input${filterText ? ' panel-toolbar__input--active' : ''}`}
+            type="search"
+            placeholder="🔍 文字列フィルタ"
+            aria-label="文字列フィルタ"
+            value={filterText}
+            onChange={handleFilterTextChange}
+          />
+          <div className="panel-toolbar__popover-anchor">
+            <button
+              type="button"
+              ref={kindFilterButtonRef}
+              className={`panel-toolbar__button${kindFilterActive ? ' panel-toolbar__button--active' : ''}`}
+              title="カード種別フィルタ"
+              aria-label="カード種別フィルタ"
+              aria-expanded={isKindFilterOpen}
+              onClick={() => setKindFilterOpen((prev) => !prev)}
+            >
+              📚
+            </button>
+            {isKindFilterOpen ? (
+              <div ref={kindFilterPopoverRef} className="panel-filter-popover" role="dialog" aria-label="カード種別フィルタ">
+                <div className="panel-filter-popover__list">
+                  {CARD_KIND_VALUES.map((kind) => (
+                    <label key={kind} className="panel-filter-popover__item">
+                      <input type="checkbox" checked={kindFilter[kind]} onChange={() => toggleKindFilterValue(kind)} />
+                      <span>
+                        <span className="panel-filter-popover__icon">{CARD_KIND_ICON[kind]}</span>
+                        {kind}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="panel-filter-popover__actions">
+                  <button type="button" onClick={() => applyKindFilterAll(true)}>全選択</button>
+                  <button type="button" onClick={() => applyKindFilterAll(false)}>全解除</button>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className={`panel-toolbar__button${isFileTraceVisible ? ' panel-toolbar__button--active' : ''}`}
@@ -906,7 +1039,10 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           </button>
         </div>
         <div className="panel-toolbar__spacer" />
-        <div className="panel-toolbar__meta">カード総数: {cardCount}</div>
+        <div className="panel-toolbar__meta">
+          カード総数: {cardCount}
+          {filterActive ? `（表示: ${visibleCards.length}）` : ''}
+        </div>
       </div>
 
       {/* カード一覧: 各カードをリスト表示 */}
@@ -928,6 +1064,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
             isEditing={editingCardId === card.id}
+            isDirty={dirtyCardIds.has(card.id)}
             displayMode={cardDisplayMode}
             onSelect={handleCardSelect}
             onKeyDown={handleCardKeyDown}
@@ -1128,6 +1265,7 @@ interface CardListItemProps {
   isExpanded: boolean; ///< 展開状態（子を持つカードのみ有効）。
   hasChildren: boolean; ///< 子カードを持つかどうか。
   isEditing: boolean; ///< 編集モード中かどうか。
+  isDirty: boolean;
   markdownPreviewEnabled: boolean;
   isMarkdownPreviewGlobalEnabled: boolean;
   leafId: string;
@@ -1165,6 +1303,7 @@ const CardListItem = ({
   isExpanded,
   hasChildren,
   isEditing,
+  isDirty,
   markdownPreviewEnabled,
   isMarkdownPreviewGlobalEnabled,
   leafId,
@@ -1278,6 +1417,7 @@ const CardListItem = ({
   const articleClassName = [
     baseClass,
     selectionClass,
+    isDirty ? 'card--dirty' : '',
     isDragging ? 'card--dragging' : '',
     dropChild ? 'card--drop-child' : '',
     isHighlighted ? 'card--highlighted' : '',

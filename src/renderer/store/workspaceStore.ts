@@ -87,6 +87,7 @@ export interface PanelTabState {
   lastSavedAt: string | null;
   expandedCardIds: Set<string>; ///< 展開状態のカードIDセット（子を持つカードのみ）
   editingCardId: string | null; ///< 編集中のカードID（インライン編集時）
+  dirtyCardIds: Set<string>; ///< 未保存編集のカードID集合。
 }
 
 /**
@@ -227,6 +228,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
           expandedCardIds: updatedExpandedIds,
           editingCardId: null,
+          dirtyCardIds: new Set<string>(),
         } satisfies PanelTabState;
 
         outcome = { status: 'activated', tabId: existingTabId, leafId } satisfies OpenTabResult;
@@ -259,6 +261,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         lastSavedAt: options?.savedAt ?? null,
         expandedCardIds: initialExpandedIds,
         editingCardId: null,
+        dirtyCardIds: new Set<string>(),
       } satisfies PanelTabState;
 
       const nextLeaf: LeafWorkspaceState = {
@@ -303,6 +306,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         lastSavedAt: null,
         expandedCardIds: initialExpandedIds,
         editingCardId: null,
+        dirtyCardIds: new Set<string>(normalizedCards.map((card) => card.id)),
       } satisfies PanelTabState;
 
       createdTab = nextTab;
@@ -642,6 +646,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       ];
       const rebuiltCards = rebuildSiblingLinks(insertedCards);
 
+      const resolvedNewCard = rebuiltCards.find((card) => card.id === newCard.id) ?? newCard;
+      createdCard = resolvedNewCard;
+
       const nextExpandedIds = new Set(tab.expandedCardIds);
       if (position === 'child' && anchorCard) {
         nextExpandedIds.add(anchorCard.id);
@@ -649,8 +656,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         nextExpandedIds.add(parentId);
       }
 
-      const resolvedNewCard = rebuiltCards.find((card) => card.id === newCard.id) ?? newCard;
-      createdCard = resolvedNewCard;
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      nextDirtyIds.add(resolvedNewCard.id);
 
       return {
         ...state,
@@ -662,6 +669,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             selectedCardIds: new Set<string>([resolvedNewCard.id]),
             expandedCardIds: nextExpandedIds,
             isDirty: true,
+            dirtyCardIds: nextDirtyIds,
           },
         },
         undoStack: trimmedUndoStack,
@@ -753,6 +761,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       const nextExpandedIds = new Set(Array.from(tab.expandedCardIds).filter((id) => !allDeleteIds.has(id)));
       const nextEditingCardId = tab.editingCardId && allDeleteIds.has(tab.editingCardId) ? null : tab.editingCardId;
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      allDeleteIds.forEach((id) => nextDirtyIds.delete(id));
 
       return {
         ...state,
@@ -764,6 +774,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             selectedCardIds: nextSelectedIds,
             expandedCardIds: nextExpandedIds,
             editingCardId: nextEditingCardId,
+            dirtyCardIds: nextDirtyIds,
             isDirty: true,
           },
         },
@@ -807,11 +818,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return { ...card, ...patch, updatedAt: nextUpdatedAt } satisfies Card;
       });
 
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      nextDirtyIds.add(cardId);
+
       return {
         ...state,
         tabs: {
           ...state.tabs,
-          [tabId]: { ...tab, cards: nextCards, isDirty: true },
+          [tabId]: { ...tab, cards: nextCards, isDirty: true, dirtyCardIds: nextDirtyIds },
         },
         undoStack: trimmedUndoStack,
         redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
@@ -936,6 +950,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             isDirty: false,
             lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
             expandedCardIds: updatedExpandedIds,
+            dirtyCardIds: new Set<string>(),
           },
         },
       };
@@ -953,7 +968,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         ...state,
         tabs: {
           ...state.tabs,
-          [tabId]: { ...tab, isDirty: false, lastSavedAt: savedAt },
+          [tabId]: { ...tab, isDirty: false, lastSavedAt: savedAt, dirtyCardIds: new Set<string>() },
         },
       };
     });
@@ -1006,6 +1021,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         } satisfies Card;
       });
 
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      nextDirtyIds.add(cardId);
+
       return {
         ...state,
         tabs: {
@@ -1013,6 +1031,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           [tabId]: {
             ...tab,
             cards,
+            dirtyCardIds: nextDirtyIds,
             isDirty: true,
           },
         },
@@ -1298,6 +1317,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       outcome = { inserted: newRootIds.length, insertedIds: newRootIds, anchorId: anchorCard?.id ?? null, position };
 
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      newRootIds.forEach((id) => nextDirtyIds.add(id));
+
       return {
         ...state,
         tabs: {
@@ -1308,6 +1330,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             selectedCardIds: new Set(newRootIds),
             expandedCardIds: nextExpandedIds,
             isDirty: true,
+            dirtyCardIds: nextDirtyIds,
           },
         },
         undoStack: trimmedUndoStack,

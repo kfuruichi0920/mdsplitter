@@ -196,6 +196,86 @@
     @apply rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
   }
 
+  .sidebar__search-form {
+    @apply flex flex-col gap-2;
+  }
+
+  .sidebar__search-options {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .sidebar__search-field {
+    @apply flex flex-col gap-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .sidebar__search-field-label {
+    @apply text-[0.6rem];
+  }
+
+  .sidebar__search-select {
+    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .sidebar__search-field--checkbox {
+    @apply flex flex-row items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200;
+  }
+
+  .sidebar__search-field--checkbox input {
+    @apply h-4 w-4 rounded border-slate-300 text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800;
+  }
+
+  .sidebar__search-actions {
+    @apply flex items-center gap-2;
+  }
+
+  .sidebar__search-button {
+    @apply flex-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .sidebar__search-button--ghost {
+    @apply border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .sidebar__search-status {
+    @apply text-[0.65rem] text-slate-500 dark:text-slate-400;
+  }
+
+  .sidebar__search-status--error {
+    @apply text-rose-500 dark:text-rose-400;
+  }
+
+  .search-results {
+    @apply mt-2 flex max-h-64 flex-col gap-2 overflow-y-auto pr-1;
+  }
+
+  .search-results__item {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition-colors hover:border-blue-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .search-results__meta {
+    @apply flex items-center gap-2 text-[0.6rem] text-slate-500 dark:text-slate-400;
+  }
+
+  .search-results__scope {
+    @apply rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200;
+  }
+
+  .search-results__file {
+    @apply flex-1 truncate;
+  }
+
+  .search-results__count {
+    @apply rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-100;
+  }
+
+  .search-results__title {
+    @apply mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100;
+  }
+
+  .search-results__snippet {
+    @apply mt-0.5 whitespace-pre-wrap text-[0.65rem] text-slate-500 dark:text-slate-300;
+  }
+
   .workspace__separator {
     @apply relative bg-blue-200 transition-colors dark:bg-slate-700;
   }
@@ -326,6 +406,38 @@
 
   .panel-toolbar__input {
     @apply rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .panel-toolbar__input--active {
+    @apply border-blue-300 bg-blue-50/70 dark:border-blue-400 dark:bg-slate-800;
+  }
+
+  .panel-toolbar__popover-anchor {
+    @apply relative inline-flex;
+  }
+
+  .panel-filter-popover {
+    @apply absolute right-0 top-full z-30 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-2 text-xs shadow-2xl dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .panel-filter-popover__list {
+    @apply flex max-h-48 flex-col gap-1 overflow-auto;
+  }
+
+  .panel-filter-popover__item {
+    @apply flex items-center gap-2 rounded-md px-2 py-1 text-slate-600 transition-colors hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+
+  .panel-filter-popover__icon {
+    @apply text-base;
+  }
+
+  .panel-filter-popover__actions {
+    @apply mt-2 flex gap-2;
+  }
+
+  .panel-filter-popover__actions button {
+    @apply flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-[0.65rem] text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
   }
 
   .panel-toolbar__select-wrapper {
@@ -572,6 +684,10 @@
     @apply border-l-4 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800;
   }
 
+  .card--dirty {
+    @apply ring-1 ring-amber-400/70 ring-offset-1 ring-offset-amber-50 dark:ring-amber-300/60 dark:ring-offset-slate-900;
+  }
+
   .card--compact {
     @apply flex-row items-center gap-2 py-1.5;
   }
@@ -727,7 +843,27 @@
   }
 
   .log-area__header {
-    @apply flex items-center justify-between border-b border-slate-200 px-3 py-1.5 text-xs font-semibold dark:border-slate-800;
+    @apply flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 px-3 py-1.5 text-xs font-semibold dark:border-slate-800;
+  }
+
+  .log-area__title {
+    @apply flex items-baseline gap-2 text-xs font-semibold text-slate-600 dark:text-slate-200;
+  }
+
+  .log-area__counter {
+    @apply rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  }
+
+  .log-area__filters {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .log-area__select {
+    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .log-area__filter-input {
+    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
   }
 
   .log-area__clear {
@@ -756,6 +892,50 @@
 
   .notification {
     @apply flex items-start gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur;
+  }
+
+  .help-overlay {
+    @apply fixed inset-0 z-40 flex items-center justify-center;
+  }
+
+  .help-overlay__backdrop {
+    @apply absolute inset-0 bg-slate-900/60 backdrop-blur-sm;
+  }
+
+  .help-overlay__panel {
+    @apply relative z-10 w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  .help-overlay__header {
+    @apply mb-4 flex items-center justify-between text-base font-semibold text-slate-700 dark:text-slate-100;
+  }
+
+  .help-overlay__close {
+    @apply rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-600 transition-colors hover:bg-rose-100 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200;
+  }
+
+  .help-overlay__body {
+    @apply grid max-h-[70vh] gap-4 overflow-y-auto text-sm text-slate-600 dark:text-slate-200 md:grid-cols-2;
+  }
+
+  .help-overlay__group h3 {
+    @apply mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .help-overlay__list {
+    @apply flex flex-col gap-2;
+  }
+
+  .help-overlay__item {
+    @apply flex items-start gap-3 rounded-md border border-slate-200 bg-white/90 px-3 py-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .help-overlay__keys {
+    @apply min-w-[120px] font-semibold text-slate-800 dark:text-slate-100;
+  }
+
+  .help-overlay__description {
+    @apply flex-1 text-slate-600 dark:text-slate-200;
   }
 
   .notification__message {

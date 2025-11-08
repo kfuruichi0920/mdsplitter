@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, FormEvent as ReactFormEvent } from 'react';
 import { nanoid } from 'nanoid';
 import { shallow } from 'zustand/shallow';
 
@@ -46,6 +46,7 @@ import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
+import { createSearchMatcher, buildSnippet } from './utils/search';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -102,6 +103,74 @@ type LogEntry = {
   message: string; ///< メッセージ本文。
   timestamp: Date; ///< 記録時刻。
 };
+
+type SearchScope = 'current' | 'open' | 'input';
+
+interface SearchResultItem {
+  id: string;
+  source: 'open' | 'input';
+  fileName: string | null;
+  tabId?: string;
+  leafId?: string;
+  cardId: string;
+  cardTitle: string;
+  snippet: string;
+  matchCount: number;
+}
+
+const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
+  current: 'アクティブタブ',
+  open: '開いているタブ',
+  input: '_input ディレクトリ',
+};
+
+type ShortcutEntry = {
+  keys: string;
+  description: string;
+};
+
+type ShortcutGroup = {
+  title: string;
+  entries: ShortcutEntry[];
+};
+
+const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  {
+    title: 'グローバルショートカット',
+    entries: [
+      { keys: 'Ctrl + S', description: 'アクティブカードファイルを保存' },
+      { keys: 'Ctrl + Shift + S', description: '名前を付けて保存' },
+      { keys: 'Ctrl + ,', description: '設定モーダルを開く' },
+      { keys: 'Ctrl + F', description: '検索パネルを開いて検索を実行' },
+      { keys: 'Ctrl + C / Ctrl + V', description: '選択カードをコピー / 貼り付け' },
+      { keys: 'Ctrl + Z', description: '直前の操作を取り消し' },
+      { keys: 'Ctrl + Y / Ctrl + Shift + Z', description: '取り消した操作をやり直し' },
+      { keys: 'Ctrl + \\', description: 'カードパネルを左右に分割' },
+      { keys: 'Ctrl + Shift + ｜ (または Ctrl + Shift + \\)', description: 'カードパネルを上下に分割' },
+    ],
+  },
+  {
+    title: 'カード挿入と編集',
+    entries: [
+      { keys: 'Alt + ↑', description: '選択カードの前にカードを追加' },
+      { keys: 'Alt + ↓', description: '選択カードの後ろにカードを追加' },
+      { keys: 'Alt + →', description: '選択カードの子カードとして追加' },
+      { keys: 'Insert', description: '現在の選択位置の直後にカードを追加' },
+      { keys: 'Delete', description: '選択カードを削除' },
+      { keys: 'ダブルクリック', description: 'カードをインライン編集モードへ切替' },
+    ],
+  },
+  {
+    title: 'カードのコンテキストメニュー',
+    entries: [
+      { keys: '右クリック → ⬆︎ 前に追加', description: '基準カードの直前へ空カードを挿入' },
+      { keys: '右クリック → ⬇︎ 後に追加', description: '基準カードの直後へ空カードを挿入' },
+      { keys: '右クリック → ➡︎ 子として追加', description: '基準カードの子階層へ空カードを挿入' },
+      { keys: '右クリック → 📋 コピー', description: '選択中カード群をコピー' },
+      { keys: '右クリック → 貼り付け (前/後/子)', description: 'クリップボード内カードを指定位置へ挿入' },
+    ],
+  },
+];
 
 const toLogLevel = (level: LogEntry['level']): LogLevel => level.toLowerCase() as LogLevel;
 
@@ -292,6 +361,29 @@ export const App = () => {
       timestamp: new Date(),
     },
   ]);
+  const [logLevelFilter, setLogLevelFilter] = useState<'ALL' | LogEntry['level']>('ALL');
+  const [logFilterKeyword, setLogFilterKeyword] = useState('');
+  const displayedLogs = useMemo(() => {
+    const keyword = logFilterKeyword.trim().toLowerCase();
+    return logs.filter((entry) => {
+      const levelMatch = logLevelFilter === 'ALL' || entry.level === logLevelFilter;
+      const keywordMatch = keyword
+        ? `${entry.message} ${entry.level}`.toLowerCase().includes(keyword)
+        : true;
+      return levelMatch && keywordMatch;
+    });
+  }, [logFilterKeyword, logLevelFilter, logs]);
+  const logLevelOptions: Array<'ALL' | LogEntry['level']> = ['ALL', 'INFO', 'WARN', 'ERROR', 'DEBUG'];
+  const clearLogs = useCallback(() => {
+    setLogs([
+      {
+        id: `log-clear-${Date.now()}`,
+        level: 'INFO',
+        message: 'ログをクリアしました。',
+        timestamp: new Date(),
+      },
+    ]);
+  }, []);
 
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -339,8 +431,16 @@ export const App = () => {
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
   const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('current');
+  const [searchUseRegex, setSearchUseRegex] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [traceBusy, setTraceBusy] = useState<boolean>(false); ///< トレース操作中フラグ。
   const [isTraceFilterOpen, setTraceFilterOpen] = useState<boolean>(false);
+  const [isHelpOpen, setHelpOpen] = useState(false);
+  const searchScopeEntries = useMemo(() => Object.entries(SEARCH_SCOPE_LABELS) as [SearchScope, string][], []);
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
@@ -460,6 +560,22 @@ export const App = () => {
       document.removeEventListener('mousedown', handleClick);
     };
   }, [isTraceFilterOpen]);
+
+  useEffect(() => {
+    if (!isHelpOpen) {
+      return;
+    }
+    const handleKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setHelpOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [isHelpOpen]);
 
   /**
    * @brief ログエントリを追加する。
@@ -1654,6 +1770,187 @@ export const App = () => {
     [activeTabId, addCard, effectiveLeafId, notify, pushLog],
   );
 
+  const executeSearch = useCallback(async () => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchError('検索キーワードを入力してください。');
+      setSearchResults([]);
+      return;
+    }
+
+    const matcher = createSearchMatcher(trimmed, searchUseRegex);
+    if (!matcher.valid) {
+      setSearchError(matcher.error ?? '検索条件が無効です。');
+      setSearchResults([]);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      type Dataset = { source: 'open' | 'input'; tabId?: string; leafId?: string; fileName: string | null; cards: Card[] };
+      const datasets: Dataset[] = [];
+      const workspaceState = useWorkspaceStore.getState();
+
+      if (searchScope === 'current') {
+        const targetLeafId = effectiveLeafId;
+        if (!targetLeafId) {
+          setSearchError('検索対象のカードパネルが選択されていません。');
+          setSearchResults([]);
+          return;
+        }
+        const leafState = workspaceState.leafs[targetLeafId];
+        const tabId = leafState?.activeTabId;
+        if (!tabId) {
+          setSearchError('アクティブなカードファイルがありません。');
+          setSearchResults([]);
+          return;
+        }
+        const tab = workspaceState.tabs[tabId];
+        if (!tab) {
+          setSearchError('アクティブタブが見つかりません。');
+          setSearchResults([]);
+          return;
+        }
+        datasets.push({ source: 'open', tabId, leafId: targetLeafId, fileName: tab.fileName, cards: tab.cards });
+      } else if (searchScope === 'open') {
+        Object.values(workspaceState.tabs).forEach((tab) => {
+          datasets.push({ source: 'open', tabId: tab.id, leafId: tab.leafId, fileName: tab.fileName, cards: tab.cards });
+        });
+        if (datasets.length === 0) {
+          setSearchError('開いているカードファイルがありません。');
+          setSearchResults([]);
+          return;
+        }
+      } else {
+        if (!window.app?.workspace?.loadCardFile) {
+          setSearchError('カードファイル読み込み機能が利用できません。');
+          setSearchResults([]);
+          return;
+        }
+        const listApi = window.app.workspace.listCardFiles?.bind(window.app.workspace);
+        const fileList = cardFiles.length > 0 ? cardFiles : listApi ? await listApi() : [];
+        for (const fileName of fileList) {
+          try {
+            const snapshot = await window.app.workspace.loadCardFile(fileName);
+            if (snapshot?.cards) {
+              datasets.push({ source: 'input', fileName, cards: snapshot.cards });
+            }
+          } catch (error) {
+            console.error('[App] search load failed', fileName, error);
+          }
+        }
+        if (datasets.length === 0) {
+          setSearchError('検索対象となるカードファイルがありません。');
+          setSearchResults([]);
+          return;
+        }
+      }
+
+      const nextResults: SearchResultItem[] = [];
+      datasets.forEach((dataset) => {
+        dataset.cards.forEach((card) => {
+          const haystack = `${card.title ?? ''}\n${card.body ?? ''}`;
+          const match = matcher.match(haystack);
+          if (match.count > 0) {
+            nextResults.push({
+              id: `${dataset.fileName ?? dataset.tabId ?? 'untitled'}-${card.id}-${nextResults.length}`,
+              source: dataset.source,
+              fileName: dataset.fileName,
+              tabId: dataset.tabId,
+              leafId: dataset.leafId,
+              cardId: card.id,
+              cardTitle: card.title,
+              snippet: buildSnippet(haystack, match),
+              matchCount: match.count,
+            });
+          }
+        });
+      });
+
+      setSearchResults(nextResults);
+      setSearchError(nextResults.length === 0 ? '該当するカードがありません。' : null);
+    } catch (error) {
+      console.error('[App] search failed', error);
+      setSearchError('検索処理中にエラーが発生しました。');
+    } finally {
+      setSearching(false);
+    }
+  }, [cardFiles, effectiveLeafId, searchQuery, searchScope, searchUseRegex]);
+
+  const handleSearchResultNavigate = useCallback(
+    async (result: SearchResultItem) => {
+      const focusCard = (tabId: string, leafId: string, cardId: string) => {
+        const store = useWorkspaceStore.getState();
+        store.setActiveTab(leafId, tabId);
+        store.selectCard(leafId, tabId, cardId);
+        useSplitStore.getState().setActiveLeaf(leafId);
+      };
+
+      const workspaceState = useWorkspaceStore.getState();
+      if (result.tabId && workspaceState.tabs[result.tabId]) {
+        focusCard(result.tabId, workspaceState.tabs[result.tabId].leafId, result.cardId);
+        return;
+      }
+
+      if (!result.fileName) {
+        return;
+      }
+
+      const existingLeafId = workspaceState.fileToLeaf[result.fileName];
+      if (existingLeafId) {
+        const targetTab = Object.values(workspaceState.tabs).find((tab) => tab.fileName === result.fileName);
+        if (targetTab) {
+          focusCard(targetTab.id, targetTab.leafId, result.cardId);
+          return;
+        }
+      }
+
+      await handleLoadCardFile(result.fileName);
+      const refreshed = useWorkspaceStore.getState();
+      const leafId = refreshed.fileToLeaf[result.fileName];
+      if (!leafId) {
+        return;
+      }
+      const targetTab = Object.values(refreshed.tabs).find((tab) => tab.fileName === result.fileName && tab.leafId === leafId);
+      if (targetTab) {
+        focusCard(targetTab.id, leafId, result.cardId);
+      }
+    },
+    [handleLoadCardFile],
+  );
+
+  const handleSearchSubmit = useCallback(
+    (event: ReactFormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void executeSearch();
+    },
+    [executeSearch],
+  );
+
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
+  }, []);
+
+  const searchStatusText = useMemo(() => {
+    if (searching) {
+      return '検索中...';
+    }
+    if (searchError) {
+      return searchError;
+    }
+    if (searchResults.length === 0) {
+      return 'まだ検索結果はありません';
+    }
+    return `${searchResults.length}件ヒット`;
+  }, [searchError, searchResults.length, searching]);
+
+  const searchStatusClass = useMemo(() => {
+    return `sidebar__search-status${searchError ? ' sidebar__search-status--error' : ''}`;
+  }, [searchError]);
+  const canClearSearch = searchQuery.trim().length > 0 || searchResults.length > 0 || Boolean(searchError);
+
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -2120,6 +2417,17 @@ export const App = () => {
         <div className="toolbar-group toolbar-group--right">
           <button
             type="button"
+            className={`toolbar-button${isHelpOpen ? ' toolbar-button--active' : ''}`}
+            onClick={() => setHelpOpen((prev) => !prev)}
+            title="ショートカット/操作ヘルプ"
+            aria-label="ショートカット/操作ヘルプを開く"
+            aria-haspopup="dialog"
+            aria-expanded={isHelpOpen}
+          >
+            ❔
+          </button>
+          <button
+            type="button"
             className="toolbar-button"
             onClick={handleThemeToggle}
             title={theme === 'dark' ? 'ライトモードに切替' : 'ダークモードに切替'}
@@ -2234,16 +2542,93 @@ export const App = () => {
                 role="region"
                 aria-hidden={!isSearchOpen}
               >
-                <label className="sidebar__label" htmlFor="sidebar-search">
-                  🔍 検索
-                </label>
-                <input
-                  id="sidebar-search"
-                  ref={searchInputRef}
-                  className="sidebar__search"
-                  type="search"
-                  placeholder="キーワードを入力"
-                />
+                <form className="sidebar__search-form" onSubmit={handleSearchSubmit}>
+                  <label className="sidebar__label" htmlFor="sidebar-search">
+                    🔍 検索
+                  </label>
+                  <input
+                    id="sidebar-search"
+                    ref={searchInputRef}
+                    className="sidebar__search"
+                    type="search"
+                    autoComplete="off"
+                    placeholder="キーワードを入力"
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      if (searchError) {
+                        setSearchError(null);
+                      }
+                    }}
+                  />
+                  <div className="sidebar__search-options">
+                    <label className="sidebar__search-field">
+                      <span className="sidebar__search-field-label">検索範囲</span>
+                      <select
+                        className="sidebar__search-select"
+                        value={searchScope}
+                        onChange={(event) => setSearchScope(event.target.value as SearchScope)}
+                      >
+                        {searchScopeEntries.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="sidebar__search-field sidebar__search-field--checkbox">
+                      <input
+                        type="checkbox"
+                        checked={searchUseRegex}
+                        onChange={(event) => setSearchUseRegex(event.target.checked)}
+                      />
+                      <span>正規表現</span>
+                    </label>
+                  </div>
+                  <div className="sidebar__search-actions">
+                    <button
+                      type="submit"
+                      className="sidebar__search-button"
+                      disabled={searching}
+                    >
+                      {searching ? '検索中…' : '検索実行'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebar__search-button sidebar__search-button--ghost"
+                      onClick={handleSearchClear}
+                      disabled={!canClearSearch}
+                    >
+                      クリア
+                    </button>
+                  </div>
+                  <div className={searchStatusClass} aria-live="polite">
+                    {searchStatusText}
+                  </div>
+                </form>
+                {searchResults.length > 0 ? (
+                  <ul className="search-results" role="list">
+                    {searchResults.map((result) => (
+                      <li key={result.id}>
+                        <button
+                          type="button"
+                          className="search-results__item"
+                          onClick={() => {
+                            void handleSearchResultNavigate(result);
+                          }}
+                        >
+                          <div className="search-results__meta">
+                            <span className="search-results__scope">{result.source === 'open' ? '開いているタブ' : '_input'}</span>
+                            <span className="search-results__file">{result.fileName ?? '未保存タブ'}</span>
+                            <span className="search-results__count">{result.matchCount}件</span>
+                          </div>
+                          <div className="search-results__title">{result.cardTitle || '無題カード'}</div>
+                          <p className="search-results__snippet">{result.snippet || '（本文なし）'}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             </div>
           </aside>
@@ -2292,31 +2677,55 @@ export const App = () => {
 
         <section className="log-area" aria-label="動作ログ">
           <header className="log-area__header">
-            <span>動作ログ</span>
-            <button
-              type="button"
-              className="log-area__clear"
-              onClick={() =>
-                setLogs([
-                  {
-                    id: `log-clear-${Date.now()}`,
-                    level: 'INFO',
-                    message: 'ログをクリアしました。',
-                    timestamp: new Date(),
-                  },
-                ])
-              }
-            >
-              クリア
-            </button>
+            <div className="log-area__title">
+              <span>動作ログ</span>
+              <span className="log-area__counter">
+                {displayedLogs.length} / {logs.length}
+              </span>
+            </div>
+            <div className="log-area__filters">
+              <label className="sr-only" htmlFor="log-level-filter">
+                ログレベル
+              </label>
+              <select
+                id="log-level-filter"
+                className="log-area__select"
+                value={logLevelFilter}
+                onChange={(event) => setLogLevelFilter(event.target.value as (typeof logLevelOptions)[number])}
+              >
+                {logLevelOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'ALL' ? 'すべて' : option}
+                  </option>
+                ))}
+              </select>
+              <label className="sr-only" htmlFor="log-keyword-filter">
+                キーワード
+              </label>
+              <input
+                id="log-keyword-filter"
+                className="log-area__filter-input"
+                type="search"
+                placeholder="キーワード"
+                value={logFilterKeyword}
+                onChange={(event) => setLogFilterKeyword(event.target.value)}
+              />
+              <button type="button" className="log-area__clear" onClick={clearLogs}>
+                ログをクリア
+              </button>
+            </div>
           </header>
           <pre className="log-area__body" aria-live="polite">
-            {logs.map((entry) => (
-              <span key={entry.id}>
-                {`[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`}
-                {'\n'}
-              </span>
-            ))}
+            {displayedLogs.length === 0 ? (
+              <span key="log-empty">該当するログがありません。</span>
+            ) : (
+              displayedLogs.map((entry) => (
+                <span key={entry.id}>
+                  {`[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`}
+                  {'\n'}
+                </span>
+              ))
+            )}
           </pre>
         </section>
       </section>
@@ -2333,6 +2742,35 @@ export const App = () => {
           <span>接続状態: {ipcStatus}</span>
         </div>
       </footer>
+
+      {isHelpOpen ? (
+        <div className="help-overlay" role="dialog" aria-modal="true" aria-label="ショートカットと操作一覧">
+          <div className="help-overlay__backdrop" onClick={() => setHelpOpen(false)} />
+          <div className="help-overlay__panel" role="document">
+            <header className="help-overlay__header">
+              <h2>ショートカットと操作一覧</h2>
+              <button type="button" className="help-overlay__close" onClick={() => setHelpOpen(false)} aria-label="ヘルプを閉じる">
+                ✕
+              </button>
+            </header>
+            <div className="help-overlay__body">
+              {SHORTCUT_GROUPS.map((group) => (
+                <section key={group.title} className="help-overlay__group">
+                  <h3>{group.title}</h3>
+                  <ul className="help-overlay__list">
+                    {group.entries.map((entry) => (
+                      <li key={`${group.title}-${entry.keys}`} className="help-overlay__item">
+                        <span className="help-overlay__keys">{entry.keys}</span>
+                        <span className="help-overlay__description">{entry.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

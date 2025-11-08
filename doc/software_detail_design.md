@@ -300,3 +300,20 @@ Deprecated --> Draft : 再利用
   - カードパネルツールバーの ⛓️ トグルは、対象ファイル内の全カードIDを取得して `toggleFileVisibility(fileName, cardIds)` を呼び出し、左右接合点の `mutedCards` 状態を一括で書き換える。これにより、UI 上でも各トレース接合点ボタンの状態が即時反映され、仕様どおり「トレース接合点のコネクタ表示の有無」を通じてファイル全体の表示を制御する。
   - `Card` モデルに `markdownPreviewEnabled` を追加し、カード単位で Markdown プレビューのON/OFFを保持する。`normalizeCardOrder` で既存ファイルを読み込む際もデフォルト値（true）を適用。
   - `renderer/utils/markdown.ts` に簡易Markdownレンダラを実装し、危険なHTMLをエスケープしたうえで `CardPanel` が `dangerouslySetInnerHTML` に渡す。ヘッダの `MD` ボタンと上部ツールバーの 🅼 トグルで `markdownPreviewEnabled` と `uiStore.markdownPreviewGlobalEnabled` を参照し、描画可否を決定する。
+
+### 8.7 P6 フィーチャ実装サマリ
+- **P6-01 全文/正規表現検索 UI**
+  - `src/renderer/App.tsx` に検索フォームを実装。`searchScopeEntries` と `searchUseRegex` を状態管理し、`executeSearch` が `createSearchMatcher`/`buildSnippet`（`renderer/utils/search.ts`）を用いてアクティブタブ/開いているタブ/_input ディレクトリのカードを横断検索する。
+  - サイドバーにはスコープセレクタ、正規表現トグル、検索/クリアボタン、状態メッセージ、結果リストを配置。結果の `SearchResultItem` をクリックすると `handleSearchResultNavigate` がタブを自動ロードし選択カードへフォーカスする。
+  - `styles.css` の `.sidebar__search-*` / `.search-results*` でフォームとリストをテーマ対応デザインに統一。`searchStatusText` を `aria-live` 領域に載せてアクセシビリティを確保。
+- **P6-02 カードパネルフィルタ**
+  - `CardPanel.tsx` に `filterText` と `kindFilter` を実装し、`filteredCardIds`/`visibleCards` を介して部分一致＋種別条件を満たしたカードと祖先だけを描画。フィルタ有効時はツールバー右端に `カード総数（表示: n）` を表示する。
+  - 種別フィルタは 📚 ボタンのポップオーバー（`panel-filter-popover`）でチェックボックスと「全選択/全解除」を提供。テキストフィルタ入力はアクティブ時に強調表示し、`styles.css` の新クラスで装飾した。
+- **P6-03 Dirty カード強調**
+  - `workspaceStore` で保持していた `dirtyCardIds` を `CardPanel` から参照し、対象カードへ `card--dirty` を付与。`styles.css` にアンバー系リングを追加して未保存カードを即時識別できるようにした。
+- **P6-04 ログフィルタリング**
+  - `App.tsx` に `logLevelFilter`/`logFilterKeyword`/`displayedLogs` を追加し、ヘッダーへレベルセレクタ・キーワード検索・カウンタ・クリアボタンをまとめた。フィルタ結果は即座に `pre` 内へ反映し、ゼロ件時は空メッセージを表示する。
+  - `styles.css` の `.log-area__*` クラスを拡張してヘッダーを多段レイアウト化し、フォームスタイルを他セクションと揃えた。
+- **P6-05 ショートカット/ヘルプオーバーレイ**
+  - `App.tsx` に `SHORTCUT_GROUPS` を定義し、トップツールバー右端へ「❔」ボタンを追加。ボタンまたは `Esc` で開閉できるモーダルをレンダリングし、グローバルショートカット・カード挿入操作・コンテキストメニュー操作を二列レイアウトで提示する。
+  - `styles.css` に `.help-overlay*` を定義し、バックドロップ/カード風リスト/クローズボタンの外観を統一。アクセシビリティ確保のため `aria-modal` とフォーカストラップを備えた。
