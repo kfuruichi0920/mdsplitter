@@ -954,7 +954,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
 
       //! 移動対象カードのバリデーション
-      const moveCardsSet = new Set(cardIds);
+      const rootMoveIds = new Set(cardIds);
       for (const cardId of cardIds) {
         const card = cardMap.get(cardId);
         if (!card) {
@@ -968,8 +968,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       //! カードの移動処理
       const nextCards = [...tab.cards];
-      const movedCards: Card[] = [];
-      const movedCardIds = new Set(cardIds);
 
       //! 移動対象カードとその子孫を収集
       const collectDescendants = (cardId: string): string[] => {
@@ -989,37 +987,37 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       });
 
       //! 移動対象カードを元の位置から削除（階層構造も更新）
-      const cardsToMove = nextCards.filter((c) => movedCardIds.has(c.id));
+      const cardsToMove = nextCards.filter((c) => allMovedIds.has(c.id));
       const remainingCards = nextCards.filter((c) => !allMovedIds.has(c.id));
 
       //! 新しい親と位置の決定
       let newParentId: string | null = null;
       let insertIndex = 0;
 
+      const targetIndex = remainingCards.findIndex((c) => c.id === targetCardId);
+      if (targetIndex === -1) {
+        return state;
+      }
+
       if (position === 'child') {
         newParentId = targetCardId;
-        insertIndex = remainingCards.findIndex((c) => c.parent_id === targetCardId);
-        if (insertIndex === -1) {
-          insertIndex = remainingCards.length;
-        }
+        insertIndex = getSubtreeEndIndex(remainingCards, targetIndex);
       } else {
         newParentId = targetCard.parent_id;
-        const targetIndex = remainingCards.findIndex((c) => c.id === targetCardId);
-        if (targetIndex === -1) {
-          return state;
-        }
-        insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+        insertIndex = position === 'before'
+          ? targetIndex
+          : getSubtreeEndIndex(remainingCards, targetIndex);
       }
 
       //! 移動対象カードの階層情報を更新
       const updatedMovedCards = cardsToMove.map((card) => {
-        if (movedCardIds.has(card.id)) {
+        if (rootMoveIds.has(card.id)) {
           //! 直接移動するカード
           const newLevel = newParentId ? (cardMap.get(newParentId)?.level ?? 0) + 1 : 0;
           return { ...card, parent_id: newParentId, level: newLevel };
         }
         //! 子孫カード（相対的なレベルを維持）
-        const rootMoveCard = cardsToMove.find((c) => movedCardIds.has(c.id) && isAncestor(c, card, cardMap));
+        const rootMoveCard = cardsToMove.find((c) => rootMoveIds.has(c.id) && isAncestor(c, card, cardMap));
         if (rootMoveCard) {
           const levelDiff = card.level - rootMoveCard.level;
           const newRootLevel = newParentId ? (cardMap.get(newParentId)?.level ?? 0) + 1 : 0;

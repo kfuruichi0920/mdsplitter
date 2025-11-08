@@ -356,3 +356,11 @@
 - 保存処理: `src/main/workspace.ts:330-380` に `saveCardFileSnapshot` を実装し、`workspace:saveCardFile` IPC（`src/main/main.ts:110-150`、`src/main/preload.ts:20-70`、`src/renderer/global.d.ts:20-40`）を追加。`App.tsx:780-930` では `saveActiveTab` を新設し、`.workspace.saveCardFile` で `_out/` 配下へカード JSON を上書き/別名保存できるようにした。`workspaceStore` に `renameTabFile` (`src/renderer/store/workspaceStore.ts:140-220`) を追加し、保存後はタブのファイル名を更新。
 - UI/ショートカット: ツールバーへ「📝 別名保存」を追加し、`Ctrl+Shift+S` で `handleSaveAs` を呼び出すよう `src/renderer/App.tsx:1400-1430,1230-1280` を更新。保存API未定義時のエラーハンドリングとログ出力も追加。
 - ドキュメント: 要件仕様 `doc/software_requirement.md:360-380`、UI設計 `doc/user_interface_design.md:120-200,500-530`、詳細設計 `doc/software_detail_design.md:210-225` を更新し、新しいドラッグプレビュー/保存フローと API 追加内容を反映した。
+### 子挿入時の表示位置バグ修正 (2025-11-08)
+- 調査: `workspaceStore.moveCards` で `position === 'child'` の挿入インデックスが既存子要素を考慮せず `remainingCards.length` へフォールバックしていたため、子として移動したカードが常にリスト末尾へ追加されていた。
+- 対応: `getSubtreeEndIndex` を再利用してターゲットカードのサブツリー終端を算出し、子挿入時はその直後へ、`position === 'after'` 時もサブツリー終端の後へ挿入するように更新 (`src/renderer/store/workspaceStore.ts:960-1010`)。兄弟挿入時は従来通りターゲット直前/直後を維持。
+- テスト: `workspaceStore.test.ts` に「moves a card as child directly under the parent card」ケースを追加し、移動後の順序 (親の直後、他のルートカードより前) と階層 (`parent_id`/`level`) を検証。`npm run test -- workspaceStore.test.ts` で 15 件緑を確認。
+### 子階層ごと移動時に孫要素が消える不具合修正 (2025-11-08)
+- 原因: `moveCards` が選択ルートのみ `cardsToMove` に残し、子孫は `remainingCards` から削除するだけで再挿入していなかったため、親の下へ子として移動した際に配下のカードが失われていた。
+- 対応: 移動サブツリーID集合 `allMovedIds` を用意し、元リストからフィルタした順序でルート+子孫を `cardsToMove` として保持。`position === 'child'` および `after` の挿入位置決定に `getSubtreeEndIndex` を利用し、ターゲットサブツリーの直後にまとめて挿入するよう更新 (`src/renderer/store/workspaceStore.ts:948-1030`)。
+- テスト: ルート/子/sibling構成のカードを用意し、`moveCards(..., 'child')` 後に「親→移動カード→兄弟」の順で並ぶことと、`parent_id`/`level` が正しいことを確認するユニットテストを追加 (`src/renderer/store/workspaceStore.test.ts:220-275`)。`npm run test -- workspaceStore.test.ts` で緑を確認。

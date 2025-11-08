@@ -265,6 +265,68 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(tab?.expandedCardIds.has('card-001')).toBe(true);
   });
 
+  it('moves a card as child directly under the parent card', () => {
+    const cards: Card[] = [
+      {
+        ...baseCards[0],
+        id: 'parent',
+        child_ids: [],
+        next_id: 'sibling',
+      },
+      {
+        ...baseCards[1],
+        id: 'sibling',
+        title: 'Sibling',
+        parent_id: null,
+        child_ids: [],
+        prev_id: 'parent',
+        next_id: 'target',
+        level: 0,
+      },
+      {
+        ...baseCards[1],
+        id: 'target',
+        title: 'Target',
+        parent_id: null,
+        child_ids: [],
+        prev_id: 'sibling',
+        next_id: null,
+        level: 0,
+      },
+    ];
+
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'move.json', cards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      const ok = useWorkspaceStore.getState().moveCards('leaf-A', tabId, ['target'], 'parent', 'child');
+      expect(ok).toBe(true);
+    });
+
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs[tabId];
+    expect(tab).toBeDefined();
+    if (!tab) {
+      return;
+    }
+
+    const parentIndex = tab.cards.findIndex((card) => card.id === 'parent');
+    const targetIndex = tab.cards.findIndex((card) => card.id === 'target');
+    const siblingIndex = tab.cards.findIndex((card) => card.id === 'sibling');
+
+    expect(parentIndex).toBeGreaterThanOrEqual(0);
+    expect(targetIndex).toBe(parentIndex + 1);
+    expect(siblingIndex).toBeGreaterThan(targetIndex);
+    expect(tab.cards[targetIndex].parent_id).toBe('parent');
+    expect(tab.cards[targetIndex].level).toBe(tab.cards[parentIndex].level + 1);
+  });
+
   it('copies selected root subtree and pastes after the anchor', () => {
     let tabId = '';
     act(() => {
