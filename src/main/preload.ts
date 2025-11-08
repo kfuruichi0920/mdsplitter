@@ -61,6 +61,9 @@ type AppAPI = {
     /** 左右カードファイルに対応するトレーサビリティファイルを読み込む。 */
     loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
   };
+  dialogs: {
+    promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
+  };
 };
 
 
@@ -87,6 +90,9 @@ const api: AppAPI = {
     loadOutputFile: async (fileName: string) => ipcRenderer.invoke('workspace:loadOutputFile', fileName),
     loadTraceFile: async (leftFile: string, rightFile: string) =>
       ipcRenderer.invoke('workspace:loadTraceFile', { leftFile, rightFile }),
+  },
+  dialogs: {
+    promptSaveFile: async (options) => ipcRenderer.invoke('dialog:promptSaveFile', options ?? {}),
   },
 };
 

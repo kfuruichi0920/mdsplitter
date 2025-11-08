@@ -128,6 +128,36 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(state.leafs['leaf-B']).toBeUndefined();
   });
 
+  it('creates an untitled tab via createUntitledTab', () => {
+    act(() => {
+      useWorkspaceStore.getState().createUntitledTab('leaf-A');
+    });
+
+    const state = useWorkspaceStore.getState();
+    const leaf = state.leafs['leaf-A'];
+    expect(leaf?.tabIds).toHaveLength(1);
+    const tabId = leaf?.activeTabId ?? undefined;
+    expect(tabId).toBeDefined();
+    const tab = tabId ? state.tabs[tabId] : undefined;
+    expect(tab?.fileName).toBeNull();
+    expect(tab?.title).toMatch(/新規ファイル/);
+    expect(tab?.isDirty).toBe(true);
+    expect(Object.keys(state.fileToLeaf)).toHaveLength(0);
+  });
+
+  it('increments untitled tab titles for successive creations', () => {
+    act(() => {
+      useWorkspaceStore.getState().createUntitledTab('leaf-A');
+      useWorkspaceStore.getState().createUntitledTab('leaf-A');
+    });
+
+    const state = useWorkspaceStore.getState();
+    const leaf = state.leafs['leaf-A'];
+    expect(leaf?.tabIds).toHaveLength(2);
+    const titles = leaf?.tabIds.map((id) => state.tabs[id]?.title) ?? [];
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
   it('closes a tab and reassigns active tab within the leaf', () => {
     let firstTabId = '';
     let secondTabId = '';

@@ -34,6 +34,9 @@ declare global {
         loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
         loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
       };
+      dialogs: {
+        promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
+      };
     };
   }
 }

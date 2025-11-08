@@ -237,7 +237,7 @@
   }
 
   .tab-bar__tab--add {
-    @apply cursor-not-allowed opacity-40; /* まだ未実装のため無効扱い */
+    @apply font-semibold text-slate-500 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
   }
 
   .tab-bar__tab-title {

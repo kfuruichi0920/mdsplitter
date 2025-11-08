@@ -1013,19 +1013,30 @@ export const App = () => {
   }, [appSettings, notify, pushLog, setThemeStore, theme]);
 
   const promptExportFileName = useCallback(
-    (initialName?: string | null) => {
+    async (initialName?: string | null) => {
       const fallback = buildDefaultExportName();
       const suggestion = normalizeOutputFileName(initialName ?? '') ?? fallback;
-      const input = window.prompt('保存するカードファイル名 (.json)', suggestion);
-      if (input === null) {
+      const dialogApi = window.app?.dialogs?.promptSaveFile;
+      if (!dialogApi) {
+        notify('error', '保存ダイアログAPIが利用できません。再起動後に再試行してください。');
         return null;
       }
-      const normalized = normalizeOutputFileName(input);
-      if (!normalized) {
-        notify('error', 'ファイル名に使用できない文字が含まれています。');
+      try {
+        const result = await dialogApi({ defaultFileName: suggestion });
+        if (!result || result.canceled || !result.fileName) {
+          return null;
+        }
+        const normalized = normalizeOutputFileName(result.fileName);
+        if (!normalized) {
+          notify('error', 'ファイル名に使用できない文字が含まれています。');
+          return null;
+        }
+        return normalized;
+      } catch (error) {
+        console.error('[renderer] failed to open save dialog', error);
+        notify('error', '保存ダイアログの表示に失敗しました。');
         return null;
       }
-      return normalized;
     },
     [notify],
   );
@@ -1076,7 +1087,7 @@ export const App = () => {
 
       let targetFileName: string | null = options?.explicitFileName ?? activeTab.fileName ?? null;
       if (!targetFileName) {
-        targetFileName = promptExportFileName(activeTab.title ?? null);
+        targetFileName = await promptExportFileName(activeTab.title ?? null);
         if (!targetFileName) {
           return false;
         }
@@ -1147,7 +1158,7 @@ export const App = () => {
    */
   const handleSaveAs = useCallback(async () => {
     const suggested = activeTab?.fileName ?? activeTab?.title ?? buildDefaultExportName();
-    const requested = promptExportFileName(suggested);
+    const requested = await promptExportFileName(suggested);
     if (!requested) {
       notify('info', '保存をキャンセルしました。');
       return;

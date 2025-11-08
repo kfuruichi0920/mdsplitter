@@ -16,11 +16,13 @@
  */
 import path from 'node:path';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import type { SaveDialogOptions } from 'electron';
 
 import type { LogLevel } from '../shared/settings';
 
 import {
+  getWorkspacePaths,
   initializeWorkspace,
   listCardFiles,
   listOutputFiles,
@@ -200,6 +202,29 @@ ipcMain.handle('workspace:loadTraceFile', async (_event, args: { leftFile: strin
     logMessage('debug', '対応するトレーサビリティファイルが見つかりませんでした');
   }
   return trace;
+});
+
+ipcMain.handle('dialog:promptSaveFile', async (_event, options: { defaultFileName?: string } = {}) => {
+  const paths = getWorkspacePaths();
+  const sanitizedDefault = typeof options.defaultFileName === 'string' && options.defaultFileName.trim().length > 0
+    ? options.defaultFileName.trim()
+    : 'cards.json';
+  const defaultPath = path.join(paths.outputDir, sanitizedDefault);
+  const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+  const dialogOptions: SaveDialogOptions = {
+    title: 'カードファイルを保存',
+    defaultPath,
+    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    properties: ['showOverwriteConfirmation', 'createDirectory'],
+  };
+
+  const result = browserWindow
+    ? await dialog.showSaveDialog(browserWindow, dialogOptions)
+    : await dialog.showSaveDialog(dialogOptions);
+  if (result.canceled || !result.filePath) {
+    return { canceled: true };
+  }
+  return { canceled: false, fileName: path.basename(result.filePath) };
 });
 
 

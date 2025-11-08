@@ -58,6 +58,9 @@ describe('App', () => {
   let saveCardFileMock: jest.Mock;
   let loadWorkspaceMock: jest.Mock;
   let loadCardFileMock: jest.Mock;
+  let listCardFilesMock: jest.Mock;
+  let listOutputFilesMock: jest.Mock;
+  let promptSaveFileMock: jest.Mock;
 
   /**
    * @brief 各テスト前の初期化処理。
@@ -76,6 +79,9 @@ describe('App', () => {
       cards: snapshotCards,
       savedAt: '2025-10-20T09:00:00.000Z',
     });
+    listCardFilesMock = jest.fn().mockResolvedValue(['test_cards.json']);
+    listOutputFilesMock = jest.fn().mockResolvedValue(['SampleCards.json']);
+    promptSaveFileMock = jest.fn().mockResolvedValue({ canceled: false, fileName: 'mock_cards.json' });
     (window as any).app = {
       ping: jest.fn().mockResolvedValue({ ok: true, timestamp: Date.now() }),
       settings: {
@@ -90,8 +96,12 @@ describe('App', () => {
         save: saveWorkspaceMock,
         saveCardFile: saveCardFileMock,
         load: loadWorkspaceMock,
-        listCardFiles: jest.fn().mockResolvedValue(['test_cards.json']),
+        listCardFiles: listCardFilesMock,
+        listOutputFiles: listOutputFilesMock,
         loadCardFile: loadCardFileMock,
+      },
+      dialogs: {
+        promptSaveFile: promptSaveFileMock,
       },
     };
 
@@ -118,6 +128,9 @@ describe('App', () => {
     saveCardFileMock.mockReset?.();
     loadWorkspaceMock.mockReset?.();
     loadCardFileMock?.mockReset?.();
+    listCardFilesMock?.mockReset?.();
+    listOutputFilesMock?.mockReset?.();
+    promptSaveFileMock?.mockReset?.();
   });
 
   /**
@@ -152,10 +165,12 @@ describe('App', () => {
     }, { timeout: 5000 });
 
     const fileItems = screen.getAllByText(/test_cards\.json/);
-    const fileItem = fileItems[0];
+    const fileItem = fileItems[0].closest('li') ?? fileItems[0];
 
     // ダブルクリックしてファイルを読み込む
-    fireEvent.doubleClick(fileItem);
+    await act(async () => {
+      fireEvent.doubleClick(fileItem);
+    });
 
     await waitFor(() => expect((window as any).app.workspace.loadCardFile).toHaveBeenCalled(), { timeout: 5000 });
 
@@ -168,7 +183,7 @@ describe('App', () => {
     // Approvedステータスのカードが表示されるまで待機
     await waitFor(() => screen.getByText('Approved'), { timeout: 5000 });
 
-    const button = screen.getByRole('button', { name: /ステータス切替/ });
+    const button = screen.getByRole('button', { name: /ステータスを切り替え/ });
     fireEvent.click(button);
 
     // ステータスが変わったことを確認
@@ -203,7 +218,7 @@ describe('App', () => {
     // カードファイルをダブルクリックして読み込む操作をシミュレート
     await waitFor(() => expect(screen.getAllByText(/test_cards\.json/).length).toBeGreaterThan(0), { timeout: 5000 });
     const fileItems = screen.getAllByText(/test_cards\.json/);
-    const fileItem = fileItems[0];
+    const fileItem = fileItems[0].closest('li') ?? fileItems[0];
 
     await act(async () => {
       fireEvent.doubleClick(fileItem);
@@ -214,7 +229,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText(/保存状態:/)).toBeInTheDocument(), { timeout: 5000 });
     expect(screen.getByText(/保存状態: ✓ 保存済み/)).toBeInTheDocument();
 
-    const statusButton = screen.getByRole('button', { name: /ステータス切替/ });
+    const statusButton = screen.getByRole('button', { name: /ステータスを切り替え/ });
     act(() => {
       statusButton.click();
     });
@@ -305,10 +320,12 @@ describe('App', () => {
     }, { timeout: 5000 });
 
     const fileItems = screen.getAllByText(/invalid_cards\.json/);
-    const fileItem = fileItems[0];
+    const fileItem = fileItems[0].closest('li') ?? fileItems[0];
 
     // ダブルクリックしてファイルを読み込む
-    fireEvent.doubleClick(fileItem);
+    await act(async () => {
+      fireEvent.doubleClick(fileItem);
+    });
 
     await waitFor(() => expect((window as any).app.workspace.loadCardFile).toHaveBeenCalledWith('invalid_cards.json'), {
       timeout: 5000,

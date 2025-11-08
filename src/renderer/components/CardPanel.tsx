@@ -105,6 +105,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const selectCard = useWorkspaceStore((state) => state.selectCard);
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
   const moveCards = useWorkspaceStore((state) => state.moveCards);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
@@ -126,6 +127,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     }
     return leafTabs.find((tab) => tab.id === activeTabId) ?? null;
   }, [activeTabId, leafTabs]);
+
+  const activeFileIdentifier = activeTab ? activeTab.fileName ?? `unsaved-${activeTab.id}` : '';
 
   useEffect(() => {
     if (!lastInsertPreview || !activeTabId) {
@@ -233,6 +236,13 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     },
     [closeTab, leafId, leafTabs, onLog],
   );
+
+  const handleCreateNewTab = useCallback(() => {
+    const created = createUntitledTab(leafId);
+    if (created) {
+      onLog?.('INFO', `新規カードファイルを作成しました: ${created.title}`);
+    }
+  }, [createUntitledTab, leafId, onLog]);
 
   const handleAddCard = useCallback(() => {
     if (!activeTabId) {
@@ -615,7 +625,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             );
           })
         )}
-        <button type="button" className="tab-bar__tab tab-bar__tab--add" disabled>
+        <button
+          type="button"
+          className="tab-bar__tab tab-bar__tab--add"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleCreateNewTab();
+          }}
+          aria-label="新規カードファイルを作成"
+          title="新規カードファイルを作成"
+        >
           ➕
         </button>
         <div className="tab-bar__spacer" />
@@ -746,7 +765,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             key={card.id}
             card={card}
             leafId={leafId}
-            fileName={activeTab?.fileName ?? ''}
+            fileName={activeFileIdentifier}
             isSelected={selectedCardIds.has(card.id)}
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
@@ -933,7 +952,7 @@ interface CardListItemProps {
   hasChildren: boolean; ///< 子カードを持つかどうか。
   isEditing: boolean; ///< 編集モード中かどうか。
   leafId: string;
-  fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
+  fileName: string; ///< カードが属するファイル識別子（ファイル名またはタブID）。
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。

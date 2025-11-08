@@ -78,7 +78,7 @@ interface InsertPreview {
 export interface PanelTabState {
   id: string;
   leafId: string;
-  fileName: string;
+  fileName: string | null;
   title: string;
   cards: Card[];
   selectedCardIds: Set<string>; ///< 選択中のカードIDセット（複数選択対応）
@@ -120,11 +120,13 @@ export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
   leafs: Record<string, LeafWorkspaceState>;
   fileToLeaf: Record<string, string>;
+  nextUntitledIndex: number;
   undoStack: UndoRedoEntry[]; ///< Undoスタック（最大100件）
   redoStack: UndoRedoEntry[]; ///< Redoスタック（最大100件）
   clipboard: ClipboardCardNode[] | null; ///< コピー済みカードツリー
   lastInsertPreview: InsertPreview | null; ///< 直近の挿入ハイライト
   openTab: (leafId: string, fileName: string, cards: Card[], options?: { savedAt?: string; title?: string }) => OpenTabResult;
+  createUntitledTab: (leafId: string, options?: { title?: string; cards?: Card[] }) => PanelTabState | null;
   closeTab: (leafId: string, tabId: string) => void;
   closeLeaf: (leafId: string) => void;
   setActiveTab: (leafId: string, tabId: string) => void;
@@ -164,10 +166,11 @@ const createLeafState = (leafId: string): LeafWorkspaceState => ({ leafId, tabId
 /**
  * @brief 初期ストア状態。
  */
-const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf' | 'undoStack' | 'redoStack' | 'clipboard' | 'lastInsertPreview'> = {
+const initialState: Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf' | 'undoStack' | 'redoStack' | 'clipboard' | 'lastInsertPreview' | 'nextUntitledIndex'> = {
   tabs: {},
   leafs: {},
   fileToLeaf: {},
+  nextUntitledIndex: 1,
   undoStack: [],
   redoStack: [],
   clipboard: null,
@@ -273,6 +276,51 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     return outcome;
   },
 
+  createUntitledTab: (leafId, options) => {
+    let createdTab: PanelTabState | null = null;
+
+    set((state) => {
+      const currentLeaf = state.leafs[leafId] ?? createLeafState(leafId);
+      const normalizedCards = options?.cards ? normalizeCardOrder(options.cards) : [];
+      const tabId = nanoid();
+      const title = options?.title ?? `新規ファイル ${state.nextUntitledIndex}`;
+      const initialExpandedIds = new Set<string>(
+        normalizedCards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
+      );
+      const initialSelectedIds = new Set<string>(normalizedCards[0]?.id ? [normalizedCards[0].id] : []);
+
+      const nextTab: PanelTabState = {
+        id: tabId,
+        leafId,
+        fileName: null,
+        title,
+        cards: [...normalizedCards],
+        selectedCardIds: initialSelectedIds,
+        isDirty: true,
+        lastSavedAt: null,
+        expandedCardIds: initialExpandedIds,
+        editingCardId: null,
+      } satisfies PanelTabState;
+
+      createdTab = nextTab;
+
+      const nextLeaf: LeafWorkspaceState = {
+        leafId,
+        tabIds: [...currentLeaf.tabIds, tabId],
+        activeTabId: tabId,
+      } satisfies LeafWorkspaceState;
+
+      return {
+        ...state,
+        tabs: { ...state.tabs, [tabId]: nextTab },
+        leafs: { ...state.leafs, [leafId]: nextLeaf },
+        nextUntitledIndex: state.nextUntitledIndex + 1,
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'nextUntitledIndex'>;
+    });
+
+    return createdTab;
+  },
+
   closeTab: (leafId, tabId) => {
     set((state) => {
       const leaf = state.leafs[leafId];
@@ -298,7 +346,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       delete nextTabs[tabId];
 
       const nextFileToLeaf = { ...state.fileToLeaf };
-      if (tab) {
+      if (tab?.fileName) {
         delete nextFileToLeaf[tab.fileName];
       }
 
@@ -325,7 +373,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       leaf.tabIds.forEach((tabId) => {
         const tab = state.tabs[tabId];
-        if (tab) {
+        if (tab?.fileName) {
           delete nextFileToLeaf[tab.fileName];
         }
         delete nextTabs[tabId];

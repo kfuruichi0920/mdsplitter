@@ -5,3 +5,14 @@
   2. `panels__body` ラッパーを新設して `SplitContainer` 全体に `min-h-0`/`overflow-hidden` を適用し、カードパネル領域が常に自分のグリッドセル内に収まるようにした。
   3. `SplitContainer` 側では既存の `split-node`/`split-container` の `flex-1` 設定と組み合わせることで、各 `CardPanel` の `panel-cards` に設定済みの `overflow-y-auto` が正しく機能するようになった。
 - これにより大量カードでもカード一覧だけに垂直スクロールが表示され、ツールバーやログエリアは固定表示のままとなる。
+
+### タブバー「＋」からの新規カードファイル作成 (2025-11-09)
+- `workspaceStore` に `fileName: string | null` と `createUntitledTab` を導入し、未保存タブは `fileName=null` かつ `title="新規ファイル n"`、`isDirty=true` で生成。`fileToLeaf` は実ファイルのみ追跡するよう `closeTab`/`closeLeaf` を調整し、保存時に `renameTabFile` が本来のファイル名を割り当てる（`src/renderer/store/workspaceStore.ts`）。
+- `CardPanel` の「＋」ボタンを有効化し、クリックで `createUntitledTab` を呼び出して空タブを追加。ログへ操作を残し、未保存タブでもトレースアンカーが一意になるよう `fileName` フォールバックとしてタブIDを `CardListItem` に渡す（`src/renderer/components/CardPanel.tsx`）。
+- `.tab-bar__tab--add` スタイルを更新してホバー/フォーカス時に視覚的なフィードバックを付与、未保存タブ追加操作が可能であることを強調（`src/renderer/styles.css`）。
+- `workspaceStore.test.ts` へ未保存タブ生成テストを追加して連番タイトルの一意性と `fileToLeaf` 未登録を保証し、`doc/software_detail_design.md` と `task/task_all.md` に仕様反映を記録。
+
+### 保存ダイアログ API への置き換え (2025-11-09)
+- サンドボックス環境で `window.prompt` が使用できず保存時に例外が発生していたため、Electron の `dialog.showSaveDialog` を `dialog:promptSaveFile` IPC として公開（`src/main/main.ts`, `preload.ts`, `renderer/global.d.ts`）。
+- `App.tsx` の `promptExportFileName` を非同期化し、新ダイアログ API を利用してファイル名を取得。キャンセル時は null を返し、失敗時のみトースト通知するように調整。
+- `App.test.tsx` へ `promptSaveFile` のモックを追加し、既存テストが新APIで成功することを確認。
