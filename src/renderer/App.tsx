@@ -226,10 +226,13 @@ export const App = () => {
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
+  const tabs = useWorkspaceStore((state) => state.tabs);
+  const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
+  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const copySelection = useWorkspaceStore((state) => state.copySelection);
@@ -611,6 +614,20 @@ export const App = () => {
     void loadCardFiles();
   }, [pushLog]);
 
+  useEffect(() => {
+    //! アプリ終了時の未保存変更確認
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const hasUnsavedTabs = Object.values(tabs).some((tab) => tab.isDirty);
+      if (hasUnsavedTabs) {
+        event.preventDefault();
+        event.returnValue = ''; // Chrome requires returnValue to be set
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [tabs]);
+
   /**
    * @brief ログエントリをプッシュするラッパー（CardPanel に渡す用）。
    * @param level ログレベル。
@@ -697,6 +714,23 @@ export const App = () => {
           return;
         }
 
+        // 同じファイルが既に開かれていて未保存変更がある場合は確認
+        const existingTab = Object.values(tabs).find((tab) => tab.fileName === fileName);
+        if (existingTab?.isDirty) {
+          const confirmed = window.confirm(
+            `ファイル「${fileName}」は既に開かれており、未保存の変更があります。\n\n再読み込みすると未保存の変更は失われます。続行しますか?`
+          );
+          if (!confirmed) {
+            pushLog({
+              id: `load-card-cancelled-${Date.now()}`,
+              level: 'INFO',
+              message: `ファイル ${fileName} の再読み込みをキャンセルしました。`,
+              timestamp: new Date(),
+            });
+            return;
+          }
+        }
+
         const snapshot = await window.app.workspace.loadCardFile(fileName);
         if (!snapshot) {
           notify('error', `カードファイルの読み込みに失敗しました: ${fileName}`);
@@ -759,7 +793,7 @@ export const App = () => {
         });
       }
     },
-    [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot],
+    [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot, tabs],
   );
 
   // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む

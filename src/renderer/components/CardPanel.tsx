@@ -214,6 +214,18 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const handleTabClose = useCallback(
     (tabId: string) => {
       const target = leafTabs.find((tab) => tab.id === tabId);
+
+      // 未保存変更がある場合は確認ダイアログを表示
+      if (target?.isDirty) {
+        const confirmed = window.confirm(
+          `タブ「${target.title}」には未保存の変更があります。\n\n保存せずに閉じますか?`
+        );
+        if (!confirmed) {
+          onLog?.('INFO', `タブ「${target.title}」のクローズをキャンセルしました。`);
+          return;
+        }
+      }
+
       closeTab(leafId, tabId);
       if (target) {
         onLog?.('INFO', `タブ「${target.title}」を閉じました。`);
@@ -573,7 +585,6 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           leafTabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             const tabClass = `tab-bar__tab${isActive ? ' tab-bar__tab--active' : ''}`;
-            const dirtyMark = tab.isDirty ? ' ●' : '';
             return (
               <div key={tab.id} className="tab-bar__tab-container" data-tab-id={tab.id}>
                 <button

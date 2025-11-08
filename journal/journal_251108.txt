@@ -372,3 +372,134 @@
 - `CardPanel` で `useSplitStore` を参照し、アクティブ葉IDと一致するパネルに `split-node--active` クラス／`data-active` 属性を付けることで視覚状態を取得できるようにした (`src/renderer/components/CardPanel.tsx:9-45,520-540`)。
 - `styles.css` に `.split-node--active` を追加し、青系ボーダー＋リングで現在パネルを強調表示するようデザインを更新 (`src/renderer/styles.css:208-216`)。
 - UI設計書へアクティブパネルのハイライト仕様を追記し、ドキュメントと実装を同期 (`doc/user_interface_design.md:206-214`)。
+
+## 作業内容
+P2-22a～P2-22bの実装: カードファイルの上書き保存/新規保存機能と、未保存変更の視覚的フィードバック
+
+## 実装した機能
+
+### P2-22a: 上書き保存/新規保存機能
+既に実装済みであることを確認:
+- **上書き保存 (Ctrl+S)**: `handleSave()` - App.tsx:961-963
+- **名前を付けて保存 (Ctrl+Shift+S)**: `handleSaveAs()` - App.tsx:968-976
+- **保存処理の本体**: `saveActiveTab()` - App.tsx:862-956
+  - isDirtyフラグによる変更検知
+  - ファイル名の検証と正規化
+  - IPC経由でのファイル保存
+  - 保存成功後のisDirtyフラグリセット
+
+### P2-22b: 未保存変更の視覚的フィードバック
+以下の機能を新規実装:
+
+#### 1. タブクローズ時の確認ダイアログ (CardPanel.tsx:214-235)
+```typescript
+const handleTabClose = useCallback(
+  (tabId: string) => {
+    const target = leafTabs.find((tab) => tab.id === tabId);
+
+    // 未保存変更がある場合は確認ダイアログを表示
+    if (target?.isDirty) {
+      const confirmed = window.confirm(
+        `タブ「${target.title}」には未保存の変更があります。\n\n保存せずに閉じますか?`
+      );
+      if (!confirmed) {
+        onLog?.('INFO', `タブ「${target.title}」のクローズをキャンセルしました。`);
+        return;
+      }
+    }
+
+    closeTab(leafId, tabId);
+    if (target) {
+      onLog?.('INFO', `タブ「${target.title}」を閉じました。`);
+    }
+  },
+  [closeTab, leafId, leafTabs, onLog],
+);
+```
+
+**根拠**:
+- PanelTabState.isDirty: workspaceStore.ts:85
+- タブクローズ処理: CardPanel.tsx:214-235
+
+#### 2. アプリ終了時の確認 (App.tsx:617-626)
+```typescript
+useEffect(() => {
+  //! アプリ終了時の未保存変更確認
+  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    const hasUnsavedTabs = Object.values(tabs).some((tab) => tab.isDirty);
+    if (hasUnsavedTabs) {
+      event.preventDefault();
+      event.returnValue = ''; // Chrome requires returnValue to be set
+    }
+  };
+
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+}, [tabs]);
+```
+
+**根拠**:
+- beforeunloadイベントハンドラ: App.tsx:617-626
+- tabs状態の取得: App.tsx:229
+
+#### 3. ファイル再読み込み時の確認 (App.tsx:717-732)
+```typescript
+// 同じファイルが既に開かれていて未保存変更がある場合は確認
+const existingTab = Object.values(tabs).find((tab) => tab.fileName === fileName);
+if (existingTab?.isDirty) {
+  const confirmed = window.confirm(
+    `ファイル「${fileName}」は既に開かれており、未保存の変更があります。\n\n再読み込みすると未保存の変更は失われます。続行しますか?`
+  );
+  if (!confirmed) {
+    pushLog({
+      id: `load-card-cancelled-${Date.now()}`,
+      level: 'INFO',
+      message: `ファイル ${fileName} の再読み込みをキャンセルしました。`,
+      timestamp: new Date(),
+    });
+    return;
+  }
+}
+```
+
+**根拠**:
+- handleLoadCardFile関数: App.tsx:690-797
+- 既存タブの検索とisDirtyチェック: App.tsx:718-732
+
+#### 4. 既存の視覚的フィードバック (既に実装済み)
+- **タブレベルの「●」マーカー**: CardPanel.tsx:590
+  ```tsx
+  {tab.isDirty ? <span className="tab-bar__tab-dirty">●</span> : null}
+  ```
+- **ステータスバーの表示**: App.tsx:1162-1166
+  ```typescript
+  const saveStatusText = isSaving
+    ? '保存状態: ⏳ 保存中...'
+    : isDirty
+      ? '保存状態: ● 未保存'
+      : `保存状態: ✓ 保存済み${lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString()})` : ''}`;
+  ```
+
+## 変更ファイル一覧
+- `src/renderer/App.tsx`: アプリ終了時・ファイル再読み込み時の確認機能を追加
+- `src/renderer/components/CardPanel.tsx`: タブクローズ時の確認ダイアログを追加
+
+## 検証結果
+- TypeScript型チェック: ✅ 成功
+- 既存のLintエラーは今回の実装とは無関係
+
+## 決定事項
+1. **タブクローズ時の確認**: window.confirm()を使用してシンプルな確認ダイアログを表示
+   - 理由: 既存のカード削除処理(CardPanel.tsx:242)でも同様の方法を採用
+
+2. **アプリ終了時の確認**: beforeunloadイベントを使用
+   - 理由: Electronアプリでも標準のWeb APIが動作し、シンプルに実装できる
+
+3. **ファイル再読み込み時の確認**: handleLoadCardFile内で既存タブをチェック
+   - 理由: 読み込み処理の一部として統合することで、処理フローが明確になる
+
+## 備考
+- P2-22a (上書き保存/新規保存機能) は既に完全に実装済みであった
+- P2-22b (視覚的フィードバック) のうち、タブ「●」マーカーとステータスバー表示も実装済み
+- 今回新規実装したのは、タブクローズ・アプリ終了・ファイル再読み込み時の確認ダイアログのみ
+- 未使用変数 `dirtyMark` を削除してコード品質を向上
