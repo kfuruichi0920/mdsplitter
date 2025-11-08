@@ -108,6 +108,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     useCallback((state) => state.leafs[leafId]?.activeTabId ?? null, [leafId]),
   );
   const selectCard = useWorkspaceStore((state) => state.selectCard);
+  const clearSelection = useWorkspaceStore((state) => state.clearSelection);
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
   const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
@@ -403,6 +404,28 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const handlePanelClick = useCallback(() => {
     onPanelClick?.(leafId);
   }, [leafId, onPanelClick]);
+
+  /**
+   * @brief カード以外の領域をクリックした際に選択状態をクリアする。
+   * @param event マウスイベント。
+   */
+  const handlePanelBlankMouseDown = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!activeTabId || selectedCardIds.size === 0) {
+        return;
+      }
+      if (event.button !== 0) {
+        return; //! 右クリックなどは対象外
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('.card-list-item')) {
+        return; //! カード上でのクリックは無視
+      }
+      clearSelection(leafId, activeTabId);
+      onLog?.('INFO', 'カードの選択をクリアしました。');
+    },
+    [activeTabId, clearSelection, leafId, onLog, selectedCardIds],
+  );
 
   /**
    * @brief パネルクローズ時の処理。
@@ -850,6 +873,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         role="list"
         ref={panelScrollRef}
         id={activeTab ? `panel-${leafId}-${activeTab.id}` : undefined}
+        onMouseDown={handlePanelBlankMouseDown}
       >
         {visibleCards.map((card) => (
           <CardListItem
