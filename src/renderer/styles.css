@@ -85,11 +85,11 @@
   }
 
   .workspace {
-    @apply grid min-h-0 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
+    @apply grid min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
   }
 
   .workspace__content {
-    @apply grid min-h-0;
+    @apply grid min-h-0 h-full overflow-hidden;
   }
 
   .sidebar {
@@ -184,7 +184,11 @@
   }
 
   .panels {
-    @apply min-h-0 overflow-hidden bg-transparent;
+    @apply flex h-full min-h-0 flex-col overflow-hidden bg-transparent;
+  }
+
+  .panels__body {
+    @apply flex-1 min-h-0 overflow-hidden;
   }
 
   .split-grid {
@@ -622,19 +626,19 @@
 
   /* 分割コンテナ関連スタイル */
   .split-container {
-    @apply relative h-full w-full;
+    @apply relative flex-1 h-full w-full min-h-0 min-w-0;
   }
 
   .split-container--horizontal {
-    @apply flex flex-col;
+    @apply flex flex-col min-h-0 min-w-0;
   }
 
   .split-container--vertical {
-    @apply flex flex-row;
+    @apply flex flex-row min-h-0 min-w-0;
   }
 
   .split-leaf {
-    @apply h-full w-full overflow-hidden;
+    @apply flex-1 h-full w-full min-h-0 min-w-0 overflow-hidden;
   }
 
   .splitter {

@@ -1,0 +1,7 @@
+### カード一覧スクロール領域の再設計 (2025-11-08)
+- 問題分析: ドキュメント指摘どおりカード一覧が独立スクロールになっておらず、画面全体がスクロールしていた。DOM階層を調査したところ、`workspace` -> `workspace__content` -> `panels` -> `SplitContainer` -> `split-node` の各レイヤーが `min-height: 0` や `overflow-hidden` を持たず、子要素の高さに引きずられて親コンテナ全体が伸長していることが原因と判明。単に `panel-cards` に CSS を当てるだけでは親要素が高さ制約を持たないため効果がなかった。
+- 対策: レイアウトを根本から見直し、以下を実施。
+  1. `workspace` / `workspace__content` / `panels` をすべて `overflow-hidden` + `h-full` + `flex` 化し、グリッド行の高さを固定したまま内部スクロールを許容。
+  2. `panels__body` ラッパーを新設して `SplitContainer` 全体に `min-h-0`/`overflow-hidden` を適用し、カードパネル領域が常に自分のグリッドセル内に収まるようにした。
+  3. `SplitContainer` 側では既存の `split-node`/`split-container` の `flex-1` 設定と組み合わせることで、各 `CardPanel` の `panel-cards` に設定済みの `overflow-y-auto` が正しく機能するようになった。
+- これにより大量カードでもカード一覧だけに垂直スクロールが表示され、ツールバーやログエリアは固定表示のままとなる。

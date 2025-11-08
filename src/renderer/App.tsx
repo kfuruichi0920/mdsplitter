@@ -1869,18 +1869,20 @@ export const App = () => {
           />
 
           <section className="panels" aria-label="カードパネル領域">
-            <SplitContainer
-              node={splitRoot}
-              renderLeaf={(leafId, { isActive }) => (
-                <CardPanel
-                  leafId={leafId}
-                  isActive={isActive}
-                  onLog={handleLog}
-                  onPanelClick={handlePanelClick}
-                  onPanelClose={handlePanelClose}
-                />
-              )}
-            />
+            <div className="panels__body">
+              <SplitContainer
+                node={splitRoot}
+                renderLeaf={(leafId, { isActive }) => (
+                  <CardPanel
+                    leafId={leafId}
+                    isActive={isActive}
+                    onLog={handleLog}
+                    onPanelClick={handlePanelClick}
+                    onPanelClose={handlePanelClose}
+                  />
+                )}
+              />
+            </div>
           </section>
         </div>
 
