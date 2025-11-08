@@ -503,3 +503,137 @@ if (existingTab?.isDirty) {
 - P2-22b (視覚的フィードバック) のうち、タブ「●」マーカーとステータスバー表示も実装済み
 - 今回新規実装したのは、タブクローズ・アプリ終了・ファイル再読み込み時の確認ダイアログのみ
 - 未使用変数 `dirtyMark` を削除してコード品質を向上
+
+## 追加対応: 保存処理のデバッグ強化 (2025-11-08 15:30)
+
+ユーザーから「カード一覧の情報が保存ボタンを押しても保存されない」との報告を受け、調査・対応を実施。
+
+### 調査結果
+1. 保存処理の実装は正しい:
+   - `saveActiveTab()` (App.tsx:896-990) が activeTab.cards を WorkspaceSnapshot に変換
+   - IPC経由でメインプロセスに送信 (main.ts:135-147)
+   - `saveCardFileSnapshot()` (workspace.ts:359-365) がJSON形式で _out/ に保存
+
+2. カード更新処理も正常:
+   - `updateCard()` (workspaceStore.ts:731-768) が編集内容を tab.cards に反映
+   - isDirtyフラグも正しく設定される (762行目)
+
+### 実施した改善
+1. **デバッグログの追加** (App.tsx:961-965, 967)
+   ```typescript
+   console.log('[saveActiveTab] Saving snapshot:', {
+     fileName: normalized,
+     cardCount: cards.length,
+     cards: cards,
+   });
+   console.log('[saveActiveTab] Save result:', result);
+   ```
+
+2. **保存成功通知の詳細化** (App.tsx:973, 977)
+   - 保存先の絶対パスを表示
+   - カード数を明示
+
+これにより、保存処理が実際に実行されているか、どこに保存されているか、何件のカードが保存されたかが明確になる。
+
+### 想定される問題の可能性
+1. ファイルは保存されているが、ユーザーが期待する場所と異なる
+2. 開発モードと本番ビルドで app.getAppPath() の値が異なる
+3. WSL2環境での _out/ ディレクトリのパス問題
+
+### 次回対応
+- ユーザーに実際の動作（保存ボタン押下後の通知内容、コンソールログ）を確認してもらう
+- 必要に応じて保存先パスの設定機能を追加
+
+## 追加対応: エクスプローラに _out ディレクトリを表示 (2025-11-08 16:00)
+
+ユーザーから「保存されていました。ただし、エクスプローラで"_out"が見えません。エクスプローラでは実行フォルダ配下を参照できるようにしてください。」との要望を受け、_out ディレクトリの可視化を実装。
+
+### 実装内容
+
+#### 1. バックエンド: 出力ファイル一覧取得機能 (workspace.ts:435-452)
+```typescript
+export const listOutputFiles = async (): Promise<string[]> => {
+  const paths = resolveWorkspacePaths();
+  try {
+    const entries = await fs.readdir(paths.outputDir, { withFileTypes: true });
+    const jsonFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map((entry) => entry.name)
+      .sort();
+    return jsonFiles;
+  } catch (error) {
+    // ENOENT時は空配列を返す
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+};
+```
+
+#### 2. IPCハンドラ登録 (main.ts:164-168)
+```typescript
+ipcMain.handle('workspace:listOutputFiles', async () => {
+  const files = await listOutputFiles();
+  logMessage('info', `出力ファイル一覧を取得しました: ${files.length}件`);
+  return files;
+});
+```
+
+#### 3. Preload API追加 (preload.ts:56, 83)
+- 型定義: `listOutputFiles: () => Promise<string[]>`
+- 実装: `ipcRenderer.invoke('workspace:listOutputFiles')`
+
+#### 4. 型定義追加 (global.d.ts:32)
+```typescript
+listOutputFiles: () => Promise<string[]>;
+```
+
+#### 5. フロントエンド状態管理 (App.tsx)
+- **状態追加** (255-256行): `const [outputFiles, setOutputFiles] = useState<string[]>([]);`
+- **初期化処理** (589-620行): `Promise.all`で _input と _out の両方のファイル一覧を取得
+- **更新用コールバック** (639-653行): 保存後にファイル一覧を再取得する `refreshFileList()`
+- **保存後の更新** (1004-1005行): `await refreshFileList();` を呼び出し
+
+#### 6. UI実装 (App.tsx:1662-1682)
+```tsx
+<li role="treeitem" aria-expanded="true">
+  📁 _out
+  <ul role="group">
+    {outputFiles.length === 0 ? (
+      <li role="treeitem" className="sidebar__tree-empty">
+        出力ファイルがありません
+      </li>
+    ) : (
+      outputFiles.map((file) => (
+        <li
+          key={file}
+          role="treeitem"
+          className="sidebar__tree-file"
+          title={`保存済み: ${file}`}
+        >
+          📄 {file}
+        </li>
+      ))
+    )}
+  </ul>
+</li>
+```
+
+### 動作
+1. アプリ起動時に _input と _out のファイル一覧を取得
+2. エクスプローラに「📁 _out」セクションを表示
+3. 保存済みファイルを「📄 ファイル名」形式で一覧表示
+4. ファイルが無い場合は「出力ファイルがありません」と表示
+5. 保存ボタン押下時に自動的にファイル一覧を更新
+
+### 技術的特徴
+- **エラーハンドリング**: _out ディレクトリが存在しない場合は空配列を返す
+- **リアルタイム更新**: 保存成功後に即座にエクスプローラを更新
+- **並列処理**: `Promise.all`で _input と _out を同時取得し、パフォーマンスを最適化
+- **型安全性**: main/preload/renderer全てで TypeScript 型定義を完備
+
+### 実装完了
+- TypeScript型チェック: ✅ 通過
+- P2-22a~P2-22b: ✅ 完全実装
+- _out ディレクトリ可視化: ✅ 完了

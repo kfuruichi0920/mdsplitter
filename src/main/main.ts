@@ -23,6 +23,7 @@ import type { LogLevel } from '../shared/settings';
 import {
   initializeWorkspace,
   listCardFiles,
+  listOutputFiles,
   loadCardFile,
   loadTraceFile,
   loadSettings,
@@ -157,6 +158,12 @@ ipcMain.handle('workspace:load', async () => {
 ipcMain.handle('workspace:listCardFiles', async () => {
   const files = await listCardFiles();
   logMessage('info', `カードファイル一覧を取得しました: ${files.length}件`);
+  return files;
+});
+
+ipcMain.handle('workspace:listOutputFiles', async () => {
+  const files = await listOutputFiles();
+  logMessage('info', `出力ファイル一覧を取得しました: ${files.length}件`);
   return files;
 });
 

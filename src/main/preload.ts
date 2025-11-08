@@ -52,6 +52,8 @@ type AppAPI = {
     load: () => Promise<WorkspaceSnapshot | null>;
     /** _inputディレクトリ内のカードファイル一覧を取得する。 */
     listCardFiles: () => Promise<string[]>;
+    /** _outディレクトリ内の出力ファイル一覧を取得する。 */
+    listOutputFiles: () => Promise<string[]>;
     /** 指定されたカードファイルを読み込む。 */
     loadCardFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
     /** 左右カードファイルに対応するトレーサビリティファイルを読み込む。 */
@@ -78,6 +80,7 @@ const api: AppAPI = {
       ipcRenderer.invoke('workspace:saveCardFile', { fileName, snapshot }),
     load: async () => ipcRenderer.invoke('workspace:load'),
     listCardFiles: async () => ipcRenderer.invoke('workspace:listCardFiles'),
+    listOutputFiles: async () => ipcRenderer.invoke('workspace:listOutputFiles'),
     loadCardFile: async (fileName: string) => ipcRenderer.invoke('workspace:loadCardFile', fileName),
     loadTraceFile: async (leftFile: string, rightFile: string) =>
       ipcRenderer.invoke('workspace:loadTraceFile', { leftFile, rightFile }),

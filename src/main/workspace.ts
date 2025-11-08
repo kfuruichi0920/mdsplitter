@@ -426,6 +426,32 @@ export const listCardFiles = async (): Promise<string[]> => {
 };
 
 /**
+ * @brief _outディレクトリ内のカードファイル一覧を取得する。
+ * @details
+ * outputDir配下の.json拡張子ファイルをアルファベット順でソート。
+ * @return ファイル名の配列（拡張子含む）。
+ * @throws ディレクトリアクセス失敗時（ENOENT以外）。
+ */
+export const listOutputFiles = async (): Promise<string[]> => {
+  const paths = resolveWorkspacePaths();
+  try {
+    const entries = await fs.readdir(paths.outputDir, { withFileTypes: true });
+    const jsonFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map((entry) => entry.name)
+      .sort();
+    return jsonFiles;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      return [];
+    }
+    console.error('[workspace] failed to list output files', error);
+    throw error;
+  }
+};
+
+/**
  * @brief 指定されたカードファイルを読み込む。
  * @param fileName ファイル名（_inputディレクトリ内の相対パス）。
  * @return カードスナップショット、または null（無効な構造の場合）。

@@ -252,7 +252,8 @@ export const App = () => {
   const setActiveLeaf = useSplitStore((state) => state.setActiveLeaf);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
-  const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧。
+  const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
+  const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
@@ -586,32 +587,36 @@ export const App = () => {
   }, [theme]);
 
   useEffect(() => {
-    //! カードファイル一覧を初期化
-    const loadCardFiles = async () => {
-      if (!window.app?.workspace?.listCardFiles) {
+    //! カードファイル一覧と出力ファイル一覧を初期化
+    const loadFileList = async () => {
+      if (!window.app?.workspace?.listCardFiles || !window.app?.workspace?.listOutputFiles) {
         return;
       }
       try {
-        const files = await window.app.workspace.listCardFiles();
-        setCardFiles(files);
+        const [inputFiles, outFiles] = await Promise.all([
+          window.app.workspace.listCardFiles(),
+          window.app.workspace.listOutputFiles(),
+        ]);
+        setCardFiles(inputFiles);
+        setOutputFiles(outFiles);
         pushLog({
-          id: `card-files-loaded-${Date.now()}`,
+          id: `file-list-loaded-${Date.now()}`,
           level: 'INFO',
-          message: `カードファイル一覧を読み込みました: ${files.length}件`,
+          message: `ファイル一覧を読み込みました: _input=${inputFiles.length}件, _out=${outFiles.length}件`,
           timestamp: new Date(),
         });
       } catch (error) {
-        console.error('[App] failed to load card files', error);
+        console.error('[App] failed to load file list', error);
         pushLog({
-          id: `card-files-error-${Date.now()}`,
+          id: `file-list-error-${Date.now()}`,
           level: 'ERROR',
-          message: 'カードファイル一覧の読み込みに失敗しました',
+          message: 'ファイル一覧の読み込みに失敗しました',
           timestamp: new Date(),
         });
       }
     };
 
-    void loadCardFiles();
+    void loadFileList();
   }, [pushLog]);
 
   useEffect(() => {
@@ -627,6 +632,25 @@ export const App = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [tabs]);
+
+  /**
+   * @brief ファイル一覧を再読み込みする。
+   */
+  const refreshFileList = useCallback(async () => {
+    if (!window.app?.workspace?.listCardFiles || !window.app?.workspace?.listOutputFiles) {
+      return;
+    }
+    try {
+      const [inputFiles, outFiles] = await Promise.all([
+        window.app.workspace.listCardFiles(),
+        window.app.workspace.listOutputFiles(),
+      ]);
+      setCardFiles(inputFiles);
+      setOutputFiles(outFiles);
+    } catch (error) {
+      console.error('[App] failed to refresh file list', error);
+    }
+  }, []);
 
   /**
    * @brief ログエントリをプッシュするラッパー（CardPanel に渡す用）。
@@ -958,18 +982,27 @@ export const App = () => {
           cards,
           savedAt: startedAt.toISOString(),
         };
+        console.log('[saveActiveTab] Saving snapshot:', {
+          fileName: normalized,
+          cardCount: cards.length,
+          cards: cards,
+        });
         const result = await saveApi(normalized, snapshot);
+        console.log('[saveActiveTab] Save result:', result);
         markSaved(activeTabId, snapshot.savedAt);
         if (!activeTab.fileName || activeTab.fileName !== normalized || options?.renameTab) {
           renameTabFile(activeTab.id, normalized);
         }
-        notify('success', `カードファイルを保存しました: ${normalized}`);
+        const savedPath = result?.path ?? normalized;
+        notify('success', `カードファイルを保存しました: ${normalized}\n保存先: ${savedPath}`);
         pushLog({
           id: `save-${startedAt.valueOf()}`,
           level: 'INFO',
-          message: `カードファイルを保存しました (出力: ${result?.path ?? normalized})。`,
+          message: `カードファイルを保存しました (カード数: ${cards.length}件, 出力: ${savedPath})。`,
           timestamp: startedAt,
         });
+        //! エクスプローラのファイル一覧を更新
+        await refreshFileList();
         return true;
       } catch (error) {
         console.error('[renderer] failed to save card file', error);
@@ -1640,6 +1673,27 @@ export const App = () => {
                             }}
                             tabIndex={0}
                             title={`ダブルクリックして ${file} を読み込む`}
+                          >
+                            📄 {file}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </li>
+                  <li role="treeitem" aria-expanded="true">
+                    📁 _out
+                    <ul role="group">
+                      {outputFiles.length === 0 ? (
+                        <li role="treeitem" className="sidebar__tree-empty">
+                          出力ファイルがありません
+                        </li>
+                      ) : (
+                        outputFiles.map((file) => (
+                          <li
+                            key={file}
+                            role="treeitem"
+                            className="sidebar__tree-file"
+                            title={`保存済み: ${file}`}
                           >
                             📄 {file}
                           </li>
