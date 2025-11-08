@@ -35,7 +35,8 @@ import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/s
 import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
-import type { TraceDirection, TraceabilityRelation } from '@/shared/traceability';
+import { TRACE_RELATION_KINDS } from '@/shared/traceability';
+import type { TraceDirection, TraceRelationKind, TraceabilityRelation } from '@/shared/traceability';
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
@@ -318,6 +319,8 @@ export const App = () => {
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
   const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
+  const creationRelationKind = useTracePreferenceStore((state) => state.creationRelationKind);
+  const setCreationRelationKind = useTracePreferenceStore((state) => state.setCreationRelationKind);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
   const notify = useNotificationStore((state) => state.add);
@@ -525,7 +528,7 @@ export const App = () => {
                 id: nanoid(),
                 left_ids: [sourceId],
                 right_ids: [targetId],
-                type: 'trace',
+                type: creationRelationKind,
                 directed: toDirectedValue(operation.direction),
               });
               existingPairs.add(pairKey);
@@ -577,7 +580,7 @@ export const App = () => {
 
         const message =
           operation.type === 'create'
-            ? `${deltaCount}件のコネクタを作成しました。`
+            ? `${deltaCount}件のコネクタを作成しました (${creationRelationKind}).`
             : `${deltaCount}件のコネクタを削除しました。`;
         notify('success', message);
         pushLog({
@@ -593,7 +596,7 @@ export const App = () => {
         setTraceBusy(false);
       }
     },
-    [activeLeafId, notify, pushLog, splitRoot, traceBusy],
+    [activeLeafId, creationRelationKind, notify, pushLog, splitRoot, traceBusy],
   );
 
   const handleTraceCreate = useCallback(
@@ -1977,6 +1980,19 @@ export const App = () => {
           >
             ↔️
           </button>
+          <label className="toolbar-select" aria-label="トレース関係種別">
+            <span className="sr-only">トレース関係種別</span>
+            <select
+              value={creationRelationKind}
+              onChange={(event) => setCreationRelationKind(event.target.value as TraceRelationKind)}
+            >
+              {TRACE_RELATION_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kind}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="toolbar-button"

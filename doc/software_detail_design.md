@@ -283,3 +283,11 @@ Deprecated --> Draft : 再利用
   - `src/renderer/store/tracePreferenceStore.ts` で可視状態・選択カード限定表示・種別別チェックボックスを管理。`TraceConnectorLayer` はこのストアを購読し、フィルタ条件に合致しないリンクを描画から除外。
   - グローバルツールバーの `⛓️` トグル、`🧐` 選択カード強調、`🧬` タイプフィルタポップオーバーを実装。ポップオーバーは CSS (`src/renderer/styles.css`) で簡易レイヤーを提供。
   - `src/renderer/store/__tests__/tracePreferenceStore.test.ts`・`traceStore.test.ts` で設定ストアと relation 永続化の挙動をユニットテストし、Playground なしでも挙動を担保。
+- **P5-05 種別選択 UI**
+  - トレース作成用の relation セレクタをツールバーへ追加し (`App.tsx`)、`useTracePreferenceStore.creationRelationKind` によって新規コネクタの `type` を決定。種別は `TRACE_RELATION_KINDS` から選択し、処理ログにも種別名を表示。
+  - 表示側のタイプフィルタ (`🧬`) はチェックボックス式ドロップダウンへ刷新し、`TraceConnectorLayer` が `enabledKinds` を参照して描画を抑制。
+- **P5-06 パネル別トグル**
+  - `CardPanel` のツールバーに `⛓️` ボタンを追加し、アクティブタブのファイル単位でコネクタ表示を ON/OFF。`useTracePreferenceStore.toggleFileVisibility` がファイル名ベースで状態を保持し、`TraceConnectorLayer` とカード接合点の双方に適用される。
+- **P5-07 トレース接合点機能拡張**
+  - カード両端の接合点をボタン化し、relation 数のバッジ表示とクリックによる個別ミュートを実現 (`CardPanel.tsx`, `styles.css`)。`useTraceStore.aggregateCountsForFile` が左右別の接続本数を算出し、`workspaceStore.setCardTraceFlags` で `hasLeftTrace`/`hasRightTrace` を同期。
+  - `TraceConnectorLayer` は `isCardVisible` を参照してリンク描画を制御し、ユーザが一部カードのみコネクタを表示するといったユースケースに対応した。

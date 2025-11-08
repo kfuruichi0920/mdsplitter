@@ -92,6 +92,14 @@
     @apply cursor-not-allowed opacity-60 hover:bg-blue-100 dark:hover:bg-slate-800;
   }
 
+  .toolbar-select {
+    @apply inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .toolbar-select select {
+    @apply bg-transparent text-xs font-medium outline-none dark:bg-transparent;
+  }
+
   .trace-filter-popover {
     @apply absolute right-0 top-10 z-40 w-48 rounded-md border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800;
   }
@@ -548,12 +556,24 @@
     @apply flex items-center gap-2 text-xs font-semibold;
   }
 
-  .card__connector {
-    @apply text-base text-slate-400 dark:text-slate-600;
+  .card__connector-button {
+    @apply relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-blue-300;
+  }
+
+  .card__connector-button:disabled {
+    @apply cursor-not-allowed opacity-50 hover:border-slate-300 hover:text-slate-500 dark:hover:border-slate-600 dark:hover:text-slate-400;
   }
 
   .card__connector--active {
-    @apply text-blue-400;
+    @apply border-blue-400 text-blue-500 dark:border-blue-300 dark:text-blue-200;
+  }
+
+  .card__connector--muted {
+    @apply opacity-40;
+  }
+
+  .card__connector-count {
+    @apply absolute -top-1 -right-1 min-w-[14px] rounded-full bg-blue-500 px-1 text-[0.55rem] font-bold leading-3 text-white dark:bg-blue-300 dark:text-slate-900;
   }
 
   .card__icon {

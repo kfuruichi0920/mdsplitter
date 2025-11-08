@@ -11,10 +11,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
+import { shallow } from 'zustand/shallow';
 import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
+import { useTraceStore, aggregateCountsForFile } from '../store/traceStore';
+import { useTracePreferenceStore, type TraceConnectorSide } from '../store/tracePreferenceStore';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -129,6 +132,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   }, [activeTabId, leafTabs]);
 
   const activeFileIdentifier = activeTab ? activeTab.fileName ?? `unsaved-${activeTab.id}` : '';
+  const activeFileName = activeTab?.fileName ?? null;
+  const traceCounts = useTraceStore(
+    useCallback(
+      (state) => (activeFileName ? aggregateCountsForFile(state.cache, activeFileName) : { left: {}, right: {} }),
+      [activeFileName],
+    ),
+    shallow,
+  );
+  const leftTraceCounts = traceCounts.left ?? {};
+  const rightTraceCounts = traceCounts.right ?? {};
 
   useEffect(() => {
     if (!lastInsertPreview || !activeTabId) {
@@ -156,6 +169,19 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const hasSelection = selectedCardIds.size > 0;
   const visualDropTarget = dropTarget ?? previewIndicator;
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
+  const isFileTraceVisible = useTracePreferenceStore(
+    useCallback((state) => (activeFileName ? state.isFileVisible(activeFileName) : true), [activeFileName]),
+  );
+  const toggleFileTraceVisibility = useTracePreferenceStore((state) => state.toggleFileVisibility);
+  const toggleCardTraceVisibility = useTracePreferenceStore((state) => state.toggleCardVisibility);
+  const isCardTraceVisible = useTracePreferenceStore((state) => state.isCardVisible);
+
+  const handlePanelTraceToggle = useCallback(() => {
+    if (!activeFileName) {
+      return;
+    }
+    toggleFileTraceVisibility(activeFileName);
+  }, [activeFileName, toggleFileTraceVisibility]);
 
   /**
    * @brief 階層構造を考慮して表示すべきカードをフィルタリングする。
@@ -734,8 +760,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           <button type="button" className="panel-toolbar__button" title="カード種別フィルタ" aria-label="カード種別フィルタ">
             📚
           </button>
-          <button type="button" className="panel-toolbar__button" title="トレースのみ表示" aria-label="トレースのみ表示">
-            🪢
+          <button
+            type="button"
+            className={`panel-toolbar__button${isFileTraceVisible ? ' panel-toolbar__button--active' : ''}`}
+            onClick={handlePanelTraceToggle}
+            disabled={!activeFileName}
+            aria-disabled={!activeFileName}
+            title="トレース表示切替"
+            aria-label="トレース表示切替"
+          >
+            ⛓️
           </button>
         </div>
         <div className="panel-toolbar__group">
@@ -790,6 +824,20 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             currentDropTarget={visualDropTarget}
             draggedCardIds={draggedCardIds}
             highlightIds={highlightedIds}
+            leftTraceCount={activeFileName ? leftTraceCounts[card.id] ?? 0 : 0}
+            rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
+            leftConnectorVisible={!activeFileName ? true : isCardTraceVisible(activeFileName, card.id, 'left')}
+            rightConnectorVisible={!activeFileName ? true : isCardTraceVisible(activeFileName, card.id, 'right')}
+            onToggleLeftConnector={
+              activeFileName && (leftTraceCounts[card.id] ?? 0) > 0
+                ? () => toggleCardTraceVisibility(activeFileName, card.id, 'left')
+                : undefined
+            }
+            onToggleRightConnector={
+              activeFileName && (rightTraceCounts[card.id] ?? 0) > 0
+                ? () => toggleCardTraceVisibility(activeFileName, card.id, 'right')
+                : undefined
+            }
           />
         ))}
         {visibleCards.length === 0 && cards.length > 0 && (
@@ -969,6 +1017,12 @@ interface CardListItemProps {
   currentDropTarget?: { cardId: string | null; position: InsertPosition } | null;
   draggedCardIds?: string[];
   highlightIds?: Set<string>;
+  leftTraceCount: number;
+  rightTraceCount: number;
+  leftConnectorVisible: boolean;
+  rightConnectorVisible: boolean;
+  onToggleLeftConnector?: () => void;
+  onToggleRightConnector?: () => void;
 }
 
 const CardListItem = ({
@@ -995,10 +1049,54 @@ const CardListItem = ({
   currentDropTarget,
   draggedCardIds,
   highlightIds,
+  leftTraceCount,
+  rightTraceCount,
+  leftConnectorVisible,
+  rightConnectorVisible,
+  onToggleLeftConnector,
+  onToggleRightConnector,
 }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
-  const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
-  const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
+
+  const renderConnector = (
+    side: TraceConnectorSide,
+    hasTrace: boolean,
+    count: number,
+    isVisible: boolean,
+    onToggle?: () => void,
+  ) => {
+    const isActive = hasTrace && count > 0;
+    const className = [
+      'card__connector-button',
+      isActive ? 'card__connector--active' : '',
+      isVisible ? '' : 'card__connector--muted',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const title = side === 'left' ? '左側トレース接合点' : '右側トレース接合点';
+
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle?.();
+        }}
+        onFocus={(event) => event.stopPropagation()}
+        disabled={!onToggle || count === 0}
+        aria-disabled={!onToggle || count === 0}
+        aria-pressed={isVisible}
+        title={`${title}${count > 0 ? ` (${count})` : ''}`}
+      >
+        {connectorSymbol(isActive)}
+        {count > 0 ? <span className="card__connector-count">{count}</span> : null}
+      </button>
+    );
+  };
+
+  const leftConnectorNode = renderConnector('left', card.hasLeftTrace, leftTraceCount, leftConnectorVisible, onToggleLeftConnector);
+  const rightConnectorNode = renderConnector('right', card.hasRightTrace, rightTraceCount, rightConnectorVisible, onToggleRightConnector);
 
   //! 編集モードの場合はEditableCardを表示
   if (isEditing) {
@@ -1079,22 +1177,22 @@ const CardListItem = ({
     ? (
         <>
           {expandButton}
-          <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+          {leftConnectorNode}
           <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
           <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
           <span className="card__title card__title--truncate">{card.title}</span>
-          <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+          {rightConnectorNode}
         </>
       )
     : (
         <>
           <header className="card__header">
             {expandButton}
-            <span className={leftConnectorClass}>{connectorSymbol(card.hasLeftTrace)}</span>
+            {leftConnectorNode}
             <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
             <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
             <span className="card__title">{card.title}</span>
-            <span className={rightConnectorClass}>{connectorSymbol(card.hasRightTrace)}</span>
+            {rightConnectorNode}
           </header>
           <p className="card__body">{card.body}</p>
           <footer className="card__footer">最終更新: {formatUpdatedAt(card.updatedAt)}</footer>

@@ -187,10 +187,6 @@ export const TraceConnectorLayer = ({
     shallow,
   );
   const highlightedSet = useMemo(() => new Set(highlightedCardIds), [highlightedCardIds]);
-  const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
-  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
-  const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
-
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
 
   const activeFilePairs = useActiveFiles(leftLeafIds, rightLeafIds);
@@ -234,9 +230,27 @@ export const TraceConnectorLayer = ({
     shallow,
   );
 
+  const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
+  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
+  const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
+  const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
+  const isCardVisible = useTracePreferenceStore((state) => state.isCardVisible);
+
   const filteredLinks = useMemo(() => {
+    if (!isTraceVisible) {
+      return [] as ExtendedLink[];
+    }
     return traceLinks.filter((link) => {
       if (!enabledRelationKinds[link.relation]) {
+        return false;
+      }
+      if (!isFileVisible(link.sourceFileName) || !isFileVisible(link.targetFileName)) {
+        return false;
+      }
+      if (!isCardVisible(link.sourceFileName, link.sourceCardId, 'right')) {
+        return false;
+      }
+      if (!isCardVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
       if (focusSelectionOnly) {
@@ -244,7 +258,7 @@ export const TraceConnectorLayer = ({
       }
       return true;
     });
-  }, [traceLinks, enabledRelationKinds, focusSelectionOnly, highlightedSet]);
+  }, [enabledRelationKinds, focusSelectionOnly, highlightedSet, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

@@ -42,6 +42,8 @@ describe('traceStore.saveRelationsForPair', () => {
       expect(entry.leftFile).toBe('left.json');
       expect(entry.rightFile).toBe('right.json');
       expect(entry.relations).toHaveLength(1);
+      expect(entry.counts.left['card-l']).toBe(1);
+      expect(entry.counts.right['card-r']).toBe(1);
       expect(window.app.workspace.saveTraceFile).toHaveBeenCalledWith({
         fileName: undefined,
         header: undefined,
@@ -54,5 +56,12 @@ describe('traceStore.saveRelationsForPair', () => {
     const cached = useTraceStore.getState().getCached('left.json', 'right.json');
     expect(cached?.relations).toHaveLength(1);
     expect(cached?.links).toHaveLength(1);
+    expect(cached?.counts.left['card-l']).toBe(1);
+    expect(cached?.counts.right['card-r']).toBe(1);
+
+    const leftFileCounts = useTraceStore.getState().getCountsForFile('left.json');
+    expect(leftFileCounts.right['card-l']).toBe(1);
+    const rightFileCounts = useTraceStore.getState().getCountsForFile('right.json');
+    expect(rightFileCounts.left['card-r']).toBe(1);
   });
 });

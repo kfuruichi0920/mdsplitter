@@ -30,4 +30,30 @@ describe('tracePreferenceStore', () => {
     });
     expect(useTracePreferenceStore.getState().enabledKinds.trace).toBe(true);
   });
+
+  it('changes creation relation kind', () => {
+    act(() => {
+      useTracePreferenceStore.getState().setCreationRelationKind('tests');
+    });
+    expect(useTracePreferenceStore.getState().creationRelationKind).toBe('tests');
+  });
+
+  it('toggles file and card visibility', () => {
+    expect(useTracePreferenceStore.getState().isFileVisible('spec.json')).toBe(true);
+    act(() => {
+      useTracePreferenceStore.getState().toggleFileVisibility('spec.json');
+    });
+    expect(useTracePreferenceStore.getState().isFileVisible('spec.json')).toBe(false);
+
+    expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'left')).toBe(true);
+    act(() => {
+      useTracePreferenceStore.getState().toggleCardVisibility('spec.json', 'card-1', 'left');
+    });
+    expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'left')).toBe(false);
+
+    act(() => {
+      useTracePreferenceStore.getState().resetCardVisibilityForFile('spec.json');
+    });
+    expect(useTracePreferenceStore.getState().isCardVisible('spec.json', 'card-1', 'left')).toBe(true);
+  });
 });

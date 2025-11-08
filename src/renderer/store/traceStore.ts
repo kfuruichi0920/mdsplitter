@@ -37,6 +37,10 @@ interface TraceCacheEntry {
   sourceFileName?: string; ///< ソースファイル名。
   fileName?: string; ///< 実際のファイル名。
   error?: string; ///< エラー内容（失敗時のみ）。
+  counts: {
+    left: Record<string, number>;
+    right: Record<string, number>;
+  };
 }
 
 
@@ -52,6 +56,7 @@ interface TraceState {
     rightFile: string;
     relations: TraceabilityRelation[];
   }) => Promise<TraceCacheEntry>;
+  getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
 }
 
 
@@ -78,6 +83,15 @@ const convertLoadedFile = (
 ): TraceCacheEntry => {
   const isSwapped = !(file.payload.left_file === leftFile && file.payload.right_file === rightFile);
   const links = relationsToLinks(file.payload.relations, { swapOrientation: isSwapped });
+  const counts = {
+    left: {} as Record<string, number>,
+    right: {} as Record<string, number>,
+  };
+
+  links.forEach((link) => {
+    counts.left[link.sourceCardId] = (counts.left[link.sourceCardId] ?? 0) + 1;
+    counts.right[link.targetCardId] = (counts.right[link.targetCardId] ?? 0) + 1;
+  });
 
   const relations = file.payload.relations.map((relation) => ({
     ...relation,
@@ -97,7 +111,35 @@ const convertLoadedFile = (
     rightFile,
     sourceFileName: file.fileName,
     fileName: file.fileName,
+    counts,
   } satisfies TraceCacheEntry;
+};
+
+const mergeCounts = (target: Record<string, number>, source: Record<string, number>): void => {
+  Object.entries(source).forEach(([cardId, count]) => {
+    target[cardId] = (target[cardId] ?? 0) + count;
+  });
+};
+
+export const aggregateCountsForFile = (
+  cache: Record<string, TraceCacheEntry>,
+  fileName: string,
+): { left: Record<string, number>; right: Record<string, number> } => {
+  const aggregated = { left: {} as Record<string, number>, right: {} as Record<string, number> };
+  if (!fileName) {
+    return aggregated;
+  }
+
+  Object.values(cache).forEach((entry) => {
+    if (entry.leftFile === fileName) {
+      mergeCounts(aggregated.right, entry.counts.left);
+    }
+    if (entry.rightFile === fileName) {
+      mergeCounts(aggregated.left, entry.counts.right);
+    }
+  });
+
+  return aggregated;
 };
 
 
@@ -111,6 +153,12 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
   getCached: (leftFile, rightFile) => {
     const key = toKey(leftFile, rightFile);
     return get().cache[key];
+  },
+  getCountsForFile: (fileName) => {
+    if (!fileName) {
+      return { left: {}, right: {} };
+    }
+    return aggregateCountsForFile(get().cache, fileName);
   },
   loadTraceForPair: async (leftFile, rightFile) => {
     const key = toKey(leftFile, rightFile);
@@ -130,6 +178,7 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
           relations: [],
           leftFile,
           rightFile,
+          counts: { left: {}, right: {} },
         },
       },
     }));
@@ -145,6 +194,7 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
           relations: [],
           leftFile,
           rightFile,
+          counts: { left: {}, right: {} },
         };
         set((state) => ({ cache: { ...state.cache, [key]: entry } }));
         if (window.app?.log) {
@@ -169,6 +219,7 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
         leftFile,
         rightFile,
         error: message,
+        counts: { left: {}, right: {} },
       };
       set((state) => ({ cache: { ...state.cache, [key]: entry } }));
       if (window.app?.log) {
