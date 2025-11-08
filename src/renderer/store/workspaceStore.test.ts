@@ -180,6 +180,72 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(state.tabs[tabId]?.cards[0].status).toBe(getNextCardStatus(beforeStatus));
   });
 
+  it('adds a new sibling card after the last selected card and selects it', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    act(() => {
+      useWorkspaceStore.getState().selectCard('leaf-A', tabId, 'card-002');
+    });
+
+    let createdCard: Card | null = null;
+    act(() => {
+      createdCard = useWorkspaceStore.getState().addCard('leaf-A', tabId);
+    });
+
+    expect(createdCard).not.toBeNull();
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs[tabId];
+    expect(tab?.cards).toHaveLength(3);
+    const lastCard = createdCard!;
+    expect(lastCard.parent_id).toBe('card-001');
+    expect(lastCard.level).toBe(1);
+    expect(tab?.selectedCardIds).toEqual(new Set([lastCard.id]));
+
+    act(() => {
+      const undone = useWorkspaceStore.getState().undo();
+      expect(undone).toBe(true);
+    });
+
+    const reverted = useWorkspaceStore.getState().tabs[tabId];
+    expect(reverted?.cards).toHaveLength(2);
+  });
+
+  it('deletes selected cards (including descendants) and restores via undo', () => {
+    let tabId = '';
+    act(() => {
+      const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'alpha.json', baseCards);
+      expect(outcome.status).toBe('opened');
+      if (outcome.status !== 'denied') {
+        tabId = outcome.tabId;
+      }
+    });
+
+    let deleted = 0;
+    act(() => {
+      deleted = useWorkspaceStore.getState().deleteCards('leaf-A', tabId);
+    });
+
+    expect(deleted).toBe(2);
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs[tabId]?.cards).toHaveLength(0);
+    expect(state.tabs[tabId]?.selectedCardIds).toEqual(new Set());
+
+    act(() => {
+      const restored = useWorkspaceStore.getState().undo();
+      expect(restored).toBe(true);
+    });
+
+    const reverted = useWorkspaceStore.getState().tabs[tabId];
+    expect(reverted?.cards).toHaveLength(2);
+  });
+
   it('removes all tabs when a leaf is closed', () => {
     let tabId: string = '';
     act(() => {

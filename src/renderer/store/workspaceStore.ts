@@ -96,6 +96,8 @@ export interface WorkspaceStore {
   clearSelection: (leafId: string, tabId: string) => void; ///< 選択をクリア
   toggleCardSelection: (leafId: string, tabId: string, cardId: string) => void; ///< カード選択をトグル（Ctrl+クリック）
   selectCardRange: (leafId: string, tabId: string, cardId: string) => void; ///< 範囲選択（Shift+クリック）
+  addCard: (leafId: string, tabId: string) => Card | null; ///< 選択中カードの直下に同階層カードを追加
+  deleteCards: (leafId: string, tabId: string, cardIds?: string[]) => number; ///< 指定または選択中カードを削除
   updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
   cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
   hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
@@ -461,6 +463,189 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
       };
     });
+  },
+
+  addCard: (leafId, tabId) => {
+    let createdCard: Card | null = null;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const undoEntry: UndoRedoEntry = {
+        type: 'add',
+        tabId,
+        cards: [...tab.cards],
+        description: 'カードを追加',
+      };
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
+      const selectionOrder = Array.from(tab.selectedCardIds);
+      const fallbackAnchorId = tab.cards[tab.cards.length - 1]?.id ?? null;
+      const anchorId = selectionOrder[selectionOrder.length - 1] ?? fallbackAnchorId;
+      const anchorCard = anchorId ? tab.cards.find((card) => card.id === anchorId) ?? null : null;
+      const targetLevel = anchorCard?.level ?? 0;
+      const parentId = anchorCard?.parent_id ?? null;
+
+      const newCard: Card = {
+        id: nanoid(),
+        title: '新規カード',
+        body: '',
+        status: 'draft',
+        kind: 'paragraph',
+        hasLeftTrace: false,
+        hasRightTrace: false,
+        updatedAt: new Date().toISOString(),
+        parent_id: parentId,
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: anchorCard ? anchorCard.level : 0,
+      } satisfies Card;
+
+      let insertIndex = tab.cards.length;
+      if (anchorCard) {
+        const anchorIndex = tab.cards.findIndex((card) => card.id === anchorCard.id);
+        if (anchorIndex !== -1) {
+          insertIndex = anchorIndex + 1;
+          for (let i = anchorIndex + 1; i < tab.cards.length; i += 1) {
+            if (tab.cards[i].level <= targetLevel) {
+              insertIndex = i;
+              break;
+            }
+            insertIndex = i + 1;
+          }
+        }
+      }
+
+      const insertedCards = [
+        ...tab.cards.slice(0, insertIndex),
+        newCard,
+        ...tab.cards.slice(insertIndex),
+      ];
+      const rebuiltCards = rebuildSiblingLinks(insertedCards);
+
+      const nextExpandedIds = new Set(tab.expandedCardIds);
+      if (parentId) {
+        nextExpandedIds.add(parentId);
+      }
+
+      const resolvedNewCard = rebuiltCards.find((card) => card.id === newCard.id) ?? newCard;
+      createdCard = resolvedNewCard;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards: rebuiltCards,
+            selectedCardIds: new Set<string>([resolvedNewCard.id]),
+            expandedCardIds: nextExpandedIds,
+            isDirty: true,
+          },
+        },
+        undoStack: trimmedUndoStack,
+        redoStack: [],
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack'>;
+    });
+
+    return createdCard;
+  },
+
+  deleteCards: (leafId, tabId, cardIds) => {
+    let deletedCount = 0;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const candidates = (cardIds && cardIds.length > 0 ? cardIds : Array.from(tab.selectedCardIds)).filter((id) =>
+        tab.cards.some((card) => card.id === id),
+      );
+
+      if (candidates.length === 0) {
+        return state;
+      }
+
+      const undoEntry: UndoRedoEntry = {
+        type: 'delete',
+        tabId,
+        cards: [...tab.cards],
+        description: `${candidates.length}件のカードを削除`,
+      } satisfies UndoRedoEntry;
+
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
+      const cardMap = new Map<string, Card>(tab.cards.map((card) => [card.id, card]));
+      const allDeleteIds = new Set<string>();
+
+      const collectDescendants = (currentId: string) => {
+        if (allDeleteIds.has(currentId)) {
+          return;
+        }
+        allDeleteIds.add(currentId);
+        const current = cardMap.get(currentId);
+        if (!current) {
+          return;
+        }
+        current.child_ids.forEach((childId) => collectDescendants(childId));
+      };
+
+      candidates.forEach((id) => collectDescendants(id));
+
+      if (allDeleteIds.size === 0) {
+        return state;
+      }
+
+      deletedCount = allDeleteIds.size;
+
+      const remainingCards = tab.cards.filter((card) => !allDeleteIds.has(card.id));
+      const rebuiltCards = rebuildSiblingLinks(remainingCards);
+
+      const deletedIndices = tab.cards.reduce<number[]>((indices, card, index) => {
+        if (allDeleteIds.has(card.id)) {
+          indices.push(index);
+        }
+        return indices;
+      }, []);
+      const pivotIndex = deletedIndices.length > 0 ? Math.min(...deletedIndices) : 0;
+
+      const nextSelectedIds = new Set<string>();
+      if (rebuiltCards.length > 0) {
+        const fallbackIndex = Math.min(pivotIndex, rebuiltCards.length - 1);
+        nextSelectedIds.add(rebuiltCards[fallbackIndex].id);
+      }
+
+      const nextExpandedIds = new Set(Array.from(tab.expandedCardIds).filter((id) => !allDeleteIds.has(id)));
+      const nextEditingCardId = tab.editingCardId && allDeleteIds.has(tab.editingCardId) ? null : tab.editingCardId;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards: rebuiltCards,
+            selectedCardIds: nextSelectedIds,
+            expandedCardIds: nextExpandedIds,
+            editingCardId: nextEditingCardId,
+            isDirty: true,
+          },
+        },
+        undoStack: trimmedUndoStack,
+        redoStack: [],
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack'>;
+    });
+
+    return deletedCount;
   },
 
   updateCard: (leafId, tabId, cardId, patch) => {

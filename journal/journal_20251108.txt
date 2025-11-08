@@ -312,3 +312,22 @@
 - src/renderer/store/workspaceStore.ts - Undo/Redoスタックとメソッド、editingCardId追加、循環参照修正
 - src/renderer/components/CardPanel.tsx - EditableCardコンポーネント、ダブルクリックハンドラ、編集関連ハンドラ
 - src/renderer/App.tsx - Undo/Redoショートカットキー実装
+
+### P2-17: カード追加/削除とUndo/Redo連携
+
+#### 実装内容
+1. **workspaceStoreへ追加/削除アクションを実装**
+   - `useWorkspaceStore` に `addCard` / `deleteCards` を公開し (`src/renderer/store/workspaceStore.ts:95-108`)、Undo/Redoスタックへ新しい操作種別 `add`/`delete` を積むよう拡張。
+   - `addCard` は選択中集合の末尾カード（なければ最後のカード）を基準に同階層へ新規カードを挿入し、親の展開状態と選択セットを更新 (`src/renderer/store/workspaceStore.ts:468-558`)。
+   - `deleteCards` は選択または引数で与えたカード群とその子孫を一括削除し、親子リンクを `rebuildSiblingLinks` で再構築、編集中カードや選択集合・展開集合を安全に更新 (`src/renderer/store/workspaceStore.ts:560-640`)。
+2. **UIからの操作経路を追加**
+   - `CardPanel` のツールバーに「➕追加」「🗑️削除」ボタンを追加し、アクティブタブの有無や選択数に応じて活性制御。削除時は `window.confirm` での確認とログ出力を実装 (`src/renderer/components/CardPanel.tsx:192-218,489-533`)。
+   - グローバルショートカットで `Insert` / `Delete` キーを監視し、テキスト入力にフォーカスしていない場合のみカード追加/削除を発火。未選択時のガードとログ/通知整備 (`src/renderer/App.tsx:918-1055`)。
+3. **ドキュメント整備**
+   - 詳細設計のソース一覧にカード追加/削除機能の実装状況を追記し、進捗セクションへ P2-17 の成果を明文化 (`doc/software_detail_design.md:47-55,204-214`)。
+
+#### テスト
+- `npm run test -- workspaceStore` を実行し、`workspaceStore.test.ts` の新規シナリオ（カード追加/削除/Undo）を含む 8 ケースが成功したことを確認。
+
+#### 残課題
+- 複数カードを異なる階層へ複製/貼り付けする UI (P2-18) は未着手。削除ショートカットは確認ダイアログなしのため、今後の要件でガードが必要になれば専用モーダルへ置き換える。

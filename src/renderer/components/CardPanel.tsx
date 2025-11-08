@@ -101,6 +101,8 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
   const moveCards = useWorkspaceStore((state) => state.moveCards);
+  const addCard = useWorkspaceStore((state) => state.addCard);
+  const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const setEditingCard = useWorkspaceStore((state) => state.setEditingCard);
   const updateCard = useWorkspaceStore((state) => state.updateCard);
   const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
@@ -186,6 +188,34 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
     },
     [closeTab, leafId, leafTabs, onLog],
   );
+
+  const handleAddCard = useCallback(() => {
+    if (!activeTabId) {
+      return;
+    }
+    const created = addCard(leafId, activeTabId);
+    if (!created) {
+      onLog?.('WARN', 'カードを追加できませんでした。');
+      return;
+    }
+    onLog?.('INFO', `カード「${created.title || '新規カード'}」を追加しました。`);
+  }, [activeTabId, addCard, leafId, onLog]);
+
+  const handleDeleteCards = useCallback(() => {
+    if (!activeTabId || selectedCardIds.size === 0) {
+      return;
+    }
+    const confirmAvailable = typeof window !== 'undefined' && typeof window.confirm === 'function';
+    if (confirmAvailable && !window.confirm('選択中のカードを削除します。よろしいですか？')) {
+      return;
+    }
+    const deleted = deleteCards(leafId, activeTabId);
+    if (deleted > 0) {
+      onLog?.('INFO', `${deleted}件のカードを削除しました。`);
+    } else {
+      onLog?.('WARN', 'カードを削除できませんでした。');
+    }
+  }, [activeTabId, deleteCards, leafId, onLog, selectedCardIds]);
 
   /**
    * @brief パネルクリック時の処理。
@@ -476,6 +506,28 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             aria-label="すべて折畳"
           >
             ⏫ 折畳
+          </button>
+        </div>
+        <div className="panel-toolbar__group">
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleAddCard}
+            disabled={!activeTabId}
+            aria-disabled={!activeTabId}
+            title="選択中カードの直下に追加"
+          >
+            ➕ 追加
+          </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleDeleteCards}
+            disabled={!activeTabId || selectedCardIds.size === 0}
+            aria-disabled={!activeTabId || selectedCardIds.size === 0}
+            title="選択中カードを削除"
+          >
+            🗑️ 削除
           </button>
         </div>
         <div className="panel-toolbar__group">

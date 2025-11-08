@@ -136,6 +136,8 @@ export const App = () => {
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
+  const addCard = useWorkspaceStore((state) => state.addCard);
+  const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
   const canUndo = useWorkspaceStore((state) => state.canUndo);
@@ -171,6 +173,7 @@ export const App = () => {
   const activeTabId = activeTab?.id ?? null;
   const cards = activeTab?.cards ?? [];
   const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
+  const selectedCount = selectedCardIds.size;
   const isDirty = activeTab?.isDirty ?? false;
   const lastSavedAt = useMemo(() => {
     if (!activeTab?.lastSavedAt) {
@@ -908,88 +911,170 @@ export const App = () => {
   }, [isSearchOpen, notify, openSearchPanel, pushLog]);
 
   useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      if (target.isContentEditable) {
+        return true;
+      }
+      const tagName = target.tagName.toLowerCase();
+      if (tagName === 'textarea' || tagName === 'select') {
+        return true;
+      }
+      if (tagName === 'input') {
+        const type = (target as HTMLInputElement).type?.toLowerCase() ?? 'text';
+        const nonTextTypes = ['button', 'checkbox', 'radio', 'range', 'color', 'file', 'image', 'reset', 'submit', 'hidden'];
+        return !nonTextTypes.includes(type);
+      }
+      return false;
+    };
+
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       const platform = window.navigator?.platform ?? '';
       const isMac = platform.toLowerCase().includes('mac');
       const primaryPressed = isMac ? event.metaKey : event.ctrlKey;
 
-      if (!primaryPressed) {
-        return;
-      }
+      if (primaryPressed && !event.altKey) {
+        const key = event.key.toLowerCase();
 
-      if (event.altKey) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-
-      //! Ctrl+Z: Undo
-      if (key === 'z' && !event.shiftKey) {
-        event.preventDefault();
-        if (canUndo()) {
-          const success = undo();
-          if (success) {
-            notify('info', '操作を取り消しました。');
-            pushLog({
-              id: `undo-${Date.now()}`,
-              level: 'INFO',
-              message: '操作を取り消しました。',
-              timestamp: new Date(),
-            });
+        if (key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          if (canUndo()) {
+            const success = undo();
+            if (success) {
+              notify('info', '操作を取り消しました。');
+              pushLog({
+                id: `undo-${Date.now()}`,
+                level: 'INFO',
+                message: '操作を取り消しました。',
+                timestamp: new Date(),
+              });
+            }
+          } else {
+            notify('info', '取り消す操作がありません。');
           }
+          return;
+        }
+
+        if (key === 'y' || (key === 'z' && event.shiftKey)) {
+          event.preventDefault();
+          if (canRedo()) {
+            const success = redo();
+            if (success) {
+              notify('info', '操作をやり直しました。');
+              pushLog({
+                id: `redo-${Date.now()}`,
+                level: 'INFO',
+                message: '操作をやり直しました。',
+                timestamp: new Date(),
+              });
+            }
+          } else {
+            notify('info', 'やり直す操作がありません。');
+          }
+          return;
+        }
+
+        if (key === 's' && !event.shiftKey) {
+          event.preventDefault();
+          void handleSave();
+          return;
+        }
+
+        if (key === 'f' && !event.shiftKey) {
+          event.preventDefault();
+          openSearchPanel();
+          return;
+        }
+
+        if (event.key === '\\' && !event.shiftKey) {
+          event.preventDefault();
+          handleSplit('vertical');
+          return;
+        }
+
+        if ((event.key === '\\' && event.shiftKey) || event.key === '|') {
+          event.preventDefault();
+          handleSplit('horizontal');
+          return;
+        }
+
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.key === 'Insert') {
+        event.preventDefault();
+        if (!effectiveLeafId || !activeTabId) {
+          notify('warn', 'カードを追加できるアクティブタブがありません。');
+          return;
+        }
+        const created = addCard(effectiveLeafId, activeTabId);
+        if (created) {
+          notify('info', 'カードを追加しました。');
+          pushLog({
+            id: `add-card-${created.id}`,
+            level: 'INFO',
+            message: `カード「${created.title || created.id}」を追加しました。`,
+            timestamp: new Date(),
+          });
         } else {
-          notify('info', '取り消す操作がありません。');
+          notify('warn', 'カードを追加できませんでした。');
         }
         return;
       }
 
-      //! Ctrl+Y or Ctrl+Shift+Z: Redo
-      if (key === 'y' || (key === 'z' && event.shiftKey)) {
+      if (event.key === 'Delete') {
         event.preventDefault();
-        if (canRedo()) {
-          const success = redo();
-          if (success) {
-            notify('info', '操作をやり直しました。');
-            pushLog({
-              id: `redo-${Date.now()}`,
-              level: 'INFO',
-              message: '操作をやり直しました。',
-              timestamp: new Date(),
-            });
-          }
-        } else {
-          notify('info', 'やり直す操作がありません。');
+        if (!effectiveLeafId || !activeTabId) {
+          notify('warn', '削除できるカードがありません。');
+          return;
         }
-        return;
-      }
-
-      if (key === 's' && !event.shiftKey) {
-        event.preventDefault();
-        void handleSave();
-        return;
-      }
-
-      if (key === 'f' && !event.shiftKey) {
-        event.preventDefault();
-        openSearchPanel();
-        return;
-      }
-
-      if (event.key === '\\' && !event.shiftKey) {
-        event.preventDefault();
-        handleSplit('vertical');
-        return;
-      }
-
-      if ((event.key === '\\' && event.shiftKey) || event.key === '|') {
-        event.preventDefault();
-        handleSplit('horizontal');
+        if (selectedCount === 0) {
+          notify('info', '削除対象のカードが選択されていません。');
+          return;
+        }
+        const deleted = deleteCards(effectiveLeafId, activeTabId);
+        if (deleted > 0) {
+          notify('info', `${deleted}件のカードを削除しました。`);
+          pushLog({
+            id: `delete-card-${Date.now()}`,
+            level: 'INFO',
+            message: `${deleted}件のカードを削除しました。`,
+            timestamp: new Date(),
+          });
+        } else {
+          notify('info', '削除できるカードがありません。');
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canRedo, canUndo, handleSave, handleSplit, notify, openSearchPanel, pushLog, redo, undo]);
+  }, [
+    activeTabId,
+    addCard,
+    canRedo,
+    canUndo,
+    deleteCards,
+    effectiveLeafId,
+    handleSave,
+    handleSplit,
+    notify,
+    openSearchPanel,
+    pushLog,
+    redo,
+    selectedCount,
+    undo,
+  ]);
 
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>

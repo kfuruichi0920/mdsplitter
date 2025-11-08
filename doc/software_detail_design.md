@@ -50,7 +50,7 @@
 | `src/main/workspace.ts` | ワークスペースディレクトリ生成と設定ファイル管理。 | `_input/_out/_logs` 作成とサンプルファイル配置、設定既定値を提供。 | ⚠️ |
 | `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
 | `src/renderer/main.tsx` | React エントリポイント。`App` を `#root` にマウント。 | Vite ビルド対象。 | ⚠️ |
-| `src/renderer/store/workspaceStore.ts` | 分割パネルごとのタブ/カードを管理する Zustand ストア。 | パネル⇔タブ⇔カードのマッピング、ファイル排他 (同一ファイルの多重オープン禁止)、カード更新・ステータス循環・保存フラグ更新を実装。 | ⚠️ |
+| `src/renderer/store/workspaceStore.ts` | 分割パネルごとのタブ/カードを管理する Zustand ストア。 | パネル⇔タブ⇔カードのマッピング、ファイル排他 (同一ファイルの多重オープン禁止)、カード更新/移動/追加/削除と Undo/Redo スタック、保存フラグ更新を実装。 | ⚠️ |
 | `src/renderer/store/uiStore.ts` | テーマ設定ストア。ライト/ダークモードのトグルを提供。 | Tailwind ダークモード制御に利用。 | ⚠️ |
 | `src/renderer/store/notificationStore.ts` | 共通通知(トースト)の状態管理。 | レベル別のメッセージ表示と自動消去を担当。 | ⚠️ |
 | `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | コンパクトモードでの余白調整とテーマ切替を保持。 | ⚠️ |
@@ -211,6 +211,7 @@ Deprecated --> Draft : 再利用
 - フェーズ P2-04: 共通通知コンポーネントと Zustand ストアを実装し、テーマ設定やエラーハンドリングで再利用。Tailwind スタイルでトースト表示を整備し、自動消去と手動閉じを提供。
 - フェーズ P2-05: `src/renderer/App.tsx` で保存 (`Ctrl+S`)、上下/左右分割 (`Ctrl+Shift+\\` / `Ctrl+\\`)、検索 (`Ctrl+F`) のショートカットマッピングを実装。`src/shared/workspace.ts` にカードモデル/スナップショット共通型・バリデーション (`isWorkspaceSnapshot`/`CARD_KIND_VALUES`) を定義し、`src/main/preload.ts`・`src/main/main.ts`・`src/main/workspace.ts` で `workspace:save/load` IPC を通じて `_out/workspace.snapshot.json` を読み書きする。読み込み時にカード内容を検証し、無効カードがあれば除外してトースト通知・ログ出力を行う。ステータスバーと `split-grid` レイアウト (`styles.css`) に保存状態と分割モードを反映し、`src/renderer/App.test.tsx` でショートカット操作と保存・バリデーションの UI テストを追加。
 - フェーズ P2-09a/b: `src/renderer/store/workspaceStore.ts` をタブ指向設計へ刷新し、葉ノード毎にタブ配列・アクティブタブ・カード一覧・未保存フラグを保持。`openTab/closeTab/closeLeaf` でカードファイルをタブ化し、同一ファイルの複数パネル展開を禁止 (`fileToLeaf` マップ) する。`src/renderer/CardPanel.tsx` はタブバー/タブ閉じボタン/空表示メッセージを描画し、`App.tsx` はタブ状態を利用して保存・ステータス更新・ファイル読み込みをアクティブパネル単位で処理する。`styles.css` にタブ用クラス (`tab-bar__tab-container` 等) を追加し、`workspaceStore.test.ts` と `App.test.tsx` でタブ管理・重複禁止のユニット/統合テストを整備。
+- フェーズ P2-17: `workspaceStore.addCard/deleteCards` を実装し、選択中カードの同階層直下に即時挿入・サブツリーごとの削除と Undo/Redo 復元をストアで完結させた。`CardPanel.tsx` のツールバーに「追加/削除」ボタンを追加し、操作ログ出力とモーダル確認（削除時）を実装。`App.tsx` には `Insert`/`Delete` ショートカットを追加し、フォーカスがテキスト入力でない場合にストアアクションへ委譲する。`workspaceStore.test.ts` へカード追加/削除と Undo を検証するユースケースを追加して回帰を防止。
 - P1-05 追加対応: 文字サイズと余白を見直し、全 UI をコンパクト表示（text-sm 基準、ツールバー/ステータスバー高さ縮小、ログエリア 112px）へ調整。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
 - ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。
