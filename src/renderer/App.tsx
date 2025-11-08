@@ -166,7 +166,7 @@ export const App = () => {
   );
   const activeTabId = activeTab?.id ?? null;
   const cards = activeTab?.cards ?? [];
-  const selectedCardId = activeTab?.selectedCardId ?? null;
+  const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
   const isDirty = activeTab?.isDirty ?? false;
   const lastSavedAt = useMemo(() => {
     if (!activeTab?.lastSavedAt) {
@@ -240,8 +240,9 @@ export const App = () => {
   );
 
   const selectedCard = useMemo<Card | null>(() => {
-    return cards.find((card) => card.id === selectedCardId) ?? null;
-  }, [cards, selectedCardId]);
+    const firstSelectedId = Array.from(selectedCardIds)[0];
+    return cards.find((card) => card.id === firstSelectedId) ?? null;
+  }, [cards, selectedCardIds]);
 
   /**
    * @brief ログエントリを追加する。
@@ -872,7 +873,8 @@ export const App = () => {
   );
 
   const cardCount = cards.length;
-  const selectedDisplayNumber = toDisplayNumber(cards, selectedCardId);
+  const firstSelectedId = Array.from(selectedCardIds)[0] ?? null;
+  const selectedDisplayNumber = toDisplayNumber(cards, firstSelectedId);
   const themeLabel = theme === 'dark' ? 'ダークモード' : 'ライトモード';
   const themeButtonLabel = theme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード';
   const saveStatusText = isSaving

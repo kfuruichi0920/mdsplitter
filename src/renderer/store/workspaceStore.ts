@@ -37,7 +37,7 @@ export interface PanelTabState {
   fileName: string;
   title: string;
   cards: Card[];
-  selectedCardId: string | null;
+  selectedCardIds: Set<string>; ///< 選択中のカードIDセット（複数選択対応）
   isDirty: boolean;
   lastSavedAt: string | null;
   expandedCardIds: Set<string>; ///< 展開状態のカードIDセット（子を持つカードのみ）
@@ -77,7 +77,10 @@ export interface WorkspaceStore {
   closeTab: (leafId: string, tabId: string) => void;
   closeLeaf: (leafId: string) => void;
   setActiveTab: (leafId: string, tabId: string) => void;
-  selectCard: (leafId: string, tabId: string, cardId: string) => void;
+  selectCard: (leafId: string, tabId: string, cardId: string, options?: { multi?: boolean; range?: boolean }) => void; ///< カード選択（単一/複数/範囲）
+  clearSelection: (leafId: string, tabId: string) => void; ///< 選択をクリア
+  toggleCardSelection: (leafId: string, tabId: string, cardId: string) => void; ///< カード選択をトグル（Ctrl+クリック）
+  selectCardRange: (leafId: string, tabId: string, cardId: string) => void; ///< 範囲選択（Shift+クリック）
   updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
   cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
   hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
@@ -138,10 +141,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         const updatedExpandedIds = new Set<string>(
           Array.from(prevTab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
         );
+        //! 選択状態も維持しつつ、新しいカードで存在しないIDは削除
+        const updatedSelectedIds = new Set<string>(
+          Array.from(prevTab.selectedCardIds).filter((id) => cards.some((card) => card.id === id)),
+        );
         const nextTab: PanelTabState = {
           ...prevTab,
           cards: [...cards],
-          selectedCardId: cards[0]?.id ?? null,
+          selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(cards[0]?.id ? [cards[0].id] : []),
           isDirty: false,
           lastSavedAt: options?.savedAt ?? prevTab.lastSavedAt,
           expandedCardIds: updatedExpandedIds,
@@ -164,13 +171,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const initialExpandedIds = new Set<string>(
         cards.filter((card) => card.child_ids && card.child_ids.length > 0).map((card) => card.id),
       );
+      //! 初期選択は最初のカード
+      const initialSelectedIds = new Set<string>(cards[0]?.id ? [cards[0].id] : []);
       const nextTab: PanelTabState = {
         id: tabId,
         leafId,
         fileName,
         title: options?.title ?? fileName,
         cards: [...cards],
-        selectedCardId: cards[0]?.id ?? null,
+        selectedCardIds: initialSelectedIds,
         isDirty: false,
         lastSavedAt: options?.savedAt ?? null,
         expandedCardIds: initialExpandedIds,
@@ -277,7 +286,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     });
   },
 
-  selectCard: (leafId, tabId, cardId) => {
+  selectCard: (leafId, tabId, cardId, options) => {
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
@@ -288,11 +297,142 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      //! multi/rangeオプションがある場合は専用の処理を呼び出す
+      if (options?.multi) {
+        const nextSelectedIds = new Set(tab.selectedCardIds);
+        if (nextSelectedIds.has(cardId)) {
+          nextSelectedIds.delete(cardId);
+        } else {
+          nextSelectedIds.add(cardId);
+        }
+        return {
+          ...state,
+          tabs: {
+            ...state.tabs,
+            [tabId]: { ...tab, selectedCardIds: nextSelectedIds },
+          },
+        };
+      }
+
+      if (options?.range) {
+        const visibleCardIds = tab.cards.map((c) => c.id);
+        const lastSelected = Array.from(tab.selectedCardIds).pop();
+        if (!lastSelected) {
+          return {
+            ...state,
+            tabs: {
+              ...state.tabs,
+              [tabId]: { ...tab, selectedCardIds: new Set([cardId]) },
+            },
+          };
+        }
+        const startIndex = visibleCardIds.indexOf(lastSelected);
+        const endIndex = visibleCardIds.indexOf(cardId);
+        if (startIndex === -1 || endIndex === -1) {
+          return state;
+        }
+        const [minIndex, maxIndex] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+        const rangeIds = visibleCardIds.slice(minIndex, maxIndex + 1);
+        return {
+          ...state,
+          tabs: {
+            ...state.tabs,
+            [tabId]: { ...tab, selectedCardIds: new Set(rangeIds) },
+          },
+        };
+      }
+
+      //! 通常の単一選択
       return {
         ...state,
         tabs: {
           ...state.tabs,
-          [tabId]: { ...tab, selectedCardId: cardId },
+          [tabId]: { ...tab, selectedCardIds: new Set([cardId]) },
+        },
+      };
+    });
+  },
+
+  clearSelection: (leafId, tabId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, selectedCardIds: new Set<string>() },
+        },
+      };
+    });
+  },
+
+  toggleCardSelection: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      if (!tab.cards.some((card) => card.id === cardId)) {
+        return state;
+      }
+
+      const nextSelectedIds = new Set(tab.selectedCardIds);
+      if (nextSelectedIds.has(cardId)) {
+        nextSelectedIds.delete(cardId);
+      } else {
+        nextSelectedIds.add(cardId);
+      }
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, selectedCardIds: nextSelectedIds },
+        },
+      };
+    });
+  },
+
+  selectCardRange: (leafId, tabId, cardId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const visibleCardIds = tab.cards.map((c) => c.id);
+      const lastSelected = Array.from(tab.selectedCardIds).pop();
+
+      if (!lastSelected) {
+        return {
+          ...state,
+          tabs: {
+            ...state.tabs,
+            [tabId]: { ...tab, selectedCardIds: new Set([cardId]) },
+          },
+        };
+      }
+
+      const startIndex = visibleCardIds.indexOf(lastSelected);
+      const endIndex = visibleCardIds.indexOf(cardId);
+
+      if (startIndex === -1 || endIndex === -1) {
+        return state;
+      }
+
+      const [minIndex, maxIndex] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+      const rangeIds = visibleCardIds.slice(minIndex, maxIndex + 1);
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, selectedCardIds: new Set(rangeIds) },
         },
       };
     });
@@ -370,6 +510,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const updatedExpandedIds = new Set<string>(
         Array.from(tab.expandedCardIds).filter((id) => cards.some((card) => card.id === id && card.child_ids.length > 0)),
       );
+      //! 選択状態も維持しつつ、新しいカードで存在しないIDは削除
+      const updatedSelectedIds = new Set<string>(
+        Array.from(tab.selectedCardIds).filter((id) => cards.some((card) => card.id === id)),
+      );
 
       return {
         ...state,
@@ -378,7 +522,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           [tabId]: {
             ...tab,
             cards: [...cards],
-            selectedCardId: cards[0]?.id ?? null,
+            selectedCardIds: updatedSelectedIds.size > 0 ? updatedSelectedIds : new Set(cards[0]?.id ? [cards[0].id] : []),
             isDirty: false,
             lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
             expandedCardIds: updatedExpandedIds,

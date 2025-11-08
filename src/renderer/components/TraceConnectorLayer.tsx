@@ -177,8 +177,8 @@ export const TraceConnectorLayer = ({
     (state) => {
       const ids: string[] = [];
       Object.values(state.tabs).forEach((tab) => {
-        if (tab?.selectedCardId) {
-          ids.push(tab.selectedCardId);
+        if (tab?.selectedCardIds) {
+          ids.push(...Array.from(tab.selectedCardIds));
         }
       });
       return ids;

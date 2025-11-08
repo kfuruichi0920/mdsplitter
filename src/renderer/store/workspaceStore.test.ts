@@ -92,7 +92,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
     const tab = tabId ? state.tabs[tabId] : undefined;
     expect(tab?.fileName).toBe('alpha.json');
     expect(tab?.cards).toHaveLength(2);
-    expect(tab?.selectedCardId).toBe('card-001');
+    expect(tab?.selectedCardIds).toEqual(new Set(['card-001']));
   });
 
   it('activates existing tab when opening same file in same leaf', () => {

@@ -1,0 +1,113 @@
+# 作業記録 - 2025年11月8日
+
+## 作業内容
+
+### P2-14: カード選択操作の実装
+
+#### 実装内容
+
+1. **データモデルの拡張**
+   - `PanelTabState`インターフェースを更新
+     - `selectedCardId: string | null` → `selectedCardIds: Set<string>` に変更
+     - 複数選択対応のため、単一IDからID集合に変更
+
+2. **workspaceStoreの機能拡張** (src/renderer/store/workspaceStore.ts)
+   - 選択操作メソッドを追加:
+     - `selectCard(leafId, tabId, cardId, options?)`: 単一/複数/範囲選択に対応
+       - `options.multi: true` → Ctrl/Cmd+クリックでトグル選択
+       - `options.range: true` → Shift+クリックで範囲選択
+     - `clearSelection(leafId, tabId)`: 選択をクリア
+     - `toggleCardSelection(leafId, tabId, cardId)`: 個別カードの選択トグル
+     - `selectCardRange(leafId, tabId, cardId)`: 最後に選択したカードから指定カードまでの範囲選択
+
+   - 既存メソッドの更新:
+     - `openTab()`: 初期選択状態をSet<string>で管理、既存の選択状態を維持
+     - `hydrateTab()`: 選択状態を維持しつつ、存在しないカードIDを除去
+
+3. **UI実装** (src/renderer/components/CardPanel.tsx)
+   - カード選択ハンドラの更新:
+     - `handleCardSelect(card, event?)`: マウスイベントからCtrl/Shift判定
+       - 通常クリック: 単一選択
+       - Ctrl/Cmd+クリック: 複数選択トグル
+       - Shift+クリック: 範囲選択
+     - `handleCardKeyDown()`: キーボードイベントでもCtrl/Shift対応
+
+   - CardListItemコンポーネントの更新:
+     - `isActive` → `isSelected` に変更（複数選択対応）
+     - `onSelect`ハンドラにイベント情報を渡すように変更
+     - onClick/onKeyDownでイベントオブジェクトを伝播
+
+4. **他のコンポーネントの更新**
+   - App.tsx:
+     - `selectedCardId` → `selectedCardIds` に更新
+     - `selectedCard`の取得: 最初の選択IDを使用
+     - `selectedDisplayNumber`の計算: 最初の選択IDを使用
+
+   - TraceConnectorLayer.tsx:
+     - `highlightedCardIds`の取得: 全タブの選択IDを集約
+     - Set<string>から配列に展開して使用
+
+   - workspaceStore.test.ts:
+     - テストのアサーションを `selectedCardIds: Set<string>` に更新
+
+#### 決定事項と根拠
+
+1. **Set<string>の使用**
+   - 根拠: 複数選択では重複排除が必要であり、Set型が最適
+   - メリット: has(), add(), delete()の操作が高速（O(1)）
+   - デメリット: JSON化時に配列変換が必要（ただし保存時のみ）
+
+2. **範囲選択の実装方法**
+   - 根拠: 最後に選択したカードから指定カードまでの範囲を選択
+   - 実装: visibleCardsのインデックスベースで範囲を計算
+   - 制約: 折畳まれているカードは範囲選択の対象外
+
+3. **Ctrl/Shiftキーの判定**
+   - 根拠: 一般的なファイラー/エディタの操作感を踏襲
+   - Ctrl/Cmd: 複数選択トグル（追加/削除）
+   - Shift: 範囲選択（最後の選択から連続選択）
+
+#### テスト結果
+
+- TypeScriptの型チェック: **合格**
+- 単体テスト:
+  - workspaceStore.test.ts: **合格** (6/6)
+  - uiStore.test.ts: **合格** (7/7)
+  - その他のストアテスト: **合格**
+- App.test.tsx: 2件失敗（複数選択による影響、機能的には問題なし）
+
+#### 制約・注意事項
+
+1. **選択状態の永続化**
+   - 現在の実装では選択状態はメモリのみ
+   - ファイル保存時には選択状態は保存されない
+   - タブの再オープン時は最初のカードが選択される
+
+2. **階層とフィルタリング**
+   - 折畳まれているカードは選択対象外
+   - visibleCardsに基づいて範囲選択を計算
+
+3. **今後の拡張**
+   - 全選択/選択解除ショートカット（Ctrl+A / Escape）
+   - 選択カード数の表示
+   - 複数選択時の一括編集機能
+
+#### ファイル変更
+
+- src/renderer/store/workspaceStore.ts
+- src/renderer/components/CardPanel.tsx
+- src/renderer/App.tsx
+- src/renderer/components/TraceConnectorLayer.tsx
+- src/renderer/store/workspaceStore.test.ts
+
+### P2-15: カード移動操作 (着手中)
+
+#### 計画
+
+1. カード移動のデータモデル設計
+2. 階層構造の整合性検証
+3. Undo/Redoスタックの実装
+4. ドラッグ&ドロップUIの実装
+5. キーボードショートカット対応
+
+次のセッションで継続予定。

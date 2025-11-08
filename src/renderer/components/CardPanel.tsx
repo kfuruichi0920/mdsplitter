@@ -108,7 +108,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   }, [activeTabId, leafTabs]);
 
   const cards = activeTab?.cards ?? [];
-  const selectedCardId = activeTab?.selectedCardId ?? null;
+  const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
   const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
   const cardCount = cards.length;
 
@@ -206,21 +206,37 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
   /**
    * @brief カードを選択する。
    * @details
-   * 既に選択済みの場合は何もしない。選択時は selectCard と onLog を呼ぶ。
+   * Ctrl/Cmdで複数選択、Shiftで範囲選択に対応。
    * @param card 対象カード。
+   * @param event マウスイベント（Ctrl/Shift判定用）。
    */
   const handleCardSelect = useCallback(
-    (card: Card) => {
-      if (card.id === selectedCardId) {
-        return; //! 既に選択済みなら何もしない
-      }
+    (card: Card, event?: React.MouseEvent) => {
       if (!activeTabId) {
         return;
       }
-      selectCard(leafId, activeTabId, card.id);
-      onLog?.('INFO', `カード「${card.title}」を選択しました。`);
+
+      const isCtrlOrCmd = event?.ctrlKey || event?.metaKey;
+      const isShift = event?.shiftKey;
+
+      if (isCtrlOrCmd) {
+        //! Ctrl/Cmd+クリック: 複数選択トグル
+        selectCard(leafId, activeTabId, card.id, { multi: true });
+        onLog?.('INFO', `カード「${card.title}」を複数選択しました。`);
+      } else if (isShift) {
+        //! Shift+クリック: 範囲選択
+        selectCard(leafId, activeTabId, card.id, { range: true });
+        onLog?.('INFO', `カード「${card.title}」まで範囲選択しました。`);
+      } else {
+        //! 通常クリック: 単一選択
+        if (selectedCardIds.size === 1 && selectedCardIds.has(card.id)) {
+          return; //! 既に単一選択済みなら何もしない
+        }
+        selectCard(leafId, activeTabId, card.id);
+        onLog?.('INFO', `カード「${card.title}」を選択しました。`);
+      }
     },
-    [activeTabId, leafId, onLog, selectCard, selectedCardId],
+    [activeTabId, leafId, onLog, selectCard, selectedCardIds],
   );
 
   /**
@@ -236,7 +252,13 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
         return; //! 対象キー以外は無視
       }
       event.preventDefault();
-      handleCardSelect(card);
+      //! キーボードイベントをマウスイベント風に変換
+      const pseudoEvent = {
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      } as React.MouseEvent;
+      handleCardSelect(card, pseudoEvent);
     },
     [handleCardSelect],
   );
@@ -388,7 +410,7 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
             card={card}
             leafId={leafId}
             fileName={activeTab?.fileName ?? ''}
-            isActive={card.id === selectedCardId}
+            isSelected={selectedCardIds.has(card.id)}
             isExpanded={expandedCardIds.has(card.id)}
             hasChildren={card.child_ids.length > 0}
             displayMode={cardDisplayMode}
@@ -419,19 +441,19 @@ export const CardPanel = ({ leafId, onLog, onPanelClick, onPanelClose }: CardPan
 
 interface CardListItemProps {
   card: Card;
-  isActive: boolean;
+  isSelected: boolean; ///< 選択状態（複数選択対応）。
   isExpanded: boolean; ///< 展開状態（子を持つカードのみ有効）。
   hasChildren: boolean; ///< 子カードを持つかどうか。
   leafId: string;
   fileName: string; ///< カードが属するファイル名（コネクタ識別に使用）。
   displayMode: 'detailed' | 'compact'; ///< カード表示モード。
   panelScrollRef: React.RefObject<HTMLDivElement | null>;
-  onSelect: (card: Card) => void;
+  onSelect: (card: Card, event?: React.MouseEvent) => void; ///< 選択ハンドラ（イベント情報で複数選択判定）。
   onKeyDown: (event: KeyboardEvent<HTMLElement>, card: Card) => void;
   onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
 }
 
-const CardListItem = ({ card, isActive, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand }: CardListItemProps) => {
+const CardListItem = ({ card, isSelected, isExpanded, hasChildren, leafId, fileName, displayMode, panelScrollRef, onSelect, onKeyDown, onToggleExpand }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
   const leftConnectorClass = `card__connector${card.hasLeftTrace ? ' card__connector--active' : ''}`;
   const rightConnectorClass = `card__connector${card.hasRightTrace ? ' card__connector--active' : ''}`;
@@ -461,13 +483,13 @@ const CardListItem = ({ card, isActive, isExpanded, hasChildren, leafId, fileNam
   if (displayMode === 'compact') {
     return (
       <article
-        className={`card card--compact${isActive ? ' card--active' : ''}`}
+        className={`card card--compact${isSelected ? ' card--active' : ''}`}
         style={indentStyle}
-        aria-selected={isActive}
+        aria-selected={isSelected}
         role="listitem"
         tabIndex={0}
         ref={anchorRef}
-        onClick={() => onSelect(card)}
+        onClick={(event) => onSelect(card, event)}
         onKeyDown={(event) => onKeyDown(event, card)}
       >
         {expandButton}
@@ -483,13 +505,13 @@ const CardListItem = ({ card, isActive, isExpanded, hasChildren, leafId, fileNam
   //! 詳細表示
   return (
     <article
-      className={`card${isActive ? ' card--active' : ''}`}
+      className={`card${isSelected ? ' card--active' : ''}`}
       style={indentStyle}
-      aria-selected={isActive}
+      aria-selected={isSelected}
       role="listitem"
       tabIndex={0}
       ref={anchorRef}
-      onClick={() => onSelect(card)}
+      onClick={(event) => onSelect(card, event)}
       onKeyDown={(event) => onKeyDown(event, card)}
     >
       <header className="card__header">
