@@ -620,6 +620,18 @@
     @apply flex-1 text-sm font-semibold text-slate-800 dark:text-slate-100;
   }
 
+  .card--editing {
+    @apply cursor-text bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-50;
+  }
+
+  .card__title-input {
+    @apply flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-800 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400;
+  }
+
+  .card__body-input {
+    @apply mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm leading-relaxed text-slate-800 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400;
+  }
+
   .card__title--truncate {
     @apply overflow-hidden text-ellipsis whitespace-nowrap;
   }
