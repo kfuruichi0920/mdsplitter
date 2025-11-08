@@ -179,7 +179,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const toggleFileTraceVisibility = useTracePreferenceStore((state) => state.toggleFileVisibility);
   const toggleCardTraceVisibility = useTracePreferenceStore((state) => state.toggleCardVisibility);
   const isCardTraceVisible = useTracePreferenceStore((state) => state.isCardVisible);
-  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
+  const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
 
   const tabsSnapshot = useWorkspaceStore((state) => state.tabs);
   const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
@@ -210,8 +210,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     const related = useTraceStore.getState().getRelatedCards(selectionSeeds);
     const set = new Set<string>(related[activeFileName] ?? []);
     globalSelections[activeFileName]?.forEach((cardId) => set.add(cardId));
+    if (excludeSelfTrace) {
+      const selectedInPanel = new Set<string>(globalSelections[activeFileName] ?? []);
+      Array.from(set).forEach((cardId) => {
+        if (!selectedInPanel.has(cardId)) {
+          set.delete(cardId);
+        }
+      });
+    }
     return set.size > 0 ? set : null;
-  }, [activeFileName, globalSelections, selectionSeeds, traceCacheSnapshot]);
+  }, [activeFileName, excludeSelfTrace, globalSelections, selectionSeeds, traceCacheSnapshot]);
 
   const handlePanelTraceToggle = useCallback(() => {
     if (!activeFileName) {
@@ -255,15 +263,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       }
     });
 
-    if (focusSelectionOnly && traceHighlightIds && traceHighlightIds.size > 0) {
-      return result.filter((card) => traceHighlightIds.has(card.id));
-    }
-    if (focusSelectionOnly && (!traceHighlightIds || traceHighlightIds.size === 0)) {
-      return result.filter((card) => selectedCardIds.has(card.id));
-    }
-
     return result;
-  }, [cards, expandedCardIds, focusSelectionOnly, selectedCardIds, traceHighlightIds]);
+  }, [cards, expandedCardIds]);
 
   /**
    * @brief アクティブタブを変更する。

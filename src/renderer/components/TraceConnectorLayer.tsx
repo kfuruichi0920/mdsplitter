@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
-import { useTraceStore, type TraceSeed, toTraceNodeKey } from '../store/traceStore';
+import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from '../store/traceStore';
 import { useTracePreferenceStore } from '../store/tracePreferenceStore';
 import type { TraceabilityLink } from '@/shared/traceability';
 
@@ -186,6 +186,16 @@ export const TraceConnectorLayer = ({
     });
     return seeds;
   }, [tabsSnapshot]);
+  const seedsByFile = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    selectionSeeds.forEach(({ fileName, cardId }) => {
+      if (!map.has(fileName)) {
+        map.set(fileName, new Set<string>());
+      }
+      map.get(fileName)?.add(cardId);
+    });
+    return map;
+  }, [selectionSeeds]);
   const loadTraceForPair = useTraceStore((state) => state.loadTraceForPair);
 
   const activeFilePairs = useActiveFiles(leftLeafIds, rightLeafIds);
@@ -228,13 +238,12 @@ export const TraceConnectorLayer = ({
     },
     shallow,
   );
-  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
-
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const isFileVisible = useTracePreferenceStore((state) => state.isFileVisible);
   const isCardVisible = useTracePreferenceStore((state) => state.isCardVisible);
 
+  const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
   const traceCacheSnapshot = useTraceStore((state) => state.cache, shallow);
   const highlightedNodeKeys = useMemo(() => {
     if (selectionSeeds.length === 0) {
@@ -242,8 +251,17 @@ export const TraceConnectorLayer = ({
     }
     const related = useTraceStore.getState().getRelatedNodeKeys(selectionSeeds);
     selectionSeeds.forEach((seed) => related.add(toTraceNodeKey(seed.fileName, seed.cardId)));
+    if (excludeSelfTrace) {
+      Array.from(related).forEach((nodeKey) => {
+        const { fileName, cardId } = splitTraceNodeKey(nodeKey);
+        const seedsForFile = seedsByFile.get(fileName);
+        if (seedsForFile && !seedsForFile.has(cardId)) {
+          related.delete(nodeKey);
+        }
+      });
+    }
     return related;
-  }, [selectionSeeds, traceCacheSnapshot]);
+  }, [excludeSelfTrace, selectionSeeds, seedsByFile, traceCacheSnapshot]);
 
   const filteredLinks = useMemo(() => {
     if (!isTraceVisible) {
@@ -262,16 +280,9 @@ export const TraceConnectorLayer = ({
       if (!isCardVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
-      if (focusSelectionOnly && highlightedNodeKeys.size > 0) {
-        const sourceKey = toTraceNodeKey(link.sourceFileName, link.sourceCardId);
-        const targetKey = toTraceNodeKey(link.targetFileName, link.targetCardId);
-        if (!highlightedNodeKeys.has(sourceKey) && !highlightedNodeKeys.has(targetKey)) {
-          return false;
-        }
-      }
       return true;
     });
-  }, [enabledRelationKinds, focusSelectionOnly, highlightedNodeKeys, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
+  }, [enabledRelationKinds, isCardVisible, isFileVisible, isTraceVisible, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

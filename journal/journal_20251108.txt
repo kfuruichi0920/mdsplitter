@@ -28,6 +28,6 @@
 - **接合点拡張 (P5-07)**: カード左右の接合点をボタン化し、relation 数のバッジと個別ミュート操作を実現。`useTraceStore.aggregateCountsForFile` がカード別接続数を算出し、`tracePreferenceStore` の `toggleCardVisibility` が `TraceConnectorLayer` と `CardPanel` の双方に反映される。
 
 ### P5-04 選択カードフォーカス強調 (2025-11-08)
-- `useTraceStore.getRelatedCards`/`getRelatedNodeKeys` を追加し、選択カードからトレーサ経路で到達可能なカード集合を算出。`TraceConnectorLayer` は nodeKey 単位でコネクタをハイライトし、`🧐` トグル ON 時には該当カードのみを可視化する。
+- `useTraceStore.getRelatedCards`/`getRelatedNodeKeys` を追加し、選択カードからトレーサ経路で到達可能なカード集合を算出。`TraceConnectorLayer` は nodeKey 単位でコネクタをハイライトし、`🔁` 還流許可トグル ON 時には自パネルへの還流を除外、OFF 時は従来どおり自パネルも含めて強調する。
 - `CardPanel` 側では `panelEngagementStore` がパネル状態（アクティブ/準アクティブ/非アクティブ）を追跡し、カードは `card--selected-primary` / `card--selected-secondary` / `card--selected-inactive` の3クラスで表現。`card--trace-related` は常に数珠つなぎカードを強調し、接合点は件数付きボタン＋個別トグルへ刷新した。
 - テーマ設定へ `relationColors`/`connectorHighlight` を追加し、CSS 変数 `--trace-color-*` / `--trace-highlight-color` 経由でトレース色をカスタマイズ可能にした。`styles.css` はこれら変数を参照するよう更新。

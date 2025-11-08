@@ -280,12 +280,12 @@ Deprecated --> Draft : 再利用
   - `workspaceStore` に `setCardTraceFlags` を追加し、relation 変化に応じて各カードの `hasLeftTrace`/`hasRightTrace` を反映。Undo スタックに影響を与えずに dirty フラグのみを立てる。
   - 垂直分割ペアの探索を `src/renderer/utils/traceLayout.ts` に切り出し、トレース操作と `TraceConnectorLayer` の双方で共通利用。
 - **P5-03 表示フィルタ/可視トグル**
-  - `src/renderer/store/tracePreferenceStore.ts` で可視状態・選択カード限定表示・種別別チェックボックスを管理。`TraceConnectorLayer` はこのストアを購読し、フィルタ条件に合致しないリンクを描画から除外。
-  - グローバルツールバーの `⛓️` トグル、`🧐` 選択カード強調、`🧬` タイプフィルタポップオーバーを実装。ポップオーバーは CSS (`src/renderer/styles.css`) で簡易レイヤーを提供。
+  - `src/renderer/store/tracePreferenceStore.ts` で可視状態・還流制御・種別別チェックボックスを管理。`TraceConnectorLayer` はこのストアを購読し、フィルタ条件に合致しないリンクを描画から除外。
+  - グローバルツールバーの `⛓️` トグル、`🔁` 還流許可トグル、`🧬` タイプフィルタポップオーバーを実装。ポップオーバーは CSS (`src/renderer/styles.css`) で簡易レイヤーを提供。
   - `src/renderer/store/__tests__/tracePreferenceStore.test.ts`・`traceStore.test.ts` で設定ストアと relation 永続化の挙動をユニットテストし、Playground なしでも挙動を担保。
 - **P5-04 選択カードフォーカス/強調**
-  - `panelEngagementStore` を新設し、クリック/Shift/ctrl 選択ごとに「アクティブ / 準アクティブ / 非アクティブ」の3段階をパネル単位で管理。カード側も `card--selected-primary`/`card--selected-secondary`/`card--selected-inactive` の3種クラスで状態を明示し、スタイルは `styles.css` でカスタマイズできる。
-  - `TracePreferenceStore.focusSelectionOnly` が ON の間は `CardPanel` が `useTraceStore.getRelatedCards` の結果に基づいてカードをフィルタし、数珠つなぎになったカードのみリスト表示。OFF の場合も `card--trace-related` と太線コネクタで常時強調する。
+  - `panelEngagementStore` を新設し、クリック/Shift/Ctrl 選択ごとに「アクティブ / 準アクティブ / 非アクティブ」の3段階をパネル単位で管理。カード側も `card--selected-primary`/`card--selected-secondary`/`card--selected-inactive` の3種クラスで状態を明示し、スタイルは `styles.css` でカスタマイズできる。
+  - `TracePreferenceStore.excludeSelfTrace` を `🔁` 還流許可ボタンに割り当て、OFF の場合は従来通り自パネルを含む数珠繋ぎ強調、ON の場合は選択カードを除き自パネルへ還流したノードをハイライト対象から除外する。`CardPanel`/`TraceConnectorLayer` が `getRelatedCards` の結果をもとに描画を切り替える。
   - カード左右の接合点は件数バッジ付きボタンとなり、`toggleCardVisibility` でカード単位にコネクタ表示を個別制御できる。`aggregateCountsForFile` が左右別件数を提供し、トグルは panel/panel で同期する。
 - **P5-05 種別選択 UI**
   - トレース作成用の relation セレクタをツールバーへ追加し (`App.tsx`)、`useTracePreferenceStore.creationRelationKind` によって新規コネクタの `type` を決定。表示側は `🧬` ポップオーバーをチェックボックス構成へ改修し、`TraceConnectorLayer` が `enabledKinds` を参照して描画を抑制。

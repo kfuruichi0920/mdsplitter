@@ -6,15 +6,15 @@ describe('tracePreferenceStore', () => {
     resetTracePreferenceStore();
   });
 
-  it('toggles visibility and focus flags', () => {
+  it('toggles visibility and exclude-self flag', () => {
     act(() => {
       useTracePreferenceStore.getState().toggleVisibility();
-      useTracePreferenceStore.getState().toggleFocusOnly();
+      useTracePreferenceStore.getState().toggleExcludeSelfTrace();
     });
 
     const state = useTracePreferenceStore.getState();
     expect(state.isVisible).toBe(false);
-    expect(state.focusSelectionOnly).toBe(true);
+    expect(state.excludeSelfTrace).toBe(true);
   });
 
   it('disables individual relation kinds', () => {

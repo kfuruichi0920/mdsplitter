@@ -315,8 +315,8 @@ export const App = () => {
   const renameTabFile = useWorkspaceStore((state) => state.renameTabFile);
   const isTraceVisible = useTracePreferenceStore((state) => state.isVisible);
   const toggleTraceVisibility = useTracePreferenceStore((state) => state.toggleVisibility);
-  const focusSelectionOnly = useTracePreferenceStore((state) => state.focusSelectionOnly);
-  const toggleTraceFocus = useTracePreferenceStore((state) => state.toggleFocusOnly);
+  const excludeSelfTrace = useTracePreferenceStore((state) => state.excludeSelfTrace);
+  const toggleTraceRecirculation = useTracePreferenceStore((state) => state.toggleExcludeSelfTrace);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
   const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
   const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
@@ -2021,12 +2021,12 @@ export const App = () => {
           </button>
           <button
             type="button"
-            className={`toolbar-button${focusSelectionOnly ? ' toolbar-button--active' : ''}`}
-            onClick={toggleTraceFocus}
-            title="選択中カードトレースフィルタ"
-            aria-label="選択中カードトレースフィルタ"
+            className={`toolbar-button${excludeSelfTrace ? ' toolbar-button--active' : ''}`}
+            onClick={toggleTraceRecirculation}
+            title="トレース強調の還流許可 (ON: 自パネル除外)"
+            aria-label="トレース強調の還流許可"
           >
-            🧐
+            🔁
           </button>
           <button
             type="button"
