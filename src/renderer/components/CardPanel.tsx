@@ -573,15 +573,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * @brief パネルクローズ時の処理。
    * @details
    * クリックイベントの伝播を防ぎ、onPanelClose コールバックを呼び出す。
-   * @param event マウスイベント。
+   * @param _event マウスイベント。
    */
   const handlePanelClose = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation(); //! パネルクリックイベントの伝播を防ぐ
+    (_event: React.MouseEvent) => {
+      // event.stopPropagation(); //! パネルクリックイベントの伝播を防ぐ
       onPanelClose?.(leafId);
     },
     [leafId, onPanelClose],
   );
+  // Note: handlePanelClose is defined for future use when close button is added to UI
+  void handlePanelClose; // Suppress unused warning
 
   /**
    * @brief カードを選択する。

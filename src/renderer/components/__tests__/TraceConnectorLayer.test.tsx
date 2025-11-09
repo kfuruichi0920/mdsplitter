@@ -7,10 +7,8 @@ import { resetWorkspaceStore, useWorkspaceStore } from '../../store/workspaceSto
 import { TraceConnectorLayer } from '../TraceConnectorLayer';
 
 class ResizeObserverStub {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private callback: ResizeObserverCallback;
-  constructor(callback: ResizeObserverCallback) {
-    this.callback = callback;
+  constructor(_callback: ResizeObserverCallback) {
+    // Store callback for potential future use
   }
   observe() {
     // no-op for tests

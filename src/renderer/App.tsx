@@ -391,12 +391,10 @@ export const App = () => {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
   const tabs = useWorkspaceStore((state) => state.tabs);
-  const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
-  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const copySelection = useWorkspaceStore((state) => state.copySelection);
