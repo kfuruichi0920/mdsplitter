@@ -10,10 +10,11 @@
  * @copyright MIT
  */
 
-import { app } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+
+import { app } from 'electron';
 
 import {
   type AppSettings,
@@ -22,11 +23,6 @@ import {
   mergeSettings,
 } from '../shared/settings';
 import {
-  WORKSPACE_SNAPSHOT_FILENAME,
-  isWorkspaceSnapshot,
-  type WorkspaceSnapshot,
-} from '../shared/workspace';
-import {
   TRACEABILITY_FILE_SCHEMA_VERSION,
   isTraceabilityFile,
   isTraceabilityHeader,
@@ -34,10 +30,14 @@ import {
   type LoadedTraceabilityFile,
   type TraceabilityFile,
   type TraceabilityHeader,
-  type TraceabilityRelation,
   type TraceFileSaveRequest,
   type TraceFileSaveResult,
 } from '../shared/traceability';
+import {
+  WORKSPACE_SNAPSHOT_FILENAME,
+  isWorkspaceSnapshot,
+  type WorkspaceSnapshot,
+} from '../shared/workspace';
 
 export interface WorkspacePaths {
   root: string;

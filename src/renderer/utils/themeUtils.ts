@@ -11,6 +11,7 @@
  */
 
 import type { ThemeColorSettings } from '@/shared/settings';
+
 import { TRACE_RELATION_KINDS, type TraceRelationKind } from '@/shared/traceability';
 
 /**

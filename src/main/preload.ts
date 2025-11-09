@@ -17,8 +17,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
-import type { WorkspaceSnapshot } from '../shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
+import type { WorkspaceSnapshot } from '../shared/workspace';
 
 
 /**

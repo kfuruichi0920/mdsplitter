@@ -1,15 +1,14 @@
 import { render, waitFor } from '@testing-library/react';
-import { TraceConnectorLayer } from '../TraceConnectorLayer';
+
 import { resetConnectorLayoutStore, useConnectorLayoutStore } from '../../store/connectorLayoutStore';
 import { resetTracePreferenceStore, useTracePreferenceStore } from '../../store/tracePreferenceStore';
 import { resetTraceStore, useTraceStore } from '../../store/traceStore';
 import { resetWorkspaceStore, useWorkspaceStore } from '../../store/workspaceStore';
+import { TraceConnectorLayer } from '../TraceConnectorLayer';
 
 class ResizeObserverStub {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private callback: ResizeObserverCallback;
-  constructor(callback: ResizeObserverCallback) {
-    this.callback = callback;
+  constructor(_callback: ResizeObserverCallback) {
+    // Store callback for potential future use
   }
   observe() {
     // no-op for tests
@@ -46,6 +45,7 @@ describe('TraceConnectorLayer', () => {
       lastSavedAt: null,
       expandedCardIds: new Set<string>(),
       editingCardId: null,
+      dirtyCardIds: new Set<string>(),
     };
     const tabRight = {
       id: 'tab-right',
@@ -58,6 +58,7 @@ describe('TraceConnectorLayer', () => {
       lastSavedAt: null,
       expandedCardIds: new Set<string>(),
       editingCardId: null,
+      dirtyCardIds: new Set<string>(),
     };
     useWorkspaceStore.setState((state) => ({
       ...state,

@@ -10,11 +10,14 @@
  * @copyright MIT
  */
 
-import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
-import type { SplitNode, SplitContainerNode as SplitContainerNodeType } from '../store/splitStore';
+
 import { useSplitStore } from '../store/splitStore';
+
 import { TraceConnectorLayer } from './TraceConnectorLayer';
+
+import type { SplitNode, SplitContainerNode as SplitContainerNodeType } from '../store/splitStore';
+import type { CSSProperties, ReactNode } from 'react';
 
 const collectLeafIds = (node: SplitNode): string[] => {
   if (node.type === 'leaf') {

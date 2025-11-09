@@ -11,10 +11,13 @@
  */
 
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
+
 import { app } from 'electron';
-import { loadSettings, updateSettings, initializeWorkspace } from '../workspace';
+
+import { updateSettings, initializeWorkspace } from '../workspace';
+
 import type { AppSettings, AppSettingsPatch } from '../../shared/settings';
 
 //! Electronアプリモジュールをモック
@@ -64,7 +67,7 @@ describe('workspace settings persistence', () => {
 
     //! 初期設定をファイルから読み込み
     let fileContent = await fs.readFile(settingsFilePath, 'utf8');
-    let initialSettings = JSON.parse(fileContent) as AppSettings;
+    const initialSettings = JSON.parse(fileContent) as AppSettings;
     expect(initialSettings.theme.mode).toBe('dark'); // defaultSettings の既定値
 
     //! テーマモードを 'light' に変更

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
-import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
-import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from '../store/traceStore';
+
+import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
+import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from '../store/traceStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
+
 import type { TraceabilityLink } from '@/shared/traceability';
 
 interface TraceConnectorLayerProps {

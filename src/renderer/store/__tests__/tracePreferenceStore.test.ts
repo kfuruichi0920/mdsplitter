@@ -1,4 +1,5 @@
 import { act } from '@testing-library/react';
+
 import { resetTracePreferenceStore, useTracePreferenceStore } from '../tracePreferenceStore';
 
 describe('tracePreferenceStore', () => {

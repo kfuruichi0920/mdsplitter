@@ -11,8 +11,8 @@
  * @copyright MIT
  */
 
-import { create } from 'zustand';
 import { nanoid } from 'nanoid';
+import { create } from 'zustand';
 
 import {
   CARD_STATUS_SEQUENCE,

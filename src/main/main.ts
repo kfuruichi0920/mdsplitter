@@ -16,11 +16,10 @@
  */
 import path from 'node:path';
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import type { SaveDialogOptions } from 'electron';
 
-import type { LogLevel } from '../shared/settings';
-
+import { initLogger, logMessage, updateLoggerSettings } from './logger';
 import {
   getWorkspacePaths,
   initializeWorkspace,
@@ -36,8 +35,13 @@ import {
   saveWorkspaceSnapshot,
   updateSettings,
 } from './workspace';
+
+import type { LogLevel } from '../shared/settings';
 import type { TraceFileSaveRequest } from '../shared/traceability';
-import { initLogger, logMessage, updateLoggerSettings } from './logger';
+
+
+
+
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -72,12 +76,35 @@ const createWindow = () => {
       preload: resolvePreloadPath(), ///< preloadスクリプト
       contextIsolation: true,        ///< コンテキスト分離
       nodeIntegration: false,        ///< Node.js無効
-      sandbox: true                  ///< サンドボックス有効
+      sandbox: true,                 ///< サンドボックス有効
+      webSecurity: true,             ///< Webセキュリティ有効
+      allowRunningInsecureContent: false ///< 非セキュアコンテンツ実行禁止
     }
   });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show(); //!< ウィンドウ表示
+  });
+
+  //! ナビゲーション制御: アプリ内ページ以外への遷移を防止
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const appUrl = resolveRendererIndexFile();
+    if (!url.startsWith('file://') || !url.includes(path.dirname(appUrl))) {
+      event.preventDefault();
+      console.warn('[security] Blocked navigation to:', url);
+    }
+  });
+
+  //! 新規ウィンドウ制御: HTTPSリンクは外部ブラウザで開く
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) {
+      shell.openExternal(url).catch((err: Error) => {
+        console.error('[security] Failed to open external URL:', err);
+      });
+    } else {
+      console.warn('[security] Blocked window.open for non-HTTPS URL:', url);
+    }
+    return { action: 'deny' };
   });
 
   mainWindow.loadFile(resolveRendererIndexFile()); //!< レンダラー読込

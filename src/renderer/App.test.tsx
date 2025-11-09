@@ -11,10 +11,12 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { defaultSettings, mergeSettings } from '@/shared/settings';
+
 import { App } from './App';
-import { resetWorkspaceStore } from './store/workspaceStore';
 import { resetUiStore } from './store/uiStore';
+import { resetWorkspaceStore } from './store/workspaceStore';
+
+import { defaultSettings, mergeSettings } from '@/shared/settings';
 
 /**
  * @brief Appコンポーネントの統合テストケース群。
@@ -151,7 +153,7 @@ describe('App', () => {
       fireEvent.doubleClick(fileItem);
     });
 
-    await waitFor(() => expect(screen.getByText('プロジェクト概要')).toBeInTheDocument(), { timeout: 3000 });
+    await screen.findByText('プロジェクト概要', { timeout: 3000 });
     expect(screen.getByText(/カード総数: 3/)).toBeInTheDocument();
   });
 
@@ -184,13 +186,13 @@ describe('App', () => {
     }, { timeout: 10000 });
 
     // Approvedステータスのカードが表示されるまで待機
-    await waitFor(() => screen.getByText('Approved'), { timeout: 5000 });
+    await screen.findByText('Approved', { timeout: 5000 });
 
     const button = screen.getByRole('button', { name: /ステータスを切り替え/ });
     fireEvent.click(button);
 
     // ステータスが変わったことを確認
-    await waitFor(() => screen.getByText('Deprecated'), { timeout: 5000 });
+    await screen.findByText('Deprecated', { timeout: 5000 });
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
   }, 30000);
 
@@ -202,13 +204,13 @@ describe('App', () => {
     await act(async () => {});
 
     const initialButton = screen.getByRole('button', { name: /ライトモード/ });
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(document.documentElement).toHaveClass('dark');
 
     act(() => {
       initialButton.click();
     });
 
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(document.documentElement).not.toHaveClass('dark');
     expect(screen.getByRole('button', { name: /ダークモード/ })).toBeInTheDocument();
   });
 
@@ -228,8 +230,8 @@ describe('App', () => {
     });
 
     // カードが読み込まれるまで待機
-    await waitFor(() => expect(screen.getByText(/カード総数: 3/)).toBeInTheDocument(), { timeout: 5000 });
-    await waitFor(() => expect(screen.getByText(/保存状態:/)).toBeInTheDocument(), { timeout: 5000 });
+    await screen.findByText(/カード総数: 3/, { timeout: 5000 });
+    await screen.findByText(/保存状態:/, { timeout: 5000 });
     expect(screen.getByText(/保存状態: ✓ 保存済み/)).toBeInTheDocument();
 
     const statusButton = screen.getByRole('button', { name: /ステータスを切り替え/ });

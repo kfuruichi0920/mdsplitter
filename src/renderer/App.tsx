@@ -12,28 +12,12 @@
  * @copyright MIT
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, FormEvent as ReactFormEvent } from 'react';
+
 import { nanoid } from 'nanoid';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { shallow } from 'zustand/shallow';
 
-import {
-  useWorkspaceStore,
-  type Card,
-  type CardKind,
-  type CardStatus,
-  type InsertPosition,
-  type WorkspaceStore,
-} from './store/workspaceStore';
-import { useUiStore, type ThemeMode } from './store/uiStore';
-import { useNotificationStore } from './store/notificationStore';
-import { useSplitStore } from './store/splitStore';
-import type { SplitNode } from './store/splitStore';
-import { useTraceStore } from './store/traceStore';
-import { useTracePreferenceStore } from './store/tracePreferenceStore';
-import { usePanelEngagementStore } from './store/panelEngagementStore';
-import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
-import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 import { TRACE_RELATION_KINDS } from '@/shared/traceability';
@@ -44,9 +28,27 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
+import { useNotificationStore } from './store/notificationStore';
+import { usePanelEngagementStore } from './store/panelEngagementStore';
+import { useSplitStore } from './store/splitStore';
+import { useTracePreferenceStore } from './store/tracePreferenceStore';
+import { useTraceStore } from './store/traceStore';
+import { useUiStore, type ThemeMode } from './store/uiStore';
+import {
+  useWorkspaceStore,
+  type Card,
+  type CardKind,
+  type CardStatus,
+  type InsertPosition,
+  type WorkspaceStore,
+} from './store/workspaceStore';
+import { createSearchMatcher, buildSnippet } from './utils/search';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
-import { createSearchMatcher, buildSnippet } from './utils/search';
+
+import type { SplitNode } from './store/splitStore';
+import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
+import { defaultSettings } from '@/shared/settings';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -389,12 +391,10 @@ export const App = () => {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
   const tabs = useWorkspaceStore((state) => state.tabs);
-  const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
-  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const copySelection = useWorkspaceStore((state) => state.copySelection);

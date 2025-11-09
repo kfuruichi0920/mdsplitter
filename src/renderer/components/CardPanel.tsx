@@ -12,15 +12,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
 import { shallow } from 'zustand/shallow';
-import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
-import { useWorkspaceStore } from '../store/workspaceStore';
-import { useUiStore } from '../store/uiStore';
+
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
-import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
-import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
+import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
+import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
+import { useUiStore } from '../store/uiStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
+
+import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
+
 import { CARD_KIND_VALUES } from '@/shared/workspace';
 
 /** ステータスラベル表示用マッピング。 */
@@ -570,15 +573,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * @brief パネルクローズ時の処理。
    * @details
    * クリックイベントの伝播を防ぎ、onPanelClose コールバックを呼び出す。
-   * @param event マウスイベント。
+   * @param _event マウスイベント。
    */
   const handlePanelClose = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation(); //! パネルクリックイベントの伝播を防ぐ
+    (_event: React.MouseEvent) => {
+      // event.stopPropagation(); //! パネルクリックイベントの伝播を防ぐ
       onPanelClose?.(leafId);
     },
     [leafId, onPanelClose],
   );
+  // Note: handlePanelClose is defined for future use when close button is added to UI
+  void handlePanelClose; // Suppress unused warning
 
   /**
    * @brief カードを選択する。
@@ -595,7 +600,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
       const isCtrlOrCmd = event?.ctrlKey || event?.metaKey;
       const isShift = event?.shiftKey;
-      const selectionMode = (isCtrlOrCmd ? 'ctrl' : isShift ? 'shift' : 'normal') as const;
+      const selectionMode: 'ctrl' | 'shift' | 'normal' = isCtrlOrCmd ? 'ctrl' : isShift ? 'shift' : 'normal';
       const splitStore = useSplitStore.getState();
       panelSelectionTransition(splitStore.activeLeafId ?? null, leafId, selectionMode);
       splitStore.setActiveLeaf(leafId);

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+
 import { TRACE_RELATION_KINDS, type TraceRelationKind } from '@/shared/traceability';
 
 export type TraceConnectorSide = 'left' | 'right';
