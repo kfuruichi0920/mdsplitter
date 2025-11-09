@@ -17,7 +17,7 @@
 import path from 'node:path';
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import type { SaveDialogOptions } from 'electron';
+import type { OpenDialogOptions, SaveDialogOptions } from 'electron';
 
 import type { LogLevel } from '../shared/settings';
 
@@ -38,6 +38,7 @@ import {
 } from './workspace';
 import type { TraceFileSaveRequest } from '../shared/traceability';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
+import { DocumentLoadError, loadDocumentFromPath } from './documentLoader';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -211,6 +212,58 @@ ipcMain.handle('workspace:saveTraceFile', async (_event, payload: TraceFileSaveR
   const result = await saveTraceFile(payload);
   logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
   return result;
+});
+
+ipcMain.handle('document:pickSource', async () => {
+  const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+  const paths = getWorkspacePaths();
+  const options: OpenDialogOptions = {
+    title: '変換するテキスト/Markdownファイルを選択',
+    defaultPath: paths.inputDir,
+    filters: [
+      { name: 'Markdown', extensions: ['md', 'markdown'] },
+      { name: 'Text', extensions: ['txt'] },
+      { name: 'すべて', extensions: ['txt', 'md', 'markdown'] },
+    ],
+    properties: ['openFile'],
+  };
+
+  const result = browserWindow
+    ? await dialog.showOpenDialog(browserWindow, options)
+    : await dialog.showOpenDialog(options);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true };
+  }
+
+  try {
+    const settings = await loadSettings();
+    const document = await loadDocumentFromPath(result.filePaths[0], settings);
+    logMessage(
+      document.sizeStatus === 'warn' ? 'warn' : 'info',
+      `入力ファイルを読み込みました: ${document.fileName} (${document.encoding}, ${document.sizeBytes} bytes)`,
+    );
+    return {
+      canceled: false,
+      document: {
+        fileName: document.fileName,
+        baseName: document.baseName,
+        extension: document.extension,
+        sizeBytes: document.sizeBytes,
+        encoding: document.encoding,
+        content: document.content,
+        isMarkdown: document.isMarkdown,
+        sizeStatus: document.sizeStatus,
+      },
+    };
+  } catch (error) {
+    if (error instanceof DocumentLoadError) {
+      logMessage('warn', `入力ファイルの読み込みに失敗しました (${error.code}): ${error.message}`);
+      return { canceled: false, error: { message: error.message, code: error.code } };
+    }
+    logMessage('error', `入力ファイル読み込みで予期せぬ例外: ${String(error)}`);
+    return { canceled: false, error: { message: '入力ファイルの読み込み中にエラーが発生しました。', code: 'READ_FAILED' } };
+  }
 });
 
 ipcMain.handle('dialog:promptSaveFile', async (_event, options: { defaultFileName?: string } = {}) => {

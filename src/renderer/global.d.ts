@@ -12,6 +12,7 @@
 import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '@/shared/traceability';
+import type { DocumentLoadErrorCode } from '@/main/documentLoader';
 
 export {};
 
@@ -37,6 +38,28 @@ declare global {
       };
       dialogs: {
         promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
+      };
+      document: {
+        pickSource: () => Promise<
+          | { canceled: true }
+          | {
+              canceled: false;
+              document: {
+                fileName: string;
+                baseName: string;
+                extension: string;
+                sizeBytes: number;
+                encoding: string;
+                content: string;
+                isMarkdown: boolean;
+                sizeStatus: 'ok' | 'warn';
+              };
+            }
+          | {
+              canceled: false;
+              error: { message: string; code: DocumentLoadErrorCode | 'READ_FAILED' };
+            }
+        >;
       };
     };
   }

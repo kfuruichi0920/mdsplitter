@@ -64,6 +64,7 @@ describe('App', () => {
   let listCardFilesMock: jest.Mock;
   let listOutputFilesMock: jest.Mock;
   let promptSaveFileMock: jest.Mock;
+  let pickSourceMock: jest.Mock;
 
   /**
    * @brief 各テスト前の初期化処理。
@@ -85,6 +86,7 @@ describe('App', () => {
     listCardFilesMock = jest.fn().mockResolvedValue(['test_cards.json']);
     listOutputFilesMock = jest.fn().mockResolvedValue(['SampleCards.json']);
     promptSaveFileMock = jest.fn().mockResolvedValue({ canceled: false, fileName: 'mock_cards.json' });
+    pickSourceMock = jest.fn().mockResolvedValue({ canceled: true });
     (window as any).app = {
       ping: jest.fn().mockResolvedValue({ ok: true, timestamp: Date.now() }),
       settings: {
@@ -105,6 +107,9 @@ describe('App', () => {
       },
       dialogs: {
         promptSaveFile: promptSaveFileMock,
+      },
+      document: {
+        pickSource: pickSourceMock,
       },
     };
 
@@ -134,6 +139,7 @@ describe('App', () => {
     listCardFilesMock?.mockReset?.();
     listOutputFilesMock?.mockReset?.();
     promptSaveFileMock?.mockReset?.();
+    pickSourceMock?.mockReset?.();
   });
 
   /**

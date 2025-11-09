@@ -1,6 +1,6 @@
 # mdsplitter 詳細設計
 
-最終更新日: 2025-11-02  
+最終更新日: 2025-11-09  
 対象リポジトリ: `mdsplitter_copy_codex`
 
 ## 1. システム概要
@@ -46,6 +46,7 @@
 | --- | --- | --- | --- |
 | `src/main/main.ts` | BrowserWindow 生成、設定/ワークスペース初期化、IPC ハンドラ登録。 | WSL2 では Electron 自体が GUI 動作不可、GUI ホストで確認する。 | ⚠️ |
 | `src/main/preload.ts` | `window.app` API を公開する contextBridge。 | 設定読み書き・ログ出力・ping を公開。 | ⚠️ |
+| `src/main/documentLoader.ts` | OpenDialog から選択した `.txt`/`.md` を読み込み、ファイルサイズ判定・文字コード自動検出 (UTF-8/UTF-16/CP932)・改行正規化を実施。 | `DocumentLoadError` (FILE_TOO_LARGE/UNSUPPORTED_ENCODING/READ_FAILED) と `evaluateFileSizeStatus` を提供。ユニットテスト: `src/main/__tests__/documentLoader.test.ts`。 | ✅ |
 | `src/main/logger.ts` | ログレベル制御とファイルローテーションを担当するロガー。 | `settings.json` の logging セクションを参照し出力。 | ⚠️ |
 | `src/main/workspace.ts` | ワークスペースディレクトリ生成と設定ファイル管理。 | `_input/_out/_logs` 作成とサンプルファイル配置、設定既定値を提供。 | ⚠️ |
 | `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
@@ -54,12 +55,17 @@
 | `src/renderer/store/uiStore.ts` | テーマ設定ストア。ライト/ダークモードのトグルを提供。 | Tailwind ダークモード制御に利用。 | ⚠️ |
 | `src/renderer/store/notificationStore.ts` | 共通通知(トースト)の状態管理。 | レベル別のメッセージ表示と自動消去を担当。 | ⚠️ |
 | `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | コンパクトモードでの余白調整とテーマ切替を保持。 | ⚠️ |
+| `src/renderer/components/ConversionModal.tsx` | 📂 ボタンから起動するカード変換モーダル。入力ファイル情報、サイズ警告同意チェック、固定ルール/LLM ストラテジ選択、変換実行ボタンを提供。 | Zustand 経由で `ConversionModalDisplayState` を受け取りレンダリング。 | ✅ |
 | `src/renderer/styles.css` | Tailwind 基礎スタイルと `@apply` によるコンポーネントスタイル。ライト/ダークテーマに対応。 | 文字サイズ・余白を小さくしたコンパクトデザインを適用。 | ⚠️ |
+| `src/renderer/types/conversion.ts` | 変換モーダル用の状態/入力ファイルサマリ型定義。 | `ConversionModalDisplayState`/`ConversionSourceSummary` を集中管理。 | ✅ |
 | `src/vite-env.d.ts` | Vite クライアント型補完の参照ディレクティブ。 | 実装コードは含まず型補助のみ提供。 | ✅ |
 | `src/components/Hello.tsx` | 挨拶コンポーネント。プロパティ `name` を受け取り、`role="status"` の段落で表示。 | テスト: `src/components/Hello.test.tsx`。日本語挨拶の確認のみ。 | ✅ (サンプル) |
 | `src/utils/sum.ts` | 純粋関数 `sum(a, b)` を提供。 | テスト: `src/utils/sum.test.ts`。 | ✅ (サンプル) |
 | `src/sum.ts` | ルート直下のサンプル `sum` 関数。 | テスト: `src/sum.test.ts` が正整数と負数の正常系を検証。 | ✅ (サンプル) |
-| (未実装) | メインレイアウト/状態管理/ファイル I/O 等の本機能コード | `task/task_all.md` のフェーズ 1 以降で実装予定。 | ⛔ |
+| `src/shared/conversion/types.ts` | 変換パイプライン共通型 (`NormalizedDocument`, `ConversionResult` 等)。 | 固定ルール/LLM 共通のデータ表現を提供。 | ✅ |
+| `src/shared/conversion/ruleEngine.ts` | Markdown/テキストをカード配列へ変換する固定ルールエンジン。見出し/段落/箇条書きのレベル判定と親子リンク、連番ID付与を実装。 | スナップショットテスト: `src/shared/conversion/__tests__/ruleEngine.test.ts`。 | ✅ |
+| `src/shared/conversion/llmAdapter.ts` | LLM 変換アダプタ抽象 + スタブ実装。 | プラグイン可能な `setLlmAdapter`/`getLlmAdapter` を提供し、未接続時は固定ルール結果を `review` ステータスで返す。テスト: `src/shared/conversion/__tests__/llmAdapter.test.ts`。 | ⚠️ |
+| `src/shared/conversion/pipeline.ts` | 変換方式に応じて固定ルールまたは LLM アダプタを実行する統合 API。 | `convertDocument(document, strategy)` で `ConversionResult` を返却。 | ✅ |
 
 #### 2.3.1 コネクタ描画関連コンポーネント（計画）
 | パス | 主な内容 | 備考 | 状況 |
@@ -71,15 +77,20 @@
 | `src/renderer/hooks/useConnectorLayout.ts` | カードコンポーネントから位置情報を登録/更新するフック。 | `CardPanel` 内のカード要素に適用し、アンカー座標を測定。 | ⚠️ |
 | `src/shared/traceability.ts` | コネクタ定義（方向・種類・スタイル）の共通型。 | 後続フェーズでメイン/レンダラ間共有。 | ⚠️ |
 
+#### 2.3.2 入力文書ロード & 変換モジュール
+- `src/main/documentLoader.ts` は IPC `document:pickSource` から利用され、ファイルサイズ閾値 (`input.maxWarnSizeMB`/`maxAbortSizeMB`) の評価、UTF-8/UTF-16/Shift_JIS(CP932) 判定、改行正規化、`DocumentLoadError` 例外を一手に担う。ユニットテスト `src/main/__tests__/documentLoader.test.ts` で BOM や Shift_JIS サンプル、閾値超過エラーを検証。
+- `src/shared/conversion/ruleEngine.ts` は Markdown/テキストから `Card` 配列を生成し、見出しレベルに応じたスタック管理で `parent_id`/`child_ids`/`prev_id`/`next_id` を確定する。スナップショットテスト `src/shared/conversion/__tests__/ruleEngine.test.ts` で仕様書サンプルを固定化。
+- `src/shared/conversion/llmAdapter.ts`/`pipeline.ts` は LLM スタブを含む抽象層で、Electron 起動時に安全なモック応答を返す。`convertDocument` が固定ルールと LLM を戦略切替で実行し、`App.tsx` から共通 API として利用。
+
 ## 3. ユースケース一覧
 全ユースケースは仕様段階であり、現行コードには未実装。ステータスを明示する。
 
 | UC ID | ユースケース | 概要 | 主要アクター | 成功条件 | 実装状況 |
 | --- | --- | --- | --- | --- | --- |
 | UC-01 | ワークスペース初期化 | `_input/`, `_out/`, `_logs/`, `settings.json` を生成し既定設定をロード。 | ユーザ、設定管理モジュール | 必要フォルダ/ファイル生成と UI 反映。 | ⚠️ |
-| UC-02 | 文書取り込み | `.md`/`.txt` の文字コード判定・サイズチェック後にコピー。 | ユーザ、ファイル I/O モジュール | `_input/` 配下に保存し読み込み成功。 | ⛔ |
-| UC-03 | カード変換（固定ルール） | 共通ルールで文書をカード化し JSON へ保存。 | ユーザ、カード変換モジュール | `_out/` にカード JSON 保存、ログ出力。 | ⛔ |
-| UC-04 | カード変換（LLM） | LLM アダプタで分割し監査情報と共に保存。 | ユーザ、LLM アダプタ | JSON 保存、監査ログ出力。 | ⛔ |
+| UC-02 | 文書取り込み | `.md`/`.txt` の文字コード判定・サイズチェック後にコピー。 | ユーザ、ファイル I/O モジュール | `_input/` 配下に保存し読み込み成功。 | ⚠️ (OpenDialog からの読み込みと警告/エラー処理を実装済、コピー処理は未着手) |
+| UC-03 | カード変換（固定ルール） | 共通ルールで文書をカード化し JSON へ保存。 | ユーザ、カード変換モジュール | `_out/` にカード JSON 保存、ログ出力。 | ⚠️ (固定ルールエンジン+タブ展開まで実装、保存出力は未実装) |
+| UC-04 | カード変換（LLM） | LLM アダプタで分割し監査情報と共に保存。 | ユーザ、LLM アダプタ | JSON 保存、監査ログ出力。 | ⚠️ (LLM スタブ/アダプタ抽象のみ実装) |
 | UC-05 | カード編集 | カード CRUD、ステータス操作、Undo/Redo。 | ユーザ、カード編集 UI | ストアとファイル整合、未保存状態表示。 | ⛔ |
 | UC-06 | トレーサビリティ管理 | カード間リンク追加/削除と可視化。 | ユーザ、トレーサ管理モジュール | `trace_*.json` 更新、ビュー反映。 | ⛔ |
 | UC-07 | 検索・フィルタ | 種別/ステータス/テキストで絞り込み。 | ユーザ、検索モジュール | 条件一致カード表示と親展開。 | ⛔ |
@@ -115,6 +126,8 @@ endif
 stop
 @enduml
 ```
+
+実装状況 (2025-11-09): `App.tsx` の `ConversionModal` から `window.app.document.pickSource` を呼び出し、`documentLoader.ts` が文字コード判定とサイズ警告 (10MB 超は確認、200MB 超は中断) を実施。取得した `NormalizedDocument` は `convertDocument(document, strategy)` (`src/shared/conversion/pipeline.ts`) に渡され、固定ルールの場合は `ruleEngine.ts` が階層構造を構築、LLM 選択時は現在スタブの `llmAdapter.ts` が安全な模倣結果を返す。変換完了後は `workspaceStore.createUntitledTab` で新規タブとして開き、警告/エラー/成功を `NotificationStore` とステータスログへ記録する。
 
 ### 4.2 カード編集シーケンス図
 ```plantuml

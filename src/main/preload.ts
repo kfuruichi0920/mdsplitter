@@ -19,6 +19,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
+import type { DocumentLoadErrorCode } from './documentLoader';
 
 
 /**
@@ -66,7 +67,36 @@ type AppAPI = {
   dialogs: {
     promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
   };
+  document: {
+    pickSource: () => Promise<PickDocumentResult>;
+  };
 };
+
+type PickDocumentSuccess = {
+  canceled: false;
+  document: {
+    fileName: string;
+    baseName: string;
+    extension: string;
+    sizeBytes: number;
+    encoding: string;
+    content: string;
+    isMarkdown: boolean;
+    sizeStatus: 'ok' | 'warn';
+  };
+};
+
+type PickDocumentError = {
+  canceled: false;
+  error: {
+    message: string;
+    code: DocumentLoadErrorCode | 'READ_FAILED';
+  };
+};
+
+type PickDocumentCancelled = { canceled: true };
+
+type PickDocumentResult = PickDocumentSuccess | PickDocumentError | PickDocumentCancelled;
 
 
 /**
@@ -97,6 +127,9 @@ const api: AppAPI = {
   },
   dialogs: {
     promptSaveFile: async (options) => ipcRenderer.invoke('dialog:promptSaveFile', options ?? {}),
+  },
+  document: {
+    pickSource: async () => ipcRenderer.invoke('document:pickSource'),
   },
 };
 

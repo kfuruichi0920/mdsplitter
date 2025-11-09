@@ -32,7 +32,7 @@ import type { SplitNode } from './store/splitStore';
 import { useTraceStore } from './store/traceStore';
 import { useTracePreferenceStore } from './store/tracePreferenceStore';
 import { usePanelEngagementStore } from './store/panelEngagementStore';
-import type { AppSettings, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
+import type { AppSettings, ConverterStrategy, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
 import { defaultSettings } from '@/shared/settings';
 import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
@@ -44,9 +44,13 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
+import { ConversionModal } from './components/ConversionModal';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
 import { createSearchMatcher, buildSnippet } from './utils/search';
+import { convertDocument } from '@/shared/conversion/pipeline';
+import type { NormalizedDocument } from '@/shared/conversion/types';
+import type { ConversionModalDisplayState, ConversionSourceSummary } from './types/conversion';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -335,6 +339,34 @@ const buildDefaultExportName = (): string => {
   return `cards_export_${stamp}.json`;
 };
 
+const summarizeContentPreview = (content: string): { preview: string; lineCount: number } => {
+  const lines = content.split('\n');
+  return {
+    preview: lines.slice(0, 40).join('\n'),
+    lineCount: lines.length,
+  };
+};
+
+const formatHumanFileSize = (bytes: number): string => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
+};
+
+const buildConversionState = (strategy: ConverterStrategy): ConversionModalDisplayState => ({
+  isOpen: false,
+  picking: false,
+  converting: false,
+  error: null,
+  source: null,
+  warnAcknowledged: false,
+  selectedStrategy: strategy,
+});
+
 /**
  * @brief React レンダラーメインコンポーネント。
  * @details
@@ -388,9 +420,13 @@ export const App = () => {
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
+  const [conversionState, setConversionState] = useState<ConversionModalDisplayState>(() =>
+    buildConversionState(defaultSettings.converter.strategy),
+  );
   const tabs = useWorkspaceStore((state) => state.tabs);
   const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
+  const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
@@ -432,6 +468,18 @@ export const App = () => {
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
   const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!appSettings) {
+      return;
+    }
+    setConversionState((prev) => {
+      if (prev.isOpen || prev.selectedStrategy === appSettings.converter.strategy) {
+        return prev;
+      }
+      return { ...prev, selectedStrategy: appSettings.converter.strategy } satisfies ConversionModalDisplayState;
+    });
+  }, [appSettings]);
   const [searchScope, setSearchScope] = useState<SearchScope>('current');
   const [searchUseRegex, setSearchUseRegex] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
@@ -1302,6 +1350,183 @@ export const App = () => {
     },
     [activeLeafId, markSaved, notify, openTab, pushLog, sanitizeSnapshotCards, splitRoot, tabs],
   );
+
+  const handleConversionFlowOpen = useCallback(() => {
+    setConversionState((prev) => ({
+      ...prev,
+      isOpen: true,
+      error: null,
+      selectedStrategy: appSettings?.converter.strategy ?? prev.selectedStrategy,
+    }));
+  }, [appSettings]);
+
+  const handleConversionFlowClose = useCallback(() => {
+    setConversionState((prev) => ({
+      ...prev,
+      isOpen: false,
+      picking: false,
+      converting: false,
+      source: null,
+      warnAcknowledged: false,
+      error: null,
+    }));
+  }, []);
+
+  const handleConversionStrategyChange = useCallback((strategy: ConverterStrategy) => {
+    setConversionState((prev) => ({ ...prev, selectedStrategy: strategy }));
+  }, []);
+
+  const handleConversionWarningAck = useCallback((ack: boolean) => {
+    setConversionState((prev) => ({ ...prev, warnAcknowledged: ack }));
+  }, []);
+
+  const handleConversionPickSource = useCallback(async () => {
+    if (!window.app?.document?.pickSource) {
+      notify('error', '入力ファイル取得APIが利用できません。');
+      return;
+    }
+    setConversionState((prev) => ({ ...prev, picking: true, error: null }));
+    try {
+      const result = await window.app.document.pickSource();
+      if (!result || result.canceled) {
+        setConversionState((prev) => ({ ...prev, picking: false }));
+        return;
+      }
+      if ('error' in result) {
+        setConversionState((prev) => ({ ...prev, picking: false, error: result.error.message }));
+        notify('error', result.error.message);
+        pushLog({
+          id: `conversion-pick-error-${Date.now()}`,
+          level: 'ERROR',
+          message: `入力ファイルの読み込みに失敗しました: ${result.error.message}`,
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      const doc = result.document;
+      const { preview, lineCount } = summarizeContentPreview(doc.content);
+      const summary: ConversionSourceSummary = {
+        fileName: doc.fileName,
+        baseName: doc.baseName,
+        extension: doc.extension,
+        sizeBytes: doc.sizeBytes,
+        encoding: doc.encoding,
+        isMarkdown: doc.isMarkdown,
+        sizeStatus: doc.sizeStatus,
+        preview,
+        lineCount,
+        content: doc.content,
+      } satisfies ConversionSourceSummary;
+
+      setConversionState((prev) => ({
+        ...prev,
+        picking: false,
+        source: summary,
+        warnAcknowledged: doc.sizeStatus === 'warn' ? false : true,
+        error: null,
+      }));
+
+      notify('success', `ファイルを読み込みました: ${doc.fileName}`);
+      pushLog({
+        id: `conversion-pick-${Date.now()}`,
+        level: 'INFO',
+        message: `入力ファイルを読み込みました: ${doc.fileName} (${formatHumanFileSize(doc.sizeBytes)})`,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      console.error('[App] failed to pick conversion source', error);
+      setConversionState((prev) => ({ ...prev, picking: false, error: '入力ファイルの取得に失敗しました。' }));
+      notify('error', '入力ファイルの取得に失敗しました。');
+      pushLog({
+        id: `conversion-pick-unexpected-${Date.now()}`,
+        level: 'ERROR',
+        message: '入力ファイルの取得中に予期せぬエラーが発生しました。',
+        timestamp: new Date(),
+      });
+    }
+  }, [notify, pushLog]);
+
+  const handleConversionExecute = useCallback(async () => {
+    const source = conversionState.source;
+    if (!source) {
+      setConversionState((prev) => ({ ...prev, error: '入力ファイルを選択してください。' }));
+      return;
+    }
+    if (source.sizeStatus === 'warn' && !conversionState.warnAcknowledged) {
+      setConversionState((prev) => ({ ...prev, error: '警告に同意すると変換を実行できます。' }));
+      return;
+    }
+    const targetLeafId = activeLeafId ?? (splitRoot.type === 'leaf' ? splitRoot.id : null);
+    if (!targetLeafId) {
+      notify('warning', 'カードを表示するパネルを選択してください。');
+      pushLog({
+        id: `conversion-no-panel-${Date.now()}`,
+        level: 'WARN',
+        message: 'カード変換結果を表示するパネルが見つかりません。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    setConversionState((prev) => ({ ...prev, converting: true, error: null }));
+    const strategy = conversionState.selectedStrategy;
+    const normalized: NormalizedDocument = {
+      fileName: source.fileName,
+      baseName: source.baseName,
+      extension: source.extension,
+      content: source.content,
+      isMarkdown: source.isMarkdown,
+    } satisfies NormalizedDocument;
+
+    pushLog({
+      id: `conversion-start-${Date.now()}`,
+      level: 'INFO',
+      message: `カード変換を開始しました: ${source.fileName} (strategy=${strategy})`,
+      timestamp: new Date(),
+    });
+
+    try {
+      const result = await convertDocument(normalized, strategy, { now: new Date() });
+      const created = createUntitledTab(targetLeafId, {
+        title: `${source.baseName}_${strategy}`,
+        cards: result.cards,
+      });
+      if (!created) {
+        throw new Error('タブの生成に失敗しました');
+      }
+
+      notify('success', `カード変換が完了しました (${result.cards.length}枚)。`);
+      if (result.warnings.length > 0) {
+        notify('warning', result.warnings.join('\n'));
+      }
+      pushLog({
+        id: `conversion-success-${Date.now()}`,
+        level: 'INFO',
+        message: `カード変換成功: ${result.cards.length}枚 (strategy=${strategy}).`,
+        timestamp: new Date(),
+      });
+
+      setConversionState((prev) => ({
+        ...prev,
+        converting: false,
+        isOpen: false,
+        source: null,
+        warnAcknowledged: false,
+        error: null,
+      }));
+    } catch (error) {
+      console.error('[App] card conversion failed', error);
+      setConversionState((prev) => ({ ...prev, converting: false, error: '変換処理に失敗しました。' }));
+      notify('error', '変換処理に失敗しました。');
+      pushLog({
+        id: `conversion-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: `カード変換に失敗しました: ${source.fileName}`,
+        timestamp: new Date(),
+      });
+    }
+  }, [activeLeafId, conversionState, createUntitledTab, notify, pushLog, splitRoot]);
 
   // 起動時の自動ファイル読み込みを削除: ユーザーがエクスプローラから選択した時のみ読み込む
 
@@ -2213,7 +2438,15 @@ export const App = () => {
         onSave={handleSettingsSave}
         onChange={handleSettingsChange}
         onPreviewTheme={previewThemeSettings}
-        onClearRecent={handleClearRecent}
+      onClearRecent={handleClearRecent}
+    />
+      <ConversionModal
+        state={conversionState}
+        onClose={handleConversionFlowClose}
+        onPickSource={handleConversionPickSource}
+        onStrategyChange={handleConversionStrategyChange}
+        onConvert={handleConversionExecute}
+        onAcknowledgeWarning={handleConversionWarningAck}
       />
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">
@@ -2231,6 +2464,7 @@ export const App = () => {
             className="toolbar-button"
             title="ファイルを開く"
             aria-label="ファイルを開く"
+            onClick={handleConversionFlowOpen}
           >
             📂
           </button>
