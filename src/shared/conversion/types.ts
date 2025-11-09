@@ -19,3 +19,8 @@ export interface ConversionResult {
 }
 
 export type ConversionStrategy = ConverterStrategy;
+
+export interface ConversionProgressEvent {
+  phase: 'prepare' | 'convert' | 'complete';
+  percent: number;
+}

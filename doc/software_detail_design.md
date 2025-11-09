@@ -127,7 +127,7 @@ stop
 @enduml
 ```
 
-実装状況 (2025-11-09): `App.tsx` の `ConversionModal` から `window.app.document.pickSource` を呼び出し、`documentLoader.ts` が文字コード判定とサイズ警告 (10MB 超は確認、200MB 超は中断) を実施。取得した `NormalizedDocument` は `convertDocument(document, strategy)` (`src/shared/conversion/pipeline.ts`) に渡され、固定ルールの場合は `ruleEngine.ts` が階層構造を構築、LLM 選択時は現在スタブの `llmAdapter.ts` が安全な模倣結果を返す。変換完了後は `workspaceStore.createUntitledTab` で新規タブとして開き、警告/エラー/成功を `NotificationStore` とステータスログへ記録する。
+実装状況 (2025-11-09): `App.tsx` の `ConversionModal` から `window.app.document.pickSource` を呼び出し、`documentLoader.ts` が文字コード判定とサイズ警告 (10MB 超は確認、200MB 超は中断) を実施。読み込んだ元ファイルは `_input/` へコピーされ、モーダル上に保管名を表示する。取得した `NormalizedDocument` は `convertDocument(document, strategy, { signal, onProgress })` (`src/shared/conversion/pipeline.ts`) に渡され、固定ルールの場合は `ruleEngine.ts` が階層構造を構築、LLM 選択時は現在スタブの `llmAdapter.ts` が安全な模倣結果を返す。進捗イベントはモーダルとステータスバーに反映され、`AbortController` により「変換を中断」ボタンでキャンセル可能。変換成功時は `workspace.saveCardFile` で `_out/` に `${base}_${strategy}_timestamp.json` として即時保存し、`workspaceStore.createUntitledTab` で新規タブを開いた上で `markSaved`/`renameTabFile` を適用する。警告/エラー/成功は `NotificationStore` とステータスログへ記録する。
 
 ### 4.2 カード編集シーケンス図
 ```plantuml

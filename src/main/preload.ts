@@ -83,6 +83,8 @@ type PickDocumentSuccess = {
     content: string;
     isMarkdown: boolean;
     sizeStatus: 'ok' | 'warn';
+    workspaceFileName: string | null;
+    workspacePath: string | null;
   };
 };
 

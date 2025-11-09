@@ -47,14 +47,16 @@ declare global {
               document: {
                 fileName: string;
                 baseName: string;
-                extension: string;
-                sizeBytes: number;
-                encoding: string;
-                content: string;
-                isMarkdown: boolean;
-                sizeStatus: 'ok' | 'warn';
-              };
-            }
+              extension: string;
+              sizeBytes: number;
+              encoding: string;
+              content: string;
+              isMarkdown: boolean;
+              sizeStatus: 'ok' | 'warn';
+              workspaceFileName: string | null;
+              workspacePath: string | null;
+            };
+          }
           | {
               canceled: false;
               error: { message: string; code: DocumentLoadErrorCode | 'READ_FAILED' };

@@ -15,6 +15,7 @@
  * @see preload.ts, renderer/index.html
  */
 import path from 'node:path';
+import { promises as fs } from 'node:fs';
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import type { OpenDialogOptions, SaveDialogOptions } from 'electron';
@@ -36,9 +37,11 @@ import {
   saveWorkspaceSnapshot,
   updateSettings,
 } from './workspace';
+import type { WorkspacePaths } from './workspace';
 import type { TraceFileSaveRequest } from '../shared/traceability';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
 import { DocumentLoadError, loadDocumentFromPath } from './documentLoader';
+import type { LoadedDocument } from './documentLoader';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -239,6 +242,7 @@ ipcMain.handle('document:pickSource', async () => {
   try {
     const settings = await loadSettings();
     const document = await loadDocumentFromPath(result.filePaths[0], settings);
+    const imported = await importSourceDocument(document, paths);
     logMessage(
       document.sizeStatus === 'warn' ? 'warn' : 'info',
       `入力ファイルを読み込みました: ${document.fileName} (${document.encoding}, ${document.sizeBytes} bytes)`,
@@ -254,6 +258,8 @@ ipcMain.handle('document:pickSource', async () => {
         content: document.content,
         isMarkdown: document.isMarkdown,
         sizeStatus: document.sizeStatus,
+        workspaceFileName: imported?.fileName ?? null,
+        workspacePath: imported?.absolutePath ?? null,
       },
     };
   } catch (error) {
@@ -317,3 +323,67 @@ app.on('window-all-closed', () => {
     app.quit(); //!< アプリ終了
   }
 });
+const sanitizeInputFileName = (fileName: string, fallbackExt = '.txt'): string => {
+  const trimmed = fileName?.trim?.() ?? '';
+  const ext = path.extname(trimmed) || fallbackExt;
+  const base = (ext ? trimmed.slice(0, -ext.length) : trimmed) || 'imported_document';
+  const safeBase = base.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeExt = ext.replace(/[^a-zA-Z0-9._-]/g, '').length > 0 ? ext : fallbackExt;
+  return `${safeBase}${safeExt}`;
+};
+
+const fileExists = async (targetPath: string): Promise<boolean> => {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+const ensureUniqueInputFileName = async (dir: string, preferred: string): Promise<string> => {
+  const ext = path.extname(preferred);
+  const base = ext ? preferred.slice(0, -ext.length) : preferred;
+  let attempt = preferred;
+  let counter = 1;
+  while (await fileExists(path.join(dir, attempt))) {
+    attempt = `${base}_${String(counter).padStart(2, '0')}${ext}`;
+    counter += 1;
+  }
+  return attempt;
+};
+
+const isWithinDirectory = (targetPath: string, directory: string): boolean => {
+  const relative = path.relative(directory, targetPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+};
+
+const importSourceDocument = async (
+  doc: LoadedDocument,
+  paths: WorkspacePaths,
+): Promise<{ fileName: string; absolutePath: string } | null> => {
+  const resolvedInputDir = path.resolve(paths.inputDir);
+  const resolvedOriginal = path.resolve(doc.originalPath);
+  if (isWithinDirectory(resolvedOriginal, resolvedInputDir)) {
+    return {
+      fileName: path.basename(resolvedOriginal),
+      absolutePath: resolvedOriginal,
+    };
+  }
+
+  try {
+    const sanitized = sanitizeInputFileName(doc.fileName, doc.extension || '.txt');
+    const uniqueName = await ensureUniqueInputFileName(resolvedInputDir, sanitized);
+    const destination = path.join(resolvedInputDir, uniqueName);
+    await fs.copyFile(resolvedOriginal, destination);
+    logMessage('info', `入力ファイルをワークスペースにコピーしました: ${uniqueName}`);
+    return {
+      fileName: uniqueName,
+      absolutePath: destination,
+    };
+  } catch (error) {
+    console.error('[main] failed to import source document', error);
+    logMessage('warn', '入力ファイルのコピーに失敗しました。元ファイルを直接参照します。');
+    return null;
+  }
+};

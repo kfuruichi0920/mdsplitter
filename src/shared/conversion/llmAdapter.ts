@@ -23,13 +23,41 @@ export interface LlmConversionResponse {
 
 export interface LlmAdapter {
   provider: LlmProvider;
-  convert: (request: LlmConversionRequest) => Promise<LlmConversionResponse>;
+  convert: (request: LlmConversionRequest, signal?: AbortSignal) => Promise<LlmConversionResponse>;
 }
 
 class StubLlmAdapter implements LlmAdapter {
   public provider: LlmProvider = 'none';
 
-  async convert(request: LlmConversionRequest): Promise<LlmConversionResponse> {
+  async convert(request: LlmConversionRequest, signal?: AbortSignal): Promise<LlmConversionResponse> {
+    const ensureNotAborted = () => {
+      if (signal?.aborted) {
+        const reason = signal.reason;
+        if (reason instanceof Error) {
+          throw reason;
+        }
+        const error = new Error('The operation was aborted');
+        error.name = 'AbortError';
+        throw error;
+      }
+    };
+
+    ensureNotAborted();
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, 20);
+      if (signal) {
+        signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timeout);
+            resolve();
+          },
+          { once: true },
+        );
+      }
+    });
+    ensureNotAborted();
+
     const cards = convertWithRuleEngine(request.document, { now: new Date() }).map((card): Card => ({
       ...card,
       status: 'review',

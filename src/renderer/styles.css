@@ -723,6 +723,18 @@
     @apply px-6 text-xs text-rose-500;
   }
 
+  .conversion-modal__progress {
+    @apply px-6 pb-3 text-xs text-slate-600 dark:text-slate-300;
+  }
+
+  .conversion-modal__progress-bar {
+    @apply mb-1 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800;
+  }
+
+  .conversion-modal__progress-bar > div {
+    @apply h-full rounded-full bg-blue-500 transition-all;
+  }
+
   .conversion-modal__footer {
     @apply flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4 dark:border-slate-800;
   }
@@ -733,6 +745,10 @@
 
   .btn-secondary {
     @apply rounded-md border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800;
+  }
+
+  .status-bar__section--progress {
+    @apply flex-1 text-center text-xs text-slate-600 dark:text-slate-300;
   }
 
   .card {

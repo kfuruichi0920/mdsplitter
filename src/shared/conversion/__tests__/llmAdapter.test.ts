@@ -22,4 +22,12 @@ describe('LLM adapter stub', () => {
     expect(response.usage?.promptTokens).toBeGreaterThan(0);
     expect(response.warnings?.[0]).toContain('スタブ');
   });
+
+  it('respects abort signals', async () => {
+    const adapter = getLlmAdapter();
+    const controller = new AbortController();
+    const promise = adapter.convert({ document }, controller.signal);
+    controller.abort();
+    await expect(promise).rejects.toHaveProperty('name', 'AbortError');
+  });
 });

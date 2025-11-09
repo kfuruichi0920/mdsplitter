@@ -9,6 +9,7 @@ interface ConversionModalProps {
   onStrategyChange: (strategy: ConverterStrategy) => void;
   onConvert: () => void;
   onAcknowledgeWarning: (next: boolean) => void;
+  onCancelConversion: () => void;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -28,6 +29,7 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
   onStrategyChange,
   onConvert,
   onAcknowledgeWarning,
+  onCancelConversion,
 }) => {
   if (!state.isOpen) {
     return null;
@@ -48,7 +50,13 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
             <h2 id="conversion-modal-title">カード変換</h2>
             <p className="conversion-modal__subtitle">テキスト/Markdownファイルを変換方式に沿ってカード化します。</p>
           </div>
-          <button type="button" className="conversion-modal__close" onClick={onClose} aria-label="閉じる">
+          <button
+            type="button"
+            className="conversion-modal__close"
+            onClick={onClose}
+            aria-label="閉じる"
+            disabled={state.converting}
+          >
             ×
           </button>
         </header>
@@ -80,6 +88,12 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
                     <dt>行数</dt>
                     <dd>{source.lineCount}</dd>
                   </div>
+                  {source.workspaceFileName && (
+                    <div>
+                      <dt>_input 保存名</dt>
+                      <dd>{source.workspaceFileName}</dd>
+                    </div>
+                  )}
                 </dl>
                 <div className="conversion-modal__preview" aria-label="内容プレビュー">
                   <pre>{source.preview}</pre>
@@ -140,11 +154,23 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
           </section>
         </div>
 
+        {state.converting && (
+          <div className="conversion-modal__progress" role="status" aria-live="polite">
+            <div className="conversion-modal__progress-bar">
+              <div style={{ width: `${state.progressPercent}%` }} />
+            </div>
+            <p>
+              {state.progressMessage}
+              {state.cancelRequested ? '（キャンセル要求中…）' : ''}
+            </p>
+          </div>
+        )}
+
         {state.error && <div className="conversion-modal__error">{state.error}</div>}
 
         <footer className="conversion-modal__footer">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={state.converting}>
-            キャンセル
+          <button type="button" className="btn-secondary" onClick={onCancelConversion}>
+            {state.converting ? (state.cancelRequested ? 'キャンセル処理中…' : '変換を中断') : '閉じる'}
           </button>
           <button type="button" className="btn-primary" onClick={onConvert} disabled={convertDisabled}>
             {state.converting ? '変換中…' : '変換を実行'}
