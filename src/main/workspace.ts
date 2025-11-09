@@ -26,6 +26,7 @@ import {
   TRACEABILITY_FILE_SCHEMA_VERSION,
   isTraceabilityFile,
   isTraceabilityHeader,
+  isTraceabilityRelation,
   type LoadedTraceabilityFile,
   type TraceabilityFile,
   type TraceabilityHeader,
