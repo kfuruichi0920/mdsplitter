@@ -10,8 +10,8 @@
  * @copyright MIT
  */
 
-import { create } from 'zustand';
 import { nanoid } from 'nanoid';
+import { create } from 'zustand';
 
 /**
  * @brief 分割方向種別。

@@ -6,8 +6,11 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import { app } from 'electron';
+
 import { initializeWorkspace, loadTraceFile, saveTraceFile } from '../workspace';
+
 import type { TraceFileSaveRequest } from '../../shared/traceability';
 
 jest.mock('electron', () => ({

@@ -8,6 +8,7 @@
  */
 
 import { applyThemeColors, applySplitterWidth } from '../themeUtils';
+
 import type { ThemeColorSettings } from '@/shared/settings';
 
 describe('themeUtils', () => {

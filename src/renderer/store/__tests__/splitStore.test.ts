@@ -10,6 +10,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
+
 import { useSplitStore, type SplitLeafNode, type SplitContainerNode } from '../splitStore';
 
 describe('splitStore', () => {

@@ -10,12 +10,14 @@
  * @copyright MIT
  */
 import { create } from 'zustand';
+
 import type {
   LoadedTraceabilityFile,
   TraceabilityHeader,
   TraceabilityLink,
   TraceabilityRelation,
 } from '@/shared/traceability';
+
 import { TRACEABILITY_FILE_SCHEMA_VERSION, relationsToLinks } from '@/shared/traceability';
 
 

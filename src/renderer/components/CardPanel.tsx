@@ -12,15 +12,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
 import { shallow } from 'zustand/shallow';
-import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
-import { useWorkspaceStore } from '../store/workspaceStore';
-import { useUiStore } from '../store/uiStore';
+
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
-import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
-import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
+import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
+import { useTraceStore, aggregateCountsForFile, type TraceSeed } from '../store/traceStore';
+import { useUiStore } from '../store/uiStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
+
+import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
+
 import { CARD_KIND_VALUES } from '@/shared/workspace';
 
 /** ステータスラベル表示用マッピング。 */
@@ -595,7 +598,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
       const isCtrlOrCmd = event?.ctrlKey || event?.metaKey;
       const isShift = event?.shiftKey;
-      const selectionMode = (isCtrlOrCmd ? 'ctrl' : isShift ? 'shift' : 'normal') as const;
+      const selectionMode: 'ctrl' | 'shift' | 'normal' = isCtrlOrCmd ? 'ctrl' : isShift ? 'shift' : 'normal';
       const splitStore = useSplitStore.getState();
       panelSelectionTransition(splitStore.activeLeafId ?? null, leafId, selectionMode);
       splitStore.setActiveLeaf(leafId);

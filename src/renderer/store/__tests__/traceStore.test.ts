@@ -1,4 +1,5 @@
 import { act } from '@testing-library/react';
+
 import { useTraceStore, resetTraceStore, toTraceNodeKey } from '../traceStore';
 
 describe('traceStore.saveRelationsForPair', () => {

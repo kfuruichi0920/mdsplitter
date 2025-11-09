@@ -17,10 +17,8 @@
 import path from 'node:path';
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import type { SaveDialogOptions } from 'electron';
 
-import type { LogLevel } from '../shared/settings';
-
+import { initLogger, logMessage, updateLoggerSettings } from './logger';
 import {
   getWorkspacePaths,
   initializeWorkspace,
@@ -36,8 +34,14 @@ import {
   saveWorkspaceSnapshot,
   updateSettings,
 } from './workspace';
+
+import type { LogLevel } from '../shared/settings';
 import type { TraceFileSaveRequest } from '../shared/traceability';
-import { initLogger, logMessage, updateLoggerSettings } from './logger';
+import type { SaveDialogOptions } from 'electron';
+
+
+
+
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 

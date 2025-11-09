@@ -40,6 +40,7 @@ module.exports = {
   ],
   rules: {
     'react/react-in-jsx-scope': 'off',
+    'import/no-unresolved': 'off', // TypeScript handles this
     'import/order': [
       'error',
       {

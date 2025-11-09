@@ -14,8 +14,9 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { formatLogLevel, isLogLevelEnabled, toBytes } from '../shared/logging';
-import type { AppSettings, LogLevel } from '../shared/settings';
+
 import type { WorkspacePaths } from './workspace';
+import type { AppSettings, LogLevel } from '../shared/settings';
 
 const ACTIVE_LOG_NAME = 'app.log';
 
