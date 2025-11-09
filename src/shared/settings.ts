@@ -14,7 +14,7 @@ import type { TraceRelationKind } from './traceability';
 
 export const SETTINGS_VERSION = 1;
 
-export type ThemeModeSetting = 'light' | 'dark' | 'system';
+export type ThemeModeSetting = 'light' | 'dark' | 'system' | 'konjo' | 'asagi' | 'sumire' | 'kurikawa' | 'tsutsuji';
 
 export type EncodingFallback = 'reject' | 'assume-sjis' | 'assume-utf8';
 
@@ -78,6 +78,11 @@ export interface ThemeSettings {
   splitterWidth: number;      ///< 分割境界の幅（px）
   light: ThemeColorSettings;  ///< ライトモード色設定
   dark: ThemeColorSettings;   ///< ダークモード色設定
+  konjo: ThemeColorSettings;  ///< KONJO（紺青）テーマ色設定
+  asagi: ThemeColorSettings;  ///< ASAGI（浅葱）テーマ色設定
+  sumire: ThemeColorSettings; ///< SUMIRE（菫）テーマ色設定
+  kurikawa: ThemeColorSettings; ///< KURIKAWA（栗皮）テーマ色設定
+  tsutsuji: ThemeColorSettings; ///< TSUTSUJI（躑躅）テーマ色設定
 }
 
 export interface AppSettings {
@@ -137,6 +142,111 @@ export const defaultSettings: AppSettings = {
         satisfy: '#818cf8',
         relate: '#2dd4bf',
         specialize: '#c084fc',
+      },
+    },
+    konjo: {
+      background: '#D7DEFB',
+      foreground: '#073165',
+      border: '#BFCEFC',
+      primary: '#428CFE',
+      secondary: '#8FAEFE',
+      cardBackground: '#BFCEFC',
+      cardBorder: '#8FAEFE',
+      connectorActive: '#0A69CF',
+      connectorInactive: '#8FAEFE',
+      connectorHighlight: '#428CFE',
+      relationColors: {
+        trace: '#428CFE',
+        refines: '#40A683',
+        tests: '#AC9301',
+        duplicates: '#F84258',
+        satisfy: '#0A69CF',
+        relate: '#6ED0AE',
+        specialize: '#8FAEFE',
+      },
+    },
+    asagi: {
+      background: '#C3EFF4',
+      foreground: '#02373C',
+      border: '#9CE6EC',
+      primary: '#00A3AF',
+      secondary: '#64CCD3',
+      cardBackground: '#9CE6EC',
+      cardBorder: '#64CCD3',
+      connectorActive: '#00757E',
+      connectorInactive: '#64CCD3',
+      connectorHighlight: '#00A3AF',
+      relationColors: {
+        trace: '#00A3AF',
+        refines: '#40A683',
+        tests: '#AC9301',
+        duplicates: '#F84258',
+        satisfy: '#00757E',
+        relate: '#6ED0AE',
+        specialize: '#64CCD3',
+      },
+    },
+    sumire: {
+      background: '#EADAEE',
+      foreground: '#462352',
+      border: '#DCBDE4',
+      primary: '#AA61C2',
+      secondary: '#CC9FD9',
+      cardBackground: '#DCBDE4',
+      cardBorder: '#CC9FD9',
+      connectorActive: '#733B85',
+      connectorInactive: '#CC9FD9',
+      connectorHighlight: '#AA61C2',
+      relationColors: {
+        trace: '#AA61C2',
+        refines: '#40A683',
+        tests: '#AC9301',
+        duplicates: '#F84258',
+        satisfy: '#733B85',
+        relate: '#6ED0AE',
+        specialize: '#CC9FD9',
+      },
+    },
+    kurikawa: {
+      background: '#F7D8C9',
+      foreground: '#50230D',
+      border: '#F7C6B0',
+      primary: '#E26324',
+      secondary: '#F49567',
+      cardBackground: '#F7C6B0',
+      cardBorder: '#F49567',
+      connectorActive: '#AB4919',
+      connectorInactive: '#F49567',
+      connectorHighlight: '#E26324',
+      relationColors: {
+        trace: '#E26324',
+        refines: '#40A683',
+        tests: '#AC9301',
+        duplicates: '#F84258',
+        satisfy: '#AB4919',
+        relate: '#6ED0AE',
+        specialize: '#F49567',
+      },
+    },
+    tsutsuji: {
+      background: '#F6D7E0',
+      foreground: '#591734',
+      border: '#F5C1D1',
+      primary: '#EB4F8E',
+      secondary: '#F190B4',
+      cardBackground: '#F5C1D1',
+      cardBorder: '#F190B4',
+      connectorActive: '#932653',
+      connectorInactive: '#F190B4',
+      connectorHighlight: '#EB4F8E',
+      relationColors: {
+        trace: '#EB4F8E',
+        refines: '#40A683',
+        tests: '#AC9301',
+        duplicates: '#F84258',
+        satisfy: '#932653',
+        relate: '#6ED0AE',
+        specialize: '#F190B4',
       },
     }
   },

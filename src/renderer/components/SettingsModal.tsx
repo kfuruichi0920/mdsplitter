@@ -125,6 +125,11 @@ export const SettingsModal = ({
               { value: 'light', label: 'ライト' },
               { value: 'dark', label: 'ダーク' },
               { value: 'system', label: 'システム' },
+              { value: 'konjo', label: 'KONJO（紺青）' },
+              { value: 'asagi', label: 'ASAGI（浅葱）' },
+              { value: 'sumire', label: 'SUMIRE（菫）' },
+              { value: 'kurikawa', label: 'KURIKAWA（栗皮）' },
+              { value: 'tsutsuji', label: 'TSUTSUJI（躑躅）' },
             ].map((option) => (
               <label key={option.value} className="settings-radio">
                 <input

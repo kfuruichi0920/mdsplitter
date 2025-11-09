@@ -110,6 +110,11 @@ describe('workspace settings persistence', () => {
           connectorInactive: '#999999',
         },
         dark: initialSettings.theme.dark, // 既定値を保持
+        konjo: initialSettings.theme.konjo, // 既定値を保持
+        asagi: initialSettings.theme.asagi, // 既定値を保持
+        sumire: initialSettings.theme.sumire, // 既定値を保持
+        kurikawa: initialSettings.theme.kurikawa, // 既定値を保持
+        tsutsuji: initialSettings.theme.tsutsuji, // 既定値を保持
       },
     };
     await updateSettings(customPatch);

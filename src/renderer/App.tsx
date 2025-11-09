@@ -93,7 +93,8 @@ const resolveThemeMode = (mode: ThemeModeSetting): ThemeMode => {
   if (mode === 'system') {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
-  return mode === 'dark' ? 'dark' : 'light';
+  // 新しいSerendieテーマを含むすべてのテーマモードをそのまま返す
+  return mode as ThemeMode;
 };
 
 /** ログエントリ構造体。 */
@@ -181,7 +182,8 @@ const applyThemeFromSettings = (
 ) => {
   const resolved = resolveThemeMode(requestedMode);
   setThemeStore(resolved);
-  const colors = resolved === 'dark' ? themeConfig.dark : themeConfig.light;
+  // 解決されたテーマモードに対応する色設定を取得
+  const colors = themeConfig[resolved];
   applyThemeColors(colors);
   applySplitterWidth(themeConfig.splitterWidth);
   return resolved;

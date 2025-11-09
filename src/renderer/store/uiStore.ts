@@ -16,7 +16,7 @@ import { create } from 'zustand';
 /**
  * @brief テーマモード種別。
  */
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'konjo' | 'asagi' | 'sumire' | 'kurikawa' | 'tsutsuji';
 
 /**
  * @brief カード表示モード種別。
