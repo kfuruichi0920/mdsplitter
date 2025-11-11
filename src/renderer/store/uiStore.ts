@@ -24,16 +24,25 @@ export type ThemeMode = 'light' | 'dark';
 export type CardDisplayMode = 'detailed' | 'compact';
 
 /**
+ * @brief Serendieカラーテーマ種別。
+ * @details
+ * konjo: 紺青、asagi: 浅葱、sumire: 菫、tsutsuji: 躑躅、kurikawa: 栗皮
+ */
+export type SerendieColorTheme = 'konjo' | 'asagi' | 'sumire' | 'tsutsuji' | 'kurikawa';
+
+/**
  * @brief UI設定ストアの状態。
  * @details
  * テーマ・切替・明示設定・リセット操作を管理。
  */
 export interface UiStoreState {
   theme: ThemeMode; ///< 現在のテーマモード。
+  colorTheme: SerendieColorTheme; ///< Serendieカラーテーマ。
   cardDisplayMode: CardDisplayMode; ///< カード表示モード（詳細/コンパクト）。
   markdownPreviewGlobalEnabled: boolean; ///< Markdownプレビューを一括で許可するか。
   toggleTheme: () => void; ///< テーマをトグルする。
   setTheme: (mode: ThemeMode) => void; ///< テーマを明示的に設定する。
+  setColorTheme: (theme: SerendieColorTheme) => void; ///< カラーテーマを設定する。
   toggleCardDisplayMode: () => void; ///< カード表示モードをトグルする。
   setCardDisplayMode: (mode: CardDisplayMode) => void; ///< カード表示モードを明示的に設定する。
   toggleMarkdownPreviewGlobal: () => void; ///< Markdownプレビューを一括で切り替える。
@@ -45,6 +54,11 @@ export interface UiStoreState {
  * @brief デフォルトテーマモード。
  */
 const DEFAULT_THEME: ThemeMode = 'dark';
+
+/**
+ * @brief デフォルトカラーテーマ。
+ */
+const DEFAULT_COLOR_THEME: SerendieColorTheme = 'konjo';
 
 /**
  * @brief デフォルトカード表示モード。
@@ -59,6 +73,7 @@ const DEFAULT_MARKDOWN_PREVIEW_GLOBAL = true;
  */
 export const useUiStore = create<UiStoreState>()((set) => ({
   theme: DEFAULT_THEME,
+  colorTheme: DEFAULT_COLOR_THEME,
   cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE,
   markdownPreviewGlobalEnabled: DEFAULT_MARKDOWN_PREVIEW_GLOBAL,
   /**
@@ -75,6 +90,13 @@ export const useUiStore = create<UiStoreState>()((set) => ({
    */
   setTheme: (mode: ThemeMode) => {
     set({ theme: mode });
+  },
+  /**
+   * @brief Serendieカラーテーマを設定。
+   * @param theme 新しいカラーテーマ。
+   */
+  setColorTheme: (theme: SerendieColorTheme) => {
+    set({ colorTheme: theme });
   },
   /**
    * @brief カード表示モードをトグルする。
@@ -98,7 +120,12 @@ export const useUiStore = create<UiStoreState>()((set) => ({
    * @brief テーマ状態を初期値にリセット。
    */
   reset: () => {
-    set({ theme: DEFAULT_THEME, cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE, markdownPreviewGlobalEnabled: DEFAULT_MARKDOWN_PREVIEW_GLOBAL });
+    set({
+      theme: DEFAULT_THEME,
+      colorTheme: DEFAULT_COLOR_THEME,
+      cardDisplayMode: DEFAULT_CARD_DISPLAY_MODE,
+      markdownPreviewGlobalEnabled: DEFAULT_MARKDOWN_PREVIEW_GLOBAL
+    });
   },
 }));
 

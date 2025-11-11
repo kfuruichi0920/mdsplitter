@@ -97,6 +97,7 @@ describe('workspace settings persistence', () => {
     const customPatch: AppSettingsPatch = {
       theme: {
         mode: 'light',
+        colorTheme: 'asagi',
         splitterWidth: 8,
         light: {
           background: '#fafafa',

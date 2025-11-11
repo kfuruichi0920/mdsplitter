@@ -71,10 +71,16 @@ export interface ThemeColorSettings {
 }
 
 /**
+ * @brief Serendieカラーテーマ種別。
+ */
+export type SerendieColorTheme = 'konjo' | 'asagi' | 'sumire' | 'tsutsuji' | 'kurikawa';
+
+/**
  * @brief テーマ設定（モード + 外観設定）。
  */
 export interface ThemeSettings {
   mode: ThemeModeSetting;
+  colorTheme: SerendieColorTheme; ///< Serendieカラーテーマ
   splitterWidth: number;      ///< 分割境界の幅（px）
   light: ThemeColorSettings;  ///< ライトモード色設定
   dark: ThemeColorSettings;   ///< ダークモード色設定
@@ -96,6 +102,7 @@ export const defaultSettings: AppSettings = {
   version: SETTINGS_VERSION,
   theme: {
     mode: 'dark',
+    colorTheme: 'konjo',
     splitterWidth: 4,
     light: {
       background: '#ffffff',
