@@ -394,3 +394,206 @@ const {
 ## 参考資料
 - `doc/performance_improvement_plan.md` - パフォーマンス改善計画書
 - `AGENT.md` - 作業プロトコル
+
+---
+
+## タブ毎のコンパクトモード切り替え機能の実装
+
+### 作業概要
+コンパクトモードと通常モードの切り替えを、グローバルな状態から各タブ（ファイル）ごとに独立した状態に変更。
+各タブで個別にコンパクト/詳細表示を切り替えられるようになった。
+
+### 実施内容
+
+#### 1. PanelTabState インターフェースに displayMode フィールドを追加
+
+**目的**: 各タブごとにカード表示モードを保持できるようにする
+
+**実施内容**:
+- workspaceStore.ts の PanelTabState インターフェースに displayMode フィールドを追加
+- CardDisplayMode 型をuiStoreからインポート
+
+**変更ファイル**:
+- `src/renderer/store/workspaceStore.ts:25` - CardDisplayMode型をインポート
+- `src/renderer/store/workspaceStore.ts:92` - displayModeフィールドを追加
+
+**実装の詳細**:
+```typescript
+export interface PanelTabState {
+  // ... 既存のフィールド
+  displayMode: CardDisplayMode; ///< カード表示モード（詳細/コンパクト）
+}
+```
+
+**根拠**:
+- 各タブが独自の表示設定を持つことで、ユーザーが複数のファイルを開いた際に、それぞれ最適な表示モードを選択できる
+
+---
+
+#### 2. workspaceStore の各関数を更新して displayMode を初期化・維持
+
+**目的**: タブの作成・再読み込み時に displayMode を適切に初期化・維持する
+
+**実施内容**:
+- openTab 関数: 既存タブの再アクティブ化時に displayMode を維持、新規タブは 'detailed' で初期化
+- createUntitledTab 関数: 新規タブを 'detailed' で初期化
+- hydrateTab 関数: タブ再読み込み時に displayMode を維持
+
+**変更ファイル**:
+- `src/renderer/store/workspaceStore.ts:235` - openTab での displayMode 維持
+- `src/renderer/store/workspaceStore.ts:269` - openTab での displayMode 初期化
+- `src/renderer/store/workspaceStore.ts:315` - createUntitledTab での displayMode 初期化
+- `src/renderer/store/workspaceStore.ts:960` - hydrateTab での displayMode 維持
+
+**実装の詳細**:
+```typescript
+// 既存タブの再アクティブ化
+displayMode: prevTab.displayMode ?? 'detailed', //! displayModeを維持
+
+// 新規タブの作成
+displayMode: 'detailed', //! デフォルトは詳細表示
+```
+
+**根拠**:
+- タブを切り替えても各タブの表示モードが維持される
+- 新規タブはデフォルトで詳細表示から開始する
+
+---
+
+#### 3. workspaceStore に toggleTabDisplayMode 関数を追加
+
+**目的**: タブごとに表示モードを切り替える機能を提供
+
+**実施内容**:
+- WorkspaceStore インターフェースに toggleTabDisplayMode メソッドを追加
+- 実装を追加し、指定されたタブの displayMode をトグル
+
+**変更ファイル**:
+- `src/renderer/store/workspaceStore.ts:162` - インターフェースにメソッドを追加
+- `src/renderer/store/workspaceStore.ts:1505-1522` - toggleTabDisplayMode の実装
+
+**実装の詳細**:
+```typescript
+toggleTabDisplayMode: (tabId) => {
+  set((state) => {
+    const tab = state.tabs[tabId];
+    if (!tab) {
+      return state;
+    }
+
+    const nextDisplayMode: CardDisplayMode = tab.displayMode === 'detailed' ? 'compact' : 'detailed';
+
+    return {
+      ...state,
+      tabs: {
+        ...state.tabs,
+        [tabId]: { ...tab, displayMode: nextDisplayMode },
+      },
+    };
+  });
+},
+```
+
+**根拠**:
+- タブごとに独立して表示モードを切り替える必要がある
+- グローバルな toggleCardDisplayMode の代わりにタブ単位での切り替えを実現
+
+---
+
+#### 4. CardPanel.tsx でタブごとの displayMode を使用
+
+**目的**: グローバルな displayMode の代わりにタブごとの displayMode を使用する
+
+**実施内容**:
+- uiStore からの cardDisplayMode と toggleCardDisplayMode を削除
+- workspaceStore から toggleTabDisplayMode をインポート
+- activeTab から displayMode を取得
+- handleToggleDisplayMode を更新して toggleTabDisplayMode を呼び出す
+
+**変更ファイル**:
+- `src/renderer/components/CardPanel.tsx:156` - toggleTabDisplayMode をインポート
+- `src/renderer/components/CardPanel.tsx:171` - activeTab から displayMode を取得
+- `src/renderer/components/CardPanel.tsx:681-685` - handleToggleDisplayMode を更新
+
+**実装の詳細**:
+```typescript
+// displayMode の取得
+const cardDisplayMode = activeTab?.displayMode ?? 'detailed';
+
+// トグル関数の更新
+const handleToggleDisplayMode = useCallback(() => {
+  if (!activeTabId) return;
+  toggleTabDisplayMode(activeTabId);
+  const nextMode = cardDisplayMode === 'detailed' ? 'コンパクト' : '詳細';
+  onLog?.('INFO', `カード表示モードを「${nextMode}」に切り替えました。`);
+}, [activeTabId, cardDisplayMode, onLog, toggleTabDisplayMode]);
+```
+
+**根拠**:
+- アクティブなタブの displayMode を使用することで、タブごとの表示状態が反映される
+- タブを切り替えた際に、各タブの表示モードが正しく復元される
+
+---
+
+### 決定事項
+
+#### 1. uiStore の cardDisplayMode は維持
+- 理由: 既存の機能とテストを維持し、将来的に新規タブのデフォルト設定として利用可能
+- CardPanel.tsx では使用しないが、uiStore の API は変更しない
+
+#### 2. デフォルトの displayMode は 'detailed'
+- 理由: 新規タブはデフォルトで詳細表示から開始するのが直感的
+- ユーザーは必要に応じてコンパクト表示に切り替えられる
+
+#### 3. displayMode は PanelTabState で管理
+- 理由: タブの状態と一緒に管理することで、タブのライフサイクルと整合性が保たれる
+- タブを閉じると displayMode も一緒に破棄される
+
+---
+
+### 期待される効果
+
+#### ユーザビリティの向上
+- 各ファイルに最適な表示モードを設定可能
+- 例: 設計書は詳細表示、要件一覧はコンパクト表示など、用途に応じた表示が可能
+- タブ切り替え時に表示モードが維持される
+
+#### コードの一貫性
+- タブ固有の状態はすべて workspaceStore で管理
+- グローバルな UI 設定とタブ固有の設定が明確に分離される
+
+---
+
+### テスト結果
+
+#### コード検証
+- TypeScript の型チェック: 既存の test ファイルのエラーは pre-existing（今回の変更とは無関係）
+- 変更したファイルの構文: 問題なし
+- 既存テストとの互換性: uiStore のテストは変更不要（機能は維持）
+
+#### 動作確認
+- 論理的な実装の検証: 完了
+- タブごとの displayMode が独立して管理される構造を確認
+- E2E テストは既存のものがスキップされているため、手動での動作確認を推奨
+
+---
+
+### 次のステップ
+
+#### コミット
+- 変更内容をコミット
+- ブランチ: `claude/toggle-compact-mode-011CV4GEShrxmKT17P3PV3v5`
+- コミットメッセージ: feat(ui): タブごとのコンパクトモード切り替えを実装
+
+#### 動作確認（推奨）
+- アプリを起動して複数のファイルを開く
+- 各タブでコンパクト/詳細表示を切り替え
+- タブを切り替えた際に表示モードが維持されることを確認
+
+---
+
+### 参考資料
+- `src/renderer/store/workspaceStore.ts` - タブ管理ストア
+- `src/renderer/store/uiStore.ts` - UI設定ストア
+- `src/renderer/components/CardPanel.tsx` - カードパネルコンポーネント
+- `tests/e2e/card-display-mode.spec.ts` - カード表示モードのE2Eテスト（スキップ中）
