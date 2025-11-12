@@ -429,7 +429,7 @@ const {
 - 切り替え時に通知とログを記録
 
 **変更ファイル**:
-- `src/renderer/App.tsx:2153-2170` - handleSidebarToggle関数を実装
+- `src/renderer/App.tsx:2158-2175` - handleSidebarToggle関数を実装
 
 **実装の詳細**:
 ```typescript
