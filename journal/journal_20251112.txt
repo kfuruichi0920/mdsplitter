@@ -397,6 +397,216 @@ const {
 
 ---
 
+## サイドバー表示/非表示トグル機能の実装
+
+### 作業概要
+サイドバーの表示/非表示を操作できるトグル機能を実装。
+ツールバーにトグルボタンを追加し、キーボードショートカット（Ctrl+B）も実装。
+
+### 実施内容
+
+#### 1. サイドバー表示/非表示ステートの追加
+
+**目的**: サイドバーの表示状態を管理
+
+**実施内容**:
+- App.tsxにsidebarVisibleステートを追加（デフォルト: true）
+
+**変更ファイル**:
+- `src/renderer/App.tsx:419` - sidebarVisible stateを追加
+
+**根拠**:
+- ユーザーからの要求: サイドバーの表示/非表示を操作できるようにする
+
+---
+
+#### 2. サイドバートグル関数の実装
+
+**目的**: サイドバーの表示/非表示を切り替える
+
+**実施内容**:
+- handleSidebarToggle関数を実装
+- 切り替え時に通知とログを記録
+
+**変更ファイル**:
+- `src/renderer/App.tsx:2158-2175` - handleSidebarToggle関数を実装
+
+**実装の詳細**:
+```typescript
+const handleSidebarToggle = useCallback(() => {
+  setSidebarVisible((prev) => {
+    const next = !prev;
+    const now = new Date();
+    const message = next ? 'サイドバーを表示しました。' : 'サイドバーを非表示にしました。';
+    notify('info', message);
+    pushLog({
+      id: `sidebar-toggle-${now.valueOf()}`,
+      level: 'INFO',
+      message,
+      timestamp: now,
+    });
+    return next;
+  });
+}, [notify, pushLog]);
+```
+
+---
+
+#### 3. レイアウトスタイルの調整
+
+**目的**: サイドバーが非表示の時にレイアウトを調整
+
+**実施内容**:
+- contentStyleを修正し、サイドバーが非表示の時はカラム定義から除外
+
+**変更ファイル**:
+- `src/renderer/App.tsx:2005-2013` - contentStyleの条件分岐を追加
+
+**実装の詳細**:
+```typescript
+const contentStyle = useMemo<CSSProperties>(() => {
+  if (!sidebarVisible) {
+    return {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    } satisfies CSSProperties;
+  }
+  return {
+    gridTemplateColumns: `${sidebarWidth}px ${V_SEPARATOR}px minmax(0, 1fr)`,
+  } satisfies CSSProperties;
+}, [sidebarWidth, sidebarVisible]);
+```
+
+---
+
+#### 4. ツールバーにトグルボタンを追加
+
+**目的**: ユーザーがクリックでサイドバーを切り替えられるようにする
+
+**実施内容**:
+- ツールバーの最初のグループにサイドバートグルボタンを追加
+- 表示状態に応じてアクティブクラスを適用
+
+**変更ファイル**:
+- `src/renderer/App.tsx:2672-2680` - サイドバートグルボタンを追加
+
+**実装の詳細**:
+```typescript
+<button
+  type="button"
+  className={`toolbar-button${sidebarVisible ? ' toolbar-button--active' : ''}`}
+  title="サイドバー表示/非表示 (Ctrl+B)"
+  aria-label="サイドバー表示/非表示"
+  onClick={handleSidebarToggle}
+>
+  🔖
+</button>
+```
+
+---
+
+#### 5. サイドバーとセパレータの条件付きレンダリング
+
+**目的**: サイドバーが非表示の時はDOMから除外
+
+**実施内容**:
+- サイドバー要素を条件付きでレンダリング
+- セパレータも同様に条件付きでレンダリング
+
+**変更ファイル**:
+- `src/renderer/App.tsx:2901` - サイドバーの開始タグを条件付きに
+- `src/renderer/App.tsx:3088` - サイドバーの終了タグを条件付きに
+- `src/renderer/App.tsx:3091-3103` - セパレータを条件付きでレンダリング
+
+**実装の詳細**:
+```typescript
+{sidebarVisible && (
+  <aside className="sidebar" aria-label="エクスプローラと検索">
+    {/* サイドバーの内容 */}
+  </aside>
+)}
+
+{sidebarVisible && (
+  <div
+    className="workspace__separator workspace__separator--vertical"
+    role="separator"
+    {/* セパレータのプロパティ */}
+  />
+)}
+```
+
+---
+
+#### 6. キーボードショートカット（Ctrl+B）の追加
+
+**目的**: キーボードで素早くサイドバーを切り替えられるようにする
+
+**実施内容**:
+- keydownイベントハンドラーにCtrl+Bの処理を追加
+- handleSidebarToggleを依存配列に追加
+
+**変更ファイル**:
+- `src/renderer/App.tsx:2528-2532` - Ctrl+Bのハンドラーを追加
+- `src/renderer/App.tsx:2621` - 依存配列にhandleSidebarToggleを追加
+
+**実装の詳細**:
+```typescript
+if (key === 'b' && !event.shiftKey) {
+  event.preventDefault();
+  handleSidebarToggle();
+  return;
+}
+```
+
+---
+
+### 決定事項
+
+#### 1. トグルボタンの配置
+- ツールバーの最初のグループの先頭に配置
+- 理由: サイドバーはナビゲーション機能なので、ファイル操作の前に配置するのが適切
+
+#### 2. アイコン選択
+- 🔖（ブックマーク）を採用
+- 理由: サイドバーのナビゲーション機能を象徴するアイコン
+
+#### 3. キーボードショートカット
+- Ctrl+Bを採用
+- 理由: VS Codeなど多くのエディタで標準的に使用されるショートカット
+
+#### 4. 表示/非表示の動作
+- サイドバーとセパレータをDOMから完全に除外
+- 理由: パフォーマンス向上とレイアウトの簡素化
+
+---
+
+### 期待される効果
+
+#### ユーザビリティ
+- サイドバーが不要な時は非表示にしてワークスペースを広く使える
+- キーボードショートカットで素早く切り替え可能
+- 表示状態が視覚的に分かりやすい（アクティブクラス）
+
+#### パフォーマンス
+- サイドバーが非表示の時はDOMから除外されるため、レンダリングコストを削減
+
+---
+
+### 次のステップ
+
+#### テスト
+- サイドバーの表示/非表示が正しく動作することを確認
+- キーボードショートカット（Ctrl+B）の動作を確認
+- レイアウトが正しく調整されることを確認
+
+#### コミット
+- 変更内容をコミットメッセージに記録
+- ブランチ: `claude/sidebar-toggle-visibility-011CV4HFGFTXSCSVXRwcZPfY`
+
+---
+
+## 参考資料
+- `AGENT.md` - 作業プロトコル
+- `spec/commit_message.md` - コミットメッセージガイドライン
 ## タブ毎のコンパクトモード切り替え機能の実装
 
 ### 作業概要

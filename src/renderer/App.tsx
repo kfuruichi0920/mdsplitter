@@ -416,6 +416,7 @@ export const App = () => {
   const traceFilterPopoverRef = useRef<HTMLDivElement | null>(null);
   const conversionAbortControllerRef = useRef<AbortController | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
+  const [sidebarVisible, setSidebarVisible] = useState<boolean>(true); ///< サイドバー表示/非表示。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
   const [ipcStatus, setIpcStatus] = useState<string>('起動準備中...'); ///< IPC 状態メッセージ。
@@ -2001,10 +2002,15 @@ export const App = () => {
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {
+    if (!sidebarVisible) {
+      return {
+        gridTemplateColumns: 'minmax(0, 1fr)',
+      } satisfies CSSProperties;
+    }
     return {
       gridTemplateColumns: `${sidebarWidth}px ${V_SEPARATOR}px minmax(0, 1fr)`,
     } satisfies CSSProperties;
-  }, [sidebarWidth]);
+  }, [sidebarWidth, sidebarVisible]);
 
   /** ワークスペースの行レイアウトスタイル。 */
   const workspaceStyle = useMemo<CSSProperties>(() => {
@@ -2148,6 +2154,25 @@ export const App = () => {
     }
     openSearchPanel();
   }, [isSearchOpen, notify, openSearchPanel, pushLog]);
+
+  /**
+   * @brief サイドバー表示/非表示トグル。
+   */
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarVisible((prev) => {
+      const next = !prev;
+      const now = new Date();
+      const message = next ? 'サイドバーを表示しました。' : 'サイドバーを非表示にしました。';
+      notify('info', message);
+      pushLog({
+        id: `sidebar-toggle-${now.valueOf()}`,
+        level: 'INFO',
+        message,
+        timestamp: now,
+      });
+      return next;
+    });
+  }, [notify, pushLog]);
 
   const addCardViaShortcut = useCallback(
     (position: InsertPosition) => {
@@ -2500,6 +2525,12 @@ export const App = () => {
             return;
           }
 
+          if (key === 'b' && !event.shiftKey) {
+            event.preventDefault();
+            handleSidebarToggle();
+            return;
+          }
+
           if (event.key === '\\' && !event.shiftKey) {
             event.preventDefault();
             handleSplit('vertical');
@@ -2587,6 +2618,7 @@ export const App = () => {
     handleSave,
     handleSaveAs,
     handleSettingsOpen,
+    handleSidebarToggle,
     handleSplit,
     hasClipboard,
     isSettingsOpen,
@@ -2637,6 +2669,15 @@ export const App = () => {
 
       <section className="top-toolbar" aria-label="グローバルツールバー">
         <div className="toolbar-group toolbar-group--trace">
+          <button
+            type="button"
+            className={`toolbar-button${sidebarVisible ? ' toolbar-button--active' : ''}`}
+            title="サイドバー表示/非表示 (Ctrl+B)"
+            aria-label="サイドバー表示/非表示"
+            onClick={handleSidebarToggle}
+          >
+            🔖
+          </button>
           <button
             type="button"
             className="toolbar-button"
@@ -2857,7 +2898,8 @@ export const App = () => {
         aria-label="コンテンツワークスペース"
       >
         <div className="workspace__content" ref={contentRef} style={contentStyle}>
-          <aside className="sidebar" aria-label="エクスプローラと検索">
+          {sidebarVisible && (
+            <aside className="sidebar" aria-label="エクスプローラと検索">
             <div className="sidebar__section">
               <button
                 type="button"
@@ -3044,18 +3086,21 @@ export const App = () => {
               </div>
             </div>
           </aside>
+          )}
 
-          <div
-            className="workspace__separator workspace__separator--vertical"
-            role="separator"
-            aria-orientation="vertical"
-            aria-valuemin={SIDEBAR_MIN}
-            aria-valuemax={SIDEBAR_MAX}
-            aria-valuenow={sidebarWidth}
-            onPointerDown={handleSidebarPointerDown}
-            onPointerMove={handleSidebarPointerMove}
-            onPointerUp={handleSidebarPointerUp}
-          />
+          {sidebarVisible && (
+            <div
+              className="workspace__separator workspace__separator--vertical"
+              role="separator"
+              aria-orientation="vertical"
+              aria-valuemin={SIDEBAR_MIN}
+              aria-valuemax={SIDEBAR_MAX}
+              aria-valuenow={sidebarWidth}
+              onPointerDown={handleSidebarPointerDown}
+              onPointerMove={handleSidebarPointerMove}
+              onPointerUp={handleSidebarPointerUp}
+            />
+          )}
 
           <section className="panels" aria-label="カードパネル領域">
             <div className="panels__body">
