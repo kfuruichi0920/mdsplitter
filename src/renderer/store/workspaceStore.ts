@@ -22,6 +22,7 @@ import {
   type CardPatch,
   type CardStatus,
 } from '@/shared/workspace';
+import type { CardDisplayMode } from './uiStore';
 
 export { CARD_STATUS_SEQUENCE, getNextCardStatus };
 export type { Card, CardKind, CardPatch, CardStatus };
@@ -88,6 +89,7 @@ export interface PanelTabState {
   expandedCardIds: Set<string>; ///< 展開状態のカードIDセット（子を持つカードのみ）
   editingCardId: string | null; ///< 編集中のカードID（インライン編集時）
   dirtyCardIds: Set<string>; ///< 未保存編集のカードID集合。
+  displayMode: CardDisplayMode; ///< カード表示モード（詳細/コンパクト）
 }
 
 /**
@@ -157,6 +159,7 @@ export interface WorkspaceStore {
   redo: () => boolean; ///< Redo実行（成功時true）
   canUndo: () => boolean; ///< Undo可能か判定
   canRedo: () => boolean; ///< Redo可能か判定
+  toggleTabDisplayMode: (tabId: string) => void; ///< タブのカード表示モードをトグル
   reset: () => void;
 }
 
@@ -229,6 +232,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           expandedCardIds: updatedExpandedIds,
           editingCardId: null,
           dirtyCardIds: new Set<string>(),
+          displayMode: prevTab.displayMode ?? 'detailed', //! displayModeを維持
         } satisfies PanelTabState;
 
         outcome = { status: 'activated', tabId: existingTabId, leafId } satisfies OpenTabResult;
@@ -262,6 +266,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         expandedCardIds: initialExpandedIds,
         editingCardId: null,
         dirtyCardIds: new Set<string>(),
+        displayMode: 'detailed', //! デフォルトは詳細表示
       } satisfies PanelTabState;
 
       const nextLeaf: LeafWorkspaceState = {
@@ -307,6 +312,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         expandedCardIds: initialExpandedIds,
         editingCardId: null,
         dirtyCardIds: new Set<string>(normalizedCards.map((card) => card.id)),
+        displayMode: 'detailed', //! デフォルトは詳細表示
       } satisfies PanelTabState;
 
       createdTab = nextTab;
@@ -951,6 +957,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             lastSavedAt: options?.savedAt ?? tab.lastSavedAt,
             expandedCardIds: updatedExpandedIds,
             dirtyCardIds: new Set<string>(),
+            displayMode: tab.displayMode ?? 'detailed', //! displayModeを維持
           },
         },
       };
@@ -1493,6 +1500,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   canRedo: () => {
     const state = get();
     return state.redoStack.length > 0;
+  },
+
+  toggleTabDisplayMode: (tabId) => {
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab) {
+        return state;
+      }
+
+      const nextDisplayMode: CardDisplayMode = tab.displayMode === 'detailed' ? 'compact' : 'detailed';
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: { ...tab, displayMode: nextDisplayMode },
+        },
+      };
+    });
   },
 
   reset: () => {

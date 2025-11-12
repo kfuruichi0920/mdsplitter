@@ -153,8 +153,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   );
   const setEditingCard = useWorkspaceStore((state) => state.setEditingCard);
   const updateCard = useWorkspaceStore((state) => state.updateCard);
-  const cardDisplayMode = useUiStore((state) => state.cardDisplayMode);
-  const toggleCardDisplayMode = useUiStore((state) => state.toggleCardDisplayMode);
+  const toggleTabDisplayMode = useWorkspaceStore((state) => state.toggleTabDisplayMode);
   const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
   const hasClipboardItems = Boolean(clipboardData && clipboardData.length > 0);
   const panelFocusState = usePanelEngagementStore((state) => state.states[leafId] ?? (isActive ? 'active' : 'inactive'));
@@ -169,6 +168,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     return leafTabs.find((tab) => tab.id === activeTabId) ?? null;
   }, [activeTabId, leafTabs]);
 
+  const cardDisplayMode = activeTab?.displayMode ?? 'detailed';
   const activeFileIdentifier = activeTab ? activeTab.fileName ?? `unsaved-${activeTab.id}` : '';
   const activeFileName = activeTab?.fileName ?? null;
   const openFileNames = useMemo(() => {
@@ -678,10 +678,11 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * コンパクト/詳細モードをトグルし、ログに記録する。
    */
   const handleToggleDisplayMode = useCallback(() => {
-    toggleCardDisplayMode();
+    if (!activeTabId) return;
+    toggleTabDisplayMode(activeTabId);
     const nextMode = cardDisplayMode === 'detailed' ? 'コンパクト' : '詳細';
     onLog?.('INFO', `カード表示モードを「${nextMode}」に切り替えました。`);
-  }, [cardDisplayMode, onLog, toggleCardDisplayMode]);
+  }, [activeTabId, cardDisplayMode, onLog, toggleTabDisplayMode]);
 
   /**
    * @brief 全カードを展開する。
