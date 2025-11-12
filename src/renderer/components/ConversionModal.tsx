@@ -1,6 +1,6 @@
 import type { ConverterStrategy } from '@/shared/settings';
 
-import type { ConversionModalDisplayState } from '../types/conversion';
+import type { CardIdAssignmentRule, ConversionModalDisplayState } from '../types/conversion';
 
 interface ConversionModalProps {
   state: ConversionModalDisplayState;
@@ -10,6 +10,10 @@ interface ConversionModalProps {
   onConvert: () => void;
   onAcknowledgeWarning: (next: boolean) => void;
   onCancelConversion: () => void;
+  onCardIdPrefixChange: (prefix: string) => void;
+  onCardIdStartNumberChange: (startNumber: number) => void;
+  onCardIdDigitsChange: (digits: number) => void;
+  onCardIdAssignmentRuleChange: (rule: CardIdAssignmentRule) => void;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -30,6 +34,10 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
   onConvert,
   onAcknowledgeWarning,
   onCancelConversion,
+  onCardIdPrefixChange,
+  onCardIdStartNumberChange,
+  onCardIdDigitsChange,
+  onCardIdAssignmentRuleChange,
 }) => {
   if (!state.isOpen) {
     return null;
@@ -150,6 +158,97 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
                   <p>LLM アダプタを通じて要約・階層化します（スタブ実装）。</p>
                 </div>
               </label>
+            </div>
+          </section>
+
+          <section className="conversion-modal__section">
+            <div className="conversion-modal__section-header">
+              <h3>3. カードID設定</h3>
+            </div>
+            <div className="conversion-modal__card-id-settings">
+              <div className="conversion-modal__field-row">
+                <div className="conversion-modal__field">
+                  <label htmlFor="card-id-prefix">接頭語</label>
+                  <input
+                    id="card-id-prefix"
+                    type="text"
+                    value={state.cardIdPrefix}
+                    onChange={(e) => onCardIdPrefixChange(e.target.value)}
+                    placeholder="例: REQ, SPEC, TEST"
+                    maxLength={10}
+                  />
+                  <p className="conversion-modal__field-help">カードIDの接頭語を指定します（例: REQ, SPEC, TEST）</p>
+                </div>
+                <div className="conversion-modal__field">
+                  <label htmlFor="card-id-start-number">開始番号</label>
+                  <input
+                    id="card-id-start-number"
+                    type="number"
+                    value={state.cardIdStartNumber}
+                    onChange={(e) => onCardIdStartNumberChange(Number(e.target.value))}
+                    min="1"
+                    max="9999"
+                  />
+                  <p className="conversion-modal__field-help">採番の開始番号を指定します</p>
+                </div>
+                <div className="conversion-modal__field">
+                  <label htmlFor="card-id-digits">桁数</label>
+                  <input
+                    id="card-id-digits"
+                    type="number"
+                    value={state.cardIdDigits}
+                    onChange={(e) => onCardIdDigitsChange(Number(e.target.value))}
+                    min="1"
+                    max="6"
+                  />
+                  <p className="conversion-modal__field-help">番号の桁数（ゼロパディング）</p>
+                </div>
+              </div>
+
+              <div className="conversion-modal__field">
+                <label>付与ルール</label>
+                <div className="conversion-modal__radio-group">
+                  <label className="conversion-modal__radio-inline">
+                    <input
+                      type="radio"
+                      name="card-id-rule"
+                      value="all"
+                      checked={state.cardIdAssignmentRule === 'all'}
+                      onChange={() => onCardIdAssignmentRuleChange('all')}
+                    />
+                    すべてのカード
+                  </label>
+                  <label className="conversion-modal__radio-inline">
+                    <input
+                      type="radio"
+                      name="card-id-rule"
+                      value="heading"
+                      checked={state.cardIdAssignmentRule === 'heading'}
+                      onChange={() => onCardIdAssignmentRuleChange('heading')}
+                    />
+                    見出しのみ
+                  </label>
+                  <label className="conversion-modal__radio-inline">
+                    <input
+                      type="radio"
+                      name="card-id-rule"
+                      value="manual"
+                      checked={state.cardIdAssignmentRule === 'manual'}
+                      onChange={() => onCardIdAssignmentRuleChange('manual')}
+                    />
+                    手動指定のみ
+                  </label>
+                </div>
+              </div>
+
+              {state.cardIdPrefix && state.cardIdAssignmentRule !== 'manual' && (
+                <div className="conversion-modal__preview-box">
+                  <strong>プレビュー:</strong>{' '}
+                  {state.cardIdPrefix}-{String(state.cardIdStartNumber).padStart(state.cardIdDigits, '0')},{' '}
+                  {state.cardIdPrefix}-{String(state.cardIdStartNumber + 1).padStart(state.cardIdDigits, '0')},{' '}
+                  {state.cardIdPrefix}-{String(state.cardIdStartNumber + 2).padStart(state.cardIdDigits, '0')}, ...
+                </div>
+              )}
             </div>
           </section>
         </div>

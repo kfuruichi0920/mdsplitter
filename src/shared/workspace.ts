@@ -55,7 +55,8 @@ export const CARD_KIND_VALUES: readonly CardKind[] = [
  * @ingroup workspace
  */
 export interface Card {
-  id: string;              ///< 一意ID
+  id: string;              ///< 一意ID（UUID）
+  cardId?: string;         ///< ユーザー向け識別子（例: REQ-001, SPEC-042）
   title: string;           ///< タイトル
   body: string;            ///< 本文
   status: CardStatus;      ///< ステータス
@@ -135,6 +136,7 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
     const target = card as Partial<Card>;
     return (
       typeof target.id === 'string' &&
+      (target.cardId === undefined || typeof target.cardId === 'string') &&
       typeof target.title === 'string' &&
       typeof target.body === 'string' &&
       typeof target.status === 'string' &&

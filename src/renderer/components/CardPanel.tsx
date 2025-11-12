@@ -1541,6 +1541,7 @@ const CardListItem = React.memo(({
           {leftConnectorNode}
           <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
           <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+          {card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
           <span className="card__title card__title--truncate">{card.title}</span>
           {markdownButton}
           {rightConnectorNode}
@@ -1553,6 +1554,7 @@ const CardListItem = React.memo(({
             {leftConnectorNode}
             <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
             <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+            {card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
             <span className="card__title">{card.title}</span>
             {markdownButton}
             {rightConnectorNode}
@@ -1617,6 +1619,7 @@ const CardListItem = React.memo(({
 
   // カード本体の変更チェック
   if (prevProps.card.id !== nextProps.card.id) return false;
+  if (prevProps.card.cardId !== nextProps.card.cardId) return false;
   if (prevProps.card.updatedAt !== nextProps.card.updatedAt) return false;
   if (prevProps.card.title !== nextProps.card.title) return false;
   if (prevProps.card.body !== nextProps.card.body) return false;
