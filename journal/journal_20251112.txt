@@ -513,9 +513,9 @@ const contentStyle = useMemo<CSSProperties>(() => {
 - セパレータも同様に条件付きでレンダリング
 
 **変更ファイル**:
-- `src/renderer/App.tsx:2894` - サイドバーの開始タグを条件付きに
-- `src/renderer/App.tsx:3082` - サイドバーの終了タグを条件付きに
-- `src/renderer/App.tsx:3084-3096` - セパレータを条件付きでレンダリング
+- `src/renderer/App.tsx:2901` - サイドバーの開始タグを条件付きに
+- `src/renderer/App.tsx:3088` - サイドバーの終了タグを条件付きに
+- `src/renderer/App.tsx:3091-3103` - セパレータを条件付きでレンダリング
 
 **実装の詳細**:
 ```typescript
