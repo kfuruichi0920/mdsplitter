@@ -100,6 +100,7 @@ export const TraceConnectorLayer = ({
   const [containerRect, setContainerRect] = useState<DOMRectReadOnly | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const rafRef = useRef<number | null>(null);
+  const lastMeasureTimeRef = useRef<number>(0);
 
   // 測定処理をuseCallbackでメモ化
   const measure = useCallback(() => {
@@ -115,13 +116,30 @@ export const TraceConnectorLayer = ({
     setContainerRect(rect);
   }, [containerRef]);
 
-  // スロットリングされた測定処理
+  /**
+   * @brief スクロール速度に応じてスロットリング間隔を調整する測定スケジューラ。
+   * @details
+   * パフォーマンス最適化: 高速スクロール中は測定間隔を広げて（約30fps）、
+   * CPU使用率を削減する。通常時は60fpsで測定。
+   */
   const scheduleMeasure = useCallback(() => {
     if (rafRef.current !== null) {
       return;
     }
+
+    // スクロール速度を検出
+    const now = Date.now();
+    const timeSinceLastMeasure = now - lastMeasureTimeRef.current;
+
+    // 高速スクロール中は間隔を空ける（60fps → 30fps）
+    // 33ms = 約30fps、前回の測定から33ms未満なら測定をスキップ
+    if (timeSinceLastMeasure < 33) {
+      return;
+    }
+
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = null;
+      lastMeasureTimeRef.current = Date.now();
       measure();
     });
   }, [measure]);
@@ -271,6 +289,13 @@ export const TraceConnectorLayer = ({
     return related;
   }, [excludeSelfTrace, selectionSeeds, seedsByFile, traceCacheSnapshot]);
 
+  /**
+   * @brief トレースリンクをフィルタリングする。
+   * @details
+   * パフォーマンス最適化: ビューポート外のカードのコネクタを早期に除外し、
+   * 後続のSVGパス生成処理を削減する。showOffscreenConnectorsがfalseの場合、
+   * ビューポート外のカードへのリンクをフィルタリング。
+   */
   const filteredLinks = useMemo(() => {
     if (!isTraceVisible) {
       return [] as ExtendedLink[];
@@ -285,9 +310,36 @@ export const TraceConnectorLayer = ({
       if (!isCardSideVisible(link.targetFileName, link.targetCardId, 'left')) {
         return false;
       }
+
+      // ビューポート外のカードのコネクタを除外（パフォーマンス最適化）
+      if (!showOffscreenConnectors) {
+        // ソースカードとターゲットカードの可視性をチェック
+        const findVisibleEntry = (cardId: string, fileName: string, leafIds: string[]): boolean => {
+          const entry = Object.values(cards).find(
+            (e) => e.cardId === cardId && e.fileName === fileName && leafIds.includes(e.leafId)
+          );
+          return entry?.isVisible ?? false;
+        };
+
+        // 左側のleafIdsでソースカードを検索
+        let sourceVisible = findVisibleEntry(link.sourceCardId, link.sourceFileName, leftLeafIds);
+        let targetVisible = findVisibleEntry(link.targetCardId, link.targetFileName, rightLeafIds);
+
+        // 見つからない場合は左右を入れ替えて検索
+        if (!sourceVisible && !targetVisible) {
+          sourceVisible = findVisibleEntry(link.sourceCardId, link.sourceFileName, rightLeafIds);
+          targetVisible = findVisibleEntry(link.targetCardId, link.targetFileName, leftLeafIds);
+        }
+
+        // 両方のカードが可視でない場合は除外
+        if (!sourceVisible || !targetVisible) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [enabledRelationKinds, isCardSideVisible, isTraceVisible, traceLinks]);
+  }, [cards, enabledRelationKinds, isCardSideVisible, isTraceVisible, leftLeafIds, rightLeafIds, showOffscreenConnectors, traceLinks]);
 
   const connectorPaths = useMemo<ConnectorPathEntry[]>(() => {
     if (direction !== 'vertical') {

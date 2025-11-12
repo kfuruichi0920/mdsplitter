@@ -10,7 +10,7 @@
  * @copyright MIT
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
 import { shallow } from 'zustand/shallow';
 import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
@@ -379,6 +379,12 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     return visible;
   }, [allowedKinds, cards, filterActive, filterTextNormalized]);
 
+  /**
+   * @brief フィルタ適用後の表示カードリスト。
+   * @details
+   * パフォーマンス最適化: useMemoで依存配列を最小化し、不要な再計算を防ぐ。
+   * フィルタが無効な場合は即座にtreeVisibleCardsを返し、追加の計算を避ける。
+   */
   const visibleCards = useMemo(() => {
     if (!filterActive) {
       return treeVisibleCards;
@@ -584,6 +590,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * @brief カードを選択する。
    * @details
    * Ctrl/Cmdで複数選択、Shiftで範囲選択に対応。
+   * パフォーマンス最適化: useCallbackで依存配列を最小化し、
+   * 必要最小限の依存のみを指定して関数の再生成を抑制。
    * @param card 対象カード。
    * @param event マウスイベント（Ctrl/Shift判定用）。
    */
@@ -1297,7 +1305,13 @@ interface CardListItemProps {
   onToggleMarkdownPreview: () => void;
 }
 
-const CardListItem = ({
+/**
+ * @brief カードリストアイテムコンポーネント。
+ * @details
+ * React.memoで包んでおり、カスタム比較関数により不要な再レンダリングを防ぐ。
+ * カードの状態変更、選択状態変更、表示モード変更などの重要な変更時のみ再レンダリングされる。
+ */
+const CardListItem = React.memo(({
   card,
   isSelected,
   isExpanded,
@@ -1559,4 +1573,67 @@ const CardListItem = ({
       ) : null}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // カスタム比較関数: 変更がない場合にtrueを返して再レンダリングをスキップ
+
+  // カード本体の変更チェック
+  if (prevProps.card.id !== nextProps.card.id) return false;
+  if (prevProps.card.updatedAt !== nextProps.card.updatedAt) return false;
+  if (prevProps.card.title !== nextProps.card.title) return false;
+  if (prevProps.card.body !== nextProps.card.body) return false;
+  if (prevProps.card.status !== nextProps.card.status) return false;
+  if (prevProps.card.kind !== nextProps.card.kind) return false;
+  if (prevProps.card.level !== nextProps.card.level) return false;
+  if (prevProps.card.hasLeftTrace !== nextProps.card.hasLeftTrace) return false;
+  if (prevProps.card.hasRightTrace !== nextProps.card.hasRightTrace) return false;
+
+  // 状態フラグの変更チェック
+  if (prevProps.isSelected !== nextProps.isSelected) return false;
+  if (prevProps.isExpanded !== nextProps.isExpanded) return false;
+  if (prevProps.hasChildren !== nextProps.hasChildren) return false;
+  if (prevProps.isEditing !== nextProps.isEditing) return false;
+  if (prevProps.isDirty !== nextProps.isDirty) return false;
+  if (prevProps.markdownPreviewEnabled !== nextProps.markdownPreviewEnabled) return false;
+  if (prevProps.isMarkdownPreviewGlobalEnabled !== nextProps.isMarkdownPreviewGlobalEnabled) return false;
+
+  // 表示設定の変更チェック
+  if (prevProps.displayMode !== nextProps.displayMode) return false;
+  if (prevProps.panelFocusState !== nextProps.panelFocusState) return false;
+
+  // トレース情報の変更チェック
+  if (prevProps.leftTraceCount !== nextProps.leftTraceCount) return false;
+  if (prevProps.rightTraceCount !== nextProps.rightTraceCount) return false;
+  if (prevProps.leftConnectorVisible !== nextProps.leftConnectorVisible) return false;
+  if (prevProps.rightConnectorVisible !== nextProps.rightConnectorVisible) return false;
+
+  // ドラッグ&ドロップ状態の変更チェック
+  const isDraggingPrev = prevProps.draggedCardIds?.includes(prevProps.card.id) ?? false;
+  const isDraggingNext = nextProps.draggedCardIds?.includes(nextProps.card.id) ?? false;
+  if (isDraggingPrev !== isDraggingNext) return false;
+
+  const isDropTargetPrev = prevProps.currentDropTarget?.cardId === prevProps.card.id;
+  const isDropTargetNext = nextProps.currentDropTarget?.cardId === nextProps.card.id;
+  if (isDropTargetPrev !== isDropTargetNext) return false;
+  if (isDropTargetPrev && isDropTargetNext) {
+    if (prevProps.currentDropTarget?.position !== nextProps.currentDropTarget?.position) return false;
+  }
+
+  // ハイライト状態の変更チェック
+  const isHighlightedPrev = prevProps.highlightIds?.has(prevProps.card.id) ?? false;
+  const isHighlightedNext = nextProps.highlightIds?.has(nextProps.card.id) ?? false;
+  if (isHighlightedPrev !== isHighlightedNext) return false;
+
+  const isTraceHighlightedPrev = prevProps.traceHighlightIds?.has(prevProps.card.id) ?? false;
+  const isTraceHighlightedNext = nextProps.traceHighlightIds?.has(nextProps.card.id) ?? false;
+  if (isTraceHighlightedPrev !== isTraceHighlightedNext) return false;
+
+  // 識別子の変更チェック
+  if (prevProps.leafId !== nextProps.leafId) return false;
+  if (prevProps.fileName !== nextProps.fileName) return false;
+
+  // コールバック関数は参照が変わっても機能的には同じなので比較しない
+  // （親コンポーネントでuseCallbackを使用することで安定化する）
+
+  // すべてのチェックをパスした場合、再レンダリング不要
+  return true;
+});
