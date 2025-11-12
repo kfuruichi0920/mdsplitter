@@ -487,7 +487,7 @@ const contentStyle = useMemo<CSSProperties>(() => {
 - 表示状態に応じてアクティブクラスを適用
 
 **変更ファイル**:
-- `src/renderer/App.tsx:2665-2673` - サイドバートグルボタンを追加
+- `src/renderer/App.tsx:2672-2680` - サイドバートグルボタンを追加
 
 **実装の詳細**:
 ```typescript
