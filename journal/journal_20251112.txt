@@ -460,7 +460,7 @@ const handleSidebarToggle = useCallback(() => {
 - contentStyleを修正し、サイドバーが非表示の時はカラム定義から除外
 
 **変更ファイル**:
-- `src/renderer/App.tsx:2003-2013` - contentStyleの条件分岐を追加
+- `src/renderer/App.tsx:2005-2013` - contentStyleの条件分岐を追加
 
 **実装の詳細**:
 ```typescript
