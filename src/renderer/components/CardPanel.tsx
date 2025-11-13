@@ -107,6 +107,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [isKindFilterOpen, setKindFilterOpen] = useState(false);
   const kindFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const kindFilterPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [showDeprecatedCards, setShowDeprecatedCards] = useState(true);
   const [isBulkPrefixEditOpen, setIsBulkPrefixEditOpen] = useState(false);
   const [bulkPrefixOldValue, setBulkPrefixOldValue] = useState('');
   const [bulkPrefixNewValue, setBulkPrefixNewValue] = useState('');
@@ -348,12 +349,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const filterActive = filterTextNormalized.length > 0 || kindFilterActive;
 
   const filteredCardIds = useMemo(() => {
-    if (!filterActive) {
+    const shouldApplyFilter = filterActive || !showDeprecatedCards;
+    if (!shouldApplyFilter) {
       return null;
     }
     const cardMap = new Map(cards.map((card) => [card.id, card]));
     const matches = new Set<string>();
     cards.forEach((card) => {
+      // 廃止カードフィルタ
+      if (!showDeprecatedCards && card.status === 'deprecated') {
+        return;
+      }
       if (!allowedKinds.has(card.kind)) {
         return;
       }
@@ -381,7 +387,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     };
     matches.forEach(addAncestors);
     return visible;
-  }, [allowedKinds, cards, filterActive, filterTextNormalized]);
+  }, [allowedKinds, cards, filterActive, filterTextNormalized, showDeprecatedCards]);
 
   /**
    * @brief フィルタ適用後の表示カードリスト。
@@ -1142,6 +1148,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             ⛓️
           </button>
+          <button
+            type="button"
+            className={`panel-toolbar__button${!showDeprecatedCards ? ' panel-toolbar__button--active' : ''}`}
+            onClick={() => setShowDeprecatedCards((prev) => !prev)}
+            title={showDeprecatedCards ? '廃止カードを非表示' : '廃止カードを表示'}
+            aria-label={showDeprecatedCards ? '廃止カードを非表示' : '廃止カードを表示'}
+          >
+            🗑️
+          </button>
         </div>
         <div className="panel-toolbar__group">
           <button
@@ -1628,6 +1643,11 @@ const CardListItem = React.memo(({
     isVisible: boolean,
     onToggle?: () => void,
   ) => {
+    // 廃止カードの場合、トレース接合点を非表示
+    if (card.status === 'deprecated') {
+      return null;
+    }
+
     const isActive = hasTrace && count > 0;
     const className = [
       'card__connector-button',
@@ -1707,6 +1727,7 @@ const CardListItem = React.memo(({
     dropChild ? 'card--drop-child' : '',
     isHighlighted ? 'card--highlighted' : '',
     isTraceHighlighted ? 'card--trace-related' : '',
+    card.status === 'deprecated' ? 'card--deprecated' : '',
   ]
     .filter(Boolean)
     .join(' ');

@@ -905,11 +905,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         return state;
       }
 
+      const targetCard = tab.cards.find((card) => card.id === cardId);
+      if (!targetCard) {
+        return state;
+      }
+
+      const proposedNextStatus = getNextCardStatus(targetCard.status);
+
+      // 廃止ステータスへの移行制約: トレースがある場合は阻止
+      if (proposedNextStatus === 'deprecated' && (targetCard.hasLeftTrace || targetCard.hasRightTrace)) {
+        // トレースがある場合は変更を阻止
+        // 警告はUI側で表示する
+        return state;
+      }
+
       const nextCards = tab.cards.map((card) => {
         if (card.id !== cardId) {
           return card;
         }
-        nextStatus = getNextCardStatus(card.status);
+        nextStatus = proposedNextStatus;
         return {
           ...card,
           status: nextStatus,
