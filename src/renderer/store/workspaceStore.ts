@@ -914,8 +914,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       // 廃止ステータスへの移行制約: トレースがある場合は阻止
       if (proposedNextStatus === 'deprecated' && (targetCard.hasLeftTrace || targetCard.hasRightTrace)) {
-        // トレースがある場合は変更を阻止
-        // 警告はUI側で表示する
+        // トレースがある場合は変更を阻止し、現在のステータスを返す
+        // UI側で元のステータスと比較して適切なメッセージを表示
+        nextStatus = targetCard.status;
         return state;
       }
 

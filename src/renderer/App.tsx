@@ -34,7 +34,7 @@ import { useTracePreferenceStore } from './store/tracePreferenceStore';
 import { usePanelEngagementStore } from './store/panelEngagementStore';
 import type { AppSettings, ConverterStrategy, LogLevel, ThemeModeSetting, ThemeSettings } from '@/shared/settings';
 import { defaultSettings } from '@/shared/settings';
-import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE } from '@/shared/workspace';
+import { CARD_KIND_VALUES, CARD_STATUS_SEQUENCE, getNextCardStatus } from '@/shared/workspace';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 import { TRACE_RELATION_KINDS } from '@/shared/traceability';
 import type { TraceDirection, TraceRelationKind, TraceabilityRelation } from '@/shared/traceability';
@@ -1751,12 +1751,25 @@ export const App = () => {
       return;
     }
 
+    const originalStatus = selectedCard.status;
     const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
+
     if (!nextStatus) {
       pushLog({
         id: `cycle-missing-${Date.now()}`,
         level: 'WARN',
         message: 'ステータス更新対象のカードが見つかりませんでした。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    // ステータスが変更されなかった場合、トレースがあって阻止された可能性を確認
+    if (nextStatus === originalStatus && getNextCardStatus(originalStatus) === 'deprecated') {
+      pushLog({
+        id: `cycle-blocked-${Date.now()}`,
+        level: 'WARN',
+        message: `カード「${selectedCard.title}」はトレースがあるため、廃止ステータスに変更できません。先にトレースを削除してください。`,
         timestamp: new Date(),
       });
       return;
