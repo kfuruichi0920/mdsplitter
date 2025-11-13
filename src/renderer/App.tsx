@@ -1740,13 +1740,24 @@ export const App = () => {
   /**
    * @brief 選択カードのステータスを次段へ遷移させる。
    */
-  const handleCycleStatus = useCallback(() => {
+  const handleCycleStatus = useCallback(async () => {
     const targetLeafId = effectiveLeafId;
     if (!selectedCard || !targetLeafId || !activeTabId) {
       pushLog({
         id: `cycle-missing-${Date.now()}`,
         level: 'WARN',
         message: 'ステータス更新対象のカードが選択されていません。',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    const activeTabState = tabs[activeTabId];
+    if (!activeTabState?.fileName) {
+      pushLog({
+        id: `cycle-no-file-${Date.now()}`,
+        level: 'WARN',
+        message: 'ファイル名が見つかりません。',
         timestamp: new Date(),
       });
       return;
@@ -1771,18 +1782,92 @@ export const App = () => {
         return;
       }
 
-      // トレースを削除
-      updateCard(targetLeafId, activeTabId, selectedCard.id, {
-        hasLeftTrace: false,
-        hasRightTrace: false,
-      });
+      // すべてのトレースを削除
+      try {
+        const traceState = useTraceStore.getState();
+        const workspaceActions = useWorkspaceStore.getState();
+        const cache = traceState.cache;
+        const fileName = activeTabState.fileName;
+        const cardId = selectedCard.id;
 
-      pushLog({
-        id: `trace-removed-${Date.now()}`,
-        level: 'INFO',
-        message: `カード「${selectedCard.title}」のトレースを削除しました。`,
-        timestamp: new Date(),
-      });
+        // 対象カードが含まれるすべてのファイルペアを収集
+        const affectedPairs: Array<{ leftFile: string; rightFile: string; key: string }> = [];
+
+        Object.values(cache).forEach((entry) => {
+          if (entry.status !== 'ready') return;
+
+          const hasInLeft = entry.leftFile === fileName && entry.relations.some(r => r.left_ids.includes(cardId));
+          const hasInRight = entry.rightFile === fileName && entry.relations.some(r => r.right_ids.includes(cardId));
+
+          if (hasInLeft || hasInRight) {
+            affectedPairs.push({
+              leftFile: entry.leftFile,
+              rightFile: entry.rightFile,
+              key: entry.key,
+            });
+          }
+        });
+
+        // 各ファイルペアのトレースを更新
+        for (const pair of affectedPairs) {
+          const entry = cache[pair.key];
+          if (!entry) continue;
+
+          const prevLeftSet = relationCardSet(entry.relations, 'left');
+          const prevRightSet = relationCardSet(entry.relations, 'right');
+
+          // 対象カードを含まない relations のみ残す
+          const nextRelations = entry.relations
+            .map(relation => {
+              const isLeftTarget = pair.leftFile === fileName;
+              const isRightTarget = pair.rightFile === fileName;
+
+              return {
+                ...relation,
+                left_ids: isLeftTarget ? relation.left_ids.filter(id => id !== cardId) : relation.left_ids,
+                right_ids: isRightTarget ? relation.right_ids.filter(id => id !== cardId) : relation.right_ids,
+              };
+            })
+            .filter(relation => relation.left_ids.length > 0 && relation.right_ids.length > 0);
+
+          // 更新を保存
+          await traceState.saveRelationsForPair({
+            leftFile: pair.leftFile,
+            rightFile: pair.rightFile,
+            relations: nextRelations,
+          });
+
+          const nextLeftSet = relationCardSet(nextRelations, 'left');
+          const nextRightSet = relationCardSet(nextRelations, 'right');
+
+          // トレースフラグを更新
+          const leftUpdates = buildTraceFlagUpdates(prevLeftSet, nextLeftSet, 'hasRightTrace');
+          const rightUpdates = buildTraceFlagUpdates(prevRightSet, nextRightSet, 'hasLeftTrace');
+
+          if (Object.keys(leftUpdates).length > 0) {
+            workspaceActions.setCardTraceFlags(pair.leftFile, leftUpdates);
+          }
+          if (Object.keys(rightUpdates).length > 0) {
+            workspaceActions.setCardTraceFlags(pair.rightFile, rightUpdates);
+          }
+        }
+
+        pushLog({
+          id: `trace-removed-${Date.now()}`,
+          level: 'INFO',
+          message: `カード「${selectedCard.title}」のトレースを削除しました（${affectedPairs.length}件のファイルペア）。`,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+        pushLog({
+          id: `trace-remove-error-${Date.now()}`,
+          level: 'ERROR',
+          message: `トレース削除中にエラーが発生しました: ${message}`,
+          timestamp: new Date(),
+        });
+        return;
+      }
     }
 
     const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
@@ -1814,7 +1899,7 @@ export const App = () => {
       message: `カード「${selectedCard.title}」のステータスを ${nextStatus} に変更しました。`,
       timestamp: new Date(),
     });
-  }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard, updateCard]);
+  }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard, tabs]);
 
   /**
    * @brief テーマを切り替える。
