@@ -1389,6 +1389,98 @@ const CardListItem = React.memo(({
 }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
 
+  // 現在のタブのカード一覧を取得（重複チェック用）
+  const allCardsInTab = useWorkspaceStore(
+    useCallback((state) => {
+      const leaf = state.leafs[leafId];
+      if (!leaf || !leaf.activeTabId) {
+        return [];
+      }
+      const tab = state.tabs[leaf.activeTabId];
+      return tab?.cards ?? [];
+    }, [leafId]),
+  );
+
+  // カードID編集用のローカルstate
+  const [isEditingCardId, setIsEditingCardId] = useState(false);
+  const [editingCardIdValue, setEditingCardIdValue] = useState('');
+  const [cardIdError, setCardIdError] = useState<string | null>(null);
+  const cardIdInputRef = useRef<HTMLInputElement>(null);
+
+  // カードID編集開始
+  const handleCardIdClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsEditingCardId(true);
+    setEditingCardIdValue(card.cardId || '');
+    setCardIdError(null);
+  };
+
+  // カードID編集のキーダウンハンドラ
+  const handleCardIdKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCardIdSave();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCardIdCancel();
+    }
+  };
+
+  // カードID保存
+  const handleCardIdSave = () => {
+    const newCardId = editingCardIdValue.trim();
+
+    // 空文字の場合は許可（ID削除）
+    if (!newCardId) {
+      onUpdateCard(card.id, { cardId: undefined });
+      setIsEditingCardId(false);
+      setCardIdError(null);
+      return;
+    }
+
+    // 重複チェック（自分自身以外）
+    const isDuplicate = allCardsInTab.some(
+      (c) => c.id !== card.id && c.cardId === newCardId,
+    );
+
+    if (isDuplicate) {
+      setCardIdError(`ID "${newCardId}" は既に使用されています`);
+      return;
+    }
+
+    // 保存
+    onUpdateCard(card.id, { cardId: newCardId });
+    setIsEditingCardId(false);
+    setCardIdError(null);
+  };
+
+  // カードID編集キャンセル
+  const handleCardIdCancel = () => {
+    setIsEditingCardId(false);
+    setEditingCardIdValue('');
+    setCardIdError(null);
+  };
+
+  // カードID編集中にフォーカスを外した時の処理
+  const handleCardIdBlur = () => {
+    // エラーがある場合はキャンセル
+    if (cardIdError) {
+      handleCardIdCancel();
+    } else {
+      handleCardIdSave();
+    }
+  };
+
+  // カードID編集モードに入ったときにinputにフォーカス
+  useEffect(() => {
+    if (isEditingCardId && cardIdInputRef.current) {
+      cardIdInputRef.current.focus();
+      cardIdInputRef.current.select();
+    }
+  }, [isEditingCardId]);
+
   const renderConnector = (
     side: TraceConnectorSide,
     hasTrace: boolean,
@@ -1534,6 +1626,53 @@ const CardListItem = React.memo(({
   const isCompact = displayMode === 'compact';
   const compactTooltip = isCompact && card.body ? card.body : undefined;
 
+  // カードID表示/編集コンポーネント
+  const renderCardId = () => {
+    if (isEditingCardId) {
+      return (
+        <span className="card__card-id-edit-container">
+          <input
+            ref={cardIdInputRef}
+            type="text"
+            className={`card__card-id-input${cardIdError ? ' card__card-id-input--error' : ''}`}
+            value={editingCardIdValue}
+            onChange={(e) => setEditingCardIdValue(e.target.value)}
+            onKeyDown={handleCardIdKeyDown}
+            onBlur={handleCardIdBlur}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="ID未設定"
+            title={cardIdError || undefined}
+          />
+          {cardIdError && (
+            <span className="card__card-id-error" title={cardIdError}>
+              ⚠
+            </span>
+          )}
+        </span>
+      );
+    }
+    if (card.cardId) {
+      return (
+        <span
+          className="card__card-id card__card-id--editable"
+          onClick={handleCardIdClick}
+          title="クリックして編集"
+        >
+          [{card.cardId}]
+        </span>
+      );
+    }
+    return (
+      <span
+        className="card__card-id card__card-id--empty card__card-id--editable"
+        onClick={handleCardIdClick}
+        title="クリックしてIDを設定"
+      >
+        [ID未設定]
+      </span>
+    );
+  };
+
   const articleContent = isCompact
     ? (
         <>
@@ -1541,7 +1680,7 @@ const CardListItem = React.memo(({
           {leftConnectorNode}
           <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
           <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-          {card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
+          {renderCardId()}
           <span className="card__title card__title--truncate">{card.title}</span>
           {markdownButton}
           {rightConnectorNode}
@@ -1554,7 +1693,7 @@ const CardListItem = React.memo(({
             {leftConnectorNode}
             <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
             <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
-            {card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
+            {renderCardId()}
             <span className="card__title">{card.title}</span>
             {markdownButton}
             {rightConnectorNode}

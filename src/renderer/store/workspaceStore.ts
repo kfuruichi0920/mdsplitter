@@ -17,6 +17,7 @@ import { nanoid } from 'nanoid';
 import {
   CARD_STATUS_SEQUENCE,
   getNextCardStatus,
+  generateNextCardId,
   type Card,
   type CardKind,
   type CardPatch,
@@ -628,8 +629,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         newLevel = 0;
       }
 
+      // 既存カードから次のカードIDを生成
+      const cardId = generateNextCardId(tab.cards);
+
       const newCard: Card = {
         id: nanoid(),
+        cardId: cardId || undefined, // 空文字の場合はundefined
         title: '新規カード',
         body: '',
         status: 'draft',
@@ -1301,6 +1306,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       if (newCards.length === 0) {
         return state;
       }
+
+      // 貼り付けられたカードにIDを自動付与
+      // 既存カードと貼り付けられたカードを合わせて最大番号を計算
+      const allCards = [...tab.cards, ...newCards];
+      newCards.forEach((card, index) => {
+        // 既に処理済みのカードも含めて番号を計算
+        const currentAllCards = [...tab.cards, ...newCards.slice(0, index)];
+        const cardId = generateNextCardId(currentAllCards);
+        if (cardId) {
+          newCards[index] = { ...card, cardId };
+        }
+      });
 
       const undoEntry: UndoRedoEntry = {
         type: 'paste',
