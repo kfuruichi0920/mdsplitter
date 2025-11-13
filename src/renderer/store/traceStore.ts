@@ -76,6 +76,7 @@ interface TraceState {
   getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
   getRelatedCards: (seeds: TraceSeed[]) => Record<string, Set<string>>;
   getRelatedNodeKeys: (seeds: TraceSeed[]) => Set<string>;
+  removeTracesForCard: (fileName: string, cardId: string) => Promise<{ removedCount: number; affectedFiles: string[] }>; ///< 指定カードに関連するトレースを削除。
 }
 
 
@@ -374,6 +375,50 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
     const entry = convertLoadedFile(leftFile, rightFile, loaded);
     set((state) => ({ cache: { ...state.cache, [key]: entry } }));
     return entry;
+  },
+  removeTracesForCard: async (fileName, cardId) => {
+    const cache = get().cache;
+    const affectedPairs: Array<{ leftFile: string; rightFile: string; entry: TraceCacheEntry }> = [];
+
+    // 指定されたカードに関連するすべてのトレースエントリを収集
+    Object.values(cache).forEach((entry) => {
+      if (entry.leftFile === fileName || entry.rightFile === fileName) {
+        affectedPairs.push({ leftFile: entry.leftFile, rightFile: entry.rightFile, entry });
+      }
+    });
+
+    let totalRemoved = 0;
+    const affectedFiles = new Set<string>();
+
+    // 各トレースファイルから該当カードのトレースを削除
+    for (const { leftFile, rightFile, entry } of affectedPairs) {
+      const isLeft = entry.leftFile === fileName;
+      const filteredRelations = entry.relations.filter((relation) => {
+        const hasMatch = isLeft
+          ? relation.left_ids.includes(cardId)
+          : relation.right_ids.includes(cardId);
+        if (hasMatch) {
+          totalRemoved++;
+          affectedFiles.add(leftFile);
+          affectedFiles.add(rightFile);
+        }
+        return !hasMatch;
+      });
+
+      // トレースファイルを保存
+      if (filteredRelations.length !== entry.relations.length) {
+        await get().saveRelationsForPair({
+          leftFile,
+          rightFile,
+          relations: filteredRelations,
+        });
+      }
+    }
+
+    return {
+      removedCount: totalRemoved,
+      affectedFiles: Array.from(affectedFiles),
+    };
   },
 }));
 

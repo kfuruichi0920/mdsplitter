@@ -142,7 +142,7 @@ export interface WorkspaceStore {
   addCard: (leafId: string, tabId: string, options?: { anchorCardId?: string | null; position?: InsertPosition }) => Card | null; ///< 挿入位置を指定してカードを追加
   deleteCards: (leafId: string, tabId: string, cardIds?: string[]) => number; ///< 指定または選択中カードを削除
   updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
-  cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
+  cycleCardStatus: (leafId: string, tabId: string, cardId: string) => Promise<CardStatus | null>;
   hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
   markSaved: (tabId: string, savedAt: string) => void;
   toggleCardExpanded: (leafId: string, tabId: string, cardId: string) => void; ///< カードの展開/折畳をトグル
@@ -897,8 +897,56 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     });
   },
 
-  cycleCardStatus: (leafId, tabId, cardId) => {
-    let nextStatus: CardStatus | null = null;
+  cycleCardStatus: async (leafId, tabId, cardId) => {
+    const state = get();
+    const tab = state.tabs[tabId];
+    if (!tab || tab.leafId !== leafId) {
+      return null;
+    }
+
+    const targetCard = tab.cards.find((card) => card.id === cardId);
+    if (!targetCard) {
+      return null;
+    }
+
+    const nextStatus = getNextCardStatus(targetCard.status);
+
+    // 廃止ステータスへの変更時の特別処理
+    if (nextStatus === 'deprecated') {
+      // トレースを持つかチェック
+      const hasTraces = targetCard.hasLeftTrace || targetCard.hasRightTrace;
+
+      if (hasTraces) {
+        // 確認ダイアログを表示
+        const confirmed = window.confirm(
+          `カード「${targetCard.title}」は他のカードとのトレース接続を持っています。\n\n廃止ステータスに変更すると、すべてのトレース接続が削除されます。\n\n続行しますか？`
+        );
+
+        if (!confirmed) {
+          return null; // キャンセルされた場合はステータス変更しない
+        }
+
+        // トレースを削除
+        if (tab.fileName) {
+          try {
+            const { useTraceStore } = await import('./traceStore');
+            const result = await useTraceStore.getState().removeTracesForCard(tab.fileName, cardId);
+
+            if (window.app?.log && result.removedCount > 0) {
+              void window.app.log('info', `カード「${targetCard.title}」の${result.removedCount}件のトレースを削除しました。`);
+            }
+          } catch (error) {
+            if (window.app?.log) {
+              const message = error instanceof Error ? error.message : 'unknown error';
+              void window.app.log('error', `トレース削除中にエラーが発生しました: ${message}`);
+            }
+            // エラーが発生してもステータス変更は続行
+          }
+        }
+      }
+    }
+
+    // ステータスを更新
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
@@ -909,17 +957,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         if (card.id !== cardId) {
           return card;
         }
-        nextStatus = getNextCardStatus(card.status);
         return {
           ...card,
           status: nextStatus,
+          hasLeftTrace: nextStatus === 'deprecated' ? false : card.hasLeftTrace,
+          hasRightTrace: nextStatus === 'deprecated' ? false : card.hasRightTrace,
           updatedAt: new Date().toISOString(),
         } satisfies Card;
       });
-
-      if (!nextStatus) {
-        return state;
-      }
 
       return {
         ...state,

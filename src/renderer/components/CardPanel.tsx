@@ -110,8 +110,12 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [isBulkPrefixEditOpen, setIsBulkPrefixEditOpen] = useState(false);
   const [bulkPrefixOldValue, setBulkPrefixOldValue] = useState('');
   const [bulkPrefixNewValue, setBulkPrefixNewValue] = useState('');
+  const [showDeprecatedCards, setShowDeprecatedCards] = useState(true); ///< 廃止カードを表示するか
   const handleFilterTextChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setFilterText(event.target.value);
+  }, []);
+  const toggleShowDeprecatedCards = useCallback(() => {
+    setShowDeprecatedCards((prev) => !prev);
   }, []);
   const toggleKindFilterValue = useCallback((kind: CardKind) => {
     setKindFilter((prev) => ({ ...prev, [kind]: !prev[kind] }));
@@ -388,16 +392,24 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * @details
    * パフォーマンス最適化: useMemoで依存配列を最小化し、不要な再計算を防ぐ。
    * フィルタが無効な場合は即座にtreeVisibleCardsを返し、追加の計算を避ける。
+   * 廃止カードの表示/非表示も制御する。
    */
   const visibleCards = useMemo(() => {
+    let baseCards = treeVisibleCards;
+
+    // 廃止カードのフィルタリング
+    if (!showDeprecatedCards) {
+      baseCards = baseCards.filter((card) => card.status !== 'deprecated');
+    }
+
     if (!filterActive) {
-      return treeVisibleCards;
+      return baseCards;
     }
     if (!filteredCardIds || filteredCardIds.size === 0) {
       return [] as Card[];
     }
-    return treeVisibleCards.filter((card) => filteredCardIds.has(card.id));
-  }, [filterActive, filteredCardIds, treeVisibleCards]);
+    return baseCards.filter((card) => filteredCardIds.has(card.id));
+  }, [filterActive, filteredCardIds, showDeprecatedCards, treeVisibleCards]);
 
   /**
    * @brief 段階的カードレンダリング（パフォーマンス改善フェーズ2）
@@ -1142,6 +1154,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             ⛓️
           </button>
+          <button
+            type="button"
+            className={`panel-toolbar__button${showDeprecatedCards ? ' panel-toolbar__button--active' : ''}`}
+            onClick={toggleShowDeprecatedCards}
+            title="廃止カードを表示"
+            aria-label="廃止カードを表示"
+          >
+            🗑️
+          </button>
         </div>
         <div className="panel-toolbar__group">
           <button
@@ -1867,6 +1888,7 @@ const CardListItem = React.memo(({
         role="listitem"
         tabIndex={0}
         data-tooltip={compactTooltip}
+        data-status={card.status}
         ref={anchorRef}
         draggable={Boolean(onDragStart)}
         onDragStart={handleDragStartInternal}

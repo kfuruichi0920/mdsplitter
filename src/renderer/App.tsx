@@ -1739,7 +1739,7 @@ export const App = () => {
   /**
    * @brief 選択カードのステータスを次段へ遷移させる。
    */
-  const handleCycleStatus = useCallback(() => {
+  const handleCycleStatus = useCallback(async () => {
     const targetLeafId = effectiveLeafId;
     if (!selectedCard || !targetLeafId || !activeTabId) {
       pushLog({
@@ -1751,7 +1751,7 @@ export const App = () => {
       return;
     }
 
-    const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
+    const nextStatus = await cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
     if (!nextStatus) {
       pushLog({
         id: `cycle-missing-${Date.now()}`,
