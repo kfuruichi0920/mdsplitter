@@ -58,6 +58,8 @@ const resolveRendererIndexFile = () => path.resolve(__dirname, '../renderer/inde
 const resolvePreloadPath = () => path.join(__dirname, 'preload.js');
 
 let mainWindow: BrowserWindow | null = null; ///< メインウィンドウ参照
+let isQuitting = false; ///< アプリ終了中フラグ
+let userClosingDecision: 'discard' | 'apply' | 'cancel' | null = null; ///< ユーザーのクローズ時の選択
 
 /**
  * @brief メインウィンドウを生成・初期化。
@@ -89,6 +91,18 @@ const createWindow = () => {
   if (isDev) {
     mainWindow.webContents.openDevTools({ mode: 'detach' }); //!< DevTools分離表示
   }
+
+  //! ウィンドウクローズイベントをフック
+  mainWindow.on('close', (event) => {
+    if (isQuitting) {
+      //! 既にアプリ終了処理中の場合は、そのままクローズを許可
+      return;
+    }
+
+    //! レンダラープロセスに未保存の変更確認を要求
+    event.preventDefault();
+    mainWindow?.webContents.send('app:checkUnsavedChanges');
+  });
 };
 
 
@@ -102,6 +116,35 @@ const createWindow = () => {
 ipcMain.handle('app:ping', async (_event, payload: string) => {
   console.log(`[main] received ping: ${payload}`); //!< 受信ログ
   return { ok: true, timestamp: Date.now() };
+});
+
+/**
+ * @brief 未保存の変更に対するユーザーの選択を処理。
+ * @details
+ * レンダラープロセスからのユーザーの選択を受け取り、適切なアクションを実行。
+ * - 'discard': 未保存の変更を破棄してアプリを終了
+ * - 'apply': 未保存の変更を保存してアプリを終了（レンダラー側で保存後、再度終了要求）
+ * - 'cancel': アプリの終了をキャンセル
+ */
+ipcMain.on('app:unsavedChangesResponse', (_event, response: { action: 'discard' | 'apply' | 'cancel' }) => {
+  const { action } = response;
+  userClosingDecision = action;
+
+  if (action === 'discard') {
+    //! 変更を破棄して終了
+    logMessage('info', 'ユーザーが変更を破棄してアプリを終了しました');
+    isQuitting = true;
+    mainWindow?.close();
+    app.quit();
+  } else if (action === 'apply') {
+    //! 変更を適用（レンダラー側で保存処理を実行）
+    //! 保存完了後、レンダラー側から再度終了要求を送信する
+    logMessage('info', 'ユーザーが変更を保存してアプリを終了します');
+  } else if (action === 'cancel') {
+    //! 終了をキャンセル
+    logMessage('info', 'ユーザーがアプリの終了をキャンセルしました');
+    userClosingDecision = null;
+  }
 });
 
 ipcMain.handle('settings:load', async () => {
@@ -320,8 +363,31 @@ app.whenReady().then(async () => {
  */
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    isQuitting = true;
     app.quit(); //!< アプリ終了
   }
+});
+
+/**
+ * @brief アプリ終了前の処理。
+ * @details
+ * Cmd+Qなどでアプリ全体の終了が要求された場合の処理。
+ */
+app.on('before-quit', (event) => {
+  if (isQuitting) {
+    //! 既にアプリ終了処理中の場合は、そのまま終了を許可
+    return;
+  }
+
+  //! 未保存の変更確認が必要な場合は終了を一時停止
+  if (!mainWindow) {
+    return;
+  }
+
+  event.preventDefault();
+  isQuitting = false;
+  //! レンダラープロセスに未保存の変更確認を要求
+  mainWindow.webContents.send('app:checkUnsavedChanges');
 });
 const sanitizeInputFileName = (fileName: string, fallbackExt = '.txt'): string => {
   const trimmed = fileName?.trim?.() ?? '';

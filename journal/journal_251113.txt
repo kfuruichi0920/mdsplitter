@@ -1,0 +1,146 @@
+# 作業記録 - 未保存の編集ファイル確認ダイアログ機能の実装
+日付: 2025-11-13
+担当: Claude (AI Agent)
+
+## 作業概要
+未保存の編集ファイルがある状態でアプリケーションをクローズする際に、ユーザー確認ダイアログを表示する機能を実装しました。
+
+## 実装内容
+
+### 1. UnsavedChangesDialogコンポーネントの作成
+**ファイル**: src/renderer/components/UnsavedChangesDialog.tsx
+
+**目的**: 未保存の変更がある場合のユーザー確認ダイアログUIを提供
+
+**実装詳細**:
+- 3つのボタンを表示:
+  1. 「全ての変更を破棄する」: 未保存の変更を破棄してアプリを終了
+  2. 「全ての変更を適用する」: 未保存の変更を保存してアプリを終了
+  3. 「キャンセル」: アプリの終了をキャンセル
+- Props:
+  - isOpen: ダイアログの表示状態
+  - unsavedTabCount: 未保存のタブ数
+  - isSaving: 保存中フラグ
+  - onAction: ユーザーアクションのコールバック
+
+**根拠**: 既存のSettingsModalとConversionModalのパターンに従い、一貫性のあるUIを提供
+
+### 2. preload.tsへのIPC API追加
+**ファイル**: src/main/preload.ts
+
+**目的**: メインプロセスとレンダラープロセス間のIPC通信を安全に提供
+
+**実装詳細**:
+- UnsavedChangesAction型とUnsavedChangesResponse型を定義
+- AppAPI型にunsavedChangesセクションを追加:
+  - onCheckUnsavedChanges: メインプロセスからの確認要求リスナー
+  - sendResponse: レンダラーからメインプロセスへの応答送信
+- contextBridgeを使用して、window.app.unsavedChangesとして公開
+
+**根拠**:
+- preload.ts 25-35行目: 型定義の追加
+- preload.ts 85-91行目: AppAPI型への追加
+- preload.ts 154-161行目: API実装
+
+### 3. メインプロセスのクローズイベントフック
+**ファイル**: src/main/main.ts
+
+**目的**: アプリケーションのクローズイベントをインターセプトし、未保存の変更確認を実行
+
+**実装詳細**:
+- グローバル変数を追加:
+  - isQuitting: アプリ終了中フラグ (61行目)
+  - userClosingDecision: ユーザーのクローズ時の選択 (62行目)
+- window.on('close')イベントハンドラーを追加 (96-105行目):
+  - isQuittingフラグをチェック
+  - レンダラープロセスに'app:checkUnsavedChanges'イベントを送信
+  - event.preventDefault()でクローズを一時停止
+- app.on('before-quit')イベントハンドラーを追加 (376-391行目):
+  - Cmd+Qなどのアプリ全体終了要求を処理
+  - レンダラープロセスに確認要求を送信
+- ipcMain.on('app:unsavedChangesResponse')ハンドラーを追加 (129-148行目):
+  - ユーザーの選択を受け取り、適切なアクションを実行:
+    - 'discard': isQuittingをtrueに設定し、app.quit()を呼び出し
+    - 'apply': レンダラー側で保存処理を実行（保存完了後、レンダラーが再度終了要求）
+    - 'cancel': 終了をキャンセル
+
+**根拠**:
+- Electronのwindow.on('close')とapp.on('before-quit')を組み合わせて、ウィンドウクローズとアプリ終了の両方に対応
+- event.preventDefault()を使用してクローズを一時停止し、ユーザーの選択を待つ
+
+### 4. App.tsxへのダイアログ統合
+**ファイル**: src/renderer/App.tsx
+
+**目的**: ダイアログをアプリケーションUIに統合し、IPCイベントを処理
+
+**実装詳細**:
+- インポートを追加 (48行目):
+  - UnsavedChangesDialogコンポーネント
+  - UnsavedChangesAction型
+- 状態管理を追加 (551-552行目):
+  - isUnsavedChangesDialogOpen: ダイアログの表示状態
+  - isSavingForClose: クローズ前の保存処理中フラグ
+- unsavedTabCountの計算 (592-594行目):
+  - useMemoを使用して全タブのisDirtyフラグをチェック
+  - 未保存のタブ数を返す
+- handleUnsavedChangesActionコールバックを追加 (604-662行目):
+  - 'cancel': ダイアログを閉じ、'cancel'応答を送信
+  - 'discard': ダイアログを閉じ、'discard'応答を送信
+  - 'apply': 未保存のタブを全て保存し、'apply'応答を送信
+    - エラー発生時は'cancel'応答を送信
+- IPCイベントリスナーをuseEffectで設定 (550-566行目):
+  - window.app.unsavedChanges.onCheckUnsavedChangesでリスナーを登録
+  - 未保存のタブがあればダイアログを表示
+  - 未保存のタブがなければそのまま'discard'応答を送信
+- JSXにUnsavedChangesDialogを追加 (2771-2776行目):
+  - NotificationCenterの直後に配置
+  - isOpen、unsavedTabCount、isSaving、onActionをPropsとして渡す
+
+**根拠**:
+- workspaceStore.ts 88行目: PanelTabStateにisDirtyフラグが定義されている
+- 未保存状態の検出: 全タブのisDirtyフラグをチェックすることで、未保存のタブを特定
+
+## 設計上の決定事項
+
+### 1. ダイアログの表示タイミング
+**決定**: ウィンドウクローズ時とアプリ終了時の両方でダイアログを表示
+**理由**: ユーザーが×ボタンをクリックした場合とCmd+Qでアプリを終了した場合の両方に対応する必要がある
+
+### 2. 保存処理の実装
+**決定**: ファイル名が設定されていないタブはスキップし、警告ログを出力
+**理由**: ファイル名がないタブを保存することはできないため、ユーザーに通知して処理を続行
+
+### 3. エラーハンドリング
+**決定**: 保存中にエラーが発生した場合は、終了をキャンセルしてユーザーに通知
+**理由**: データの損失を防ぐため、保存に失敗した場合はアプリを終了しない
+
+## テスト項目
+以下の項目について、実際の動作環境でテストが必要:
+1. 未保存のタブがある状態でウィンドウの×ボタンをクリック
+2. 未保存のタブがある状態でCmd+Q（macOS）またはAlt+F4（Windows）でアプリを終了
+3. ダイアログで「全ての変更を破棄する」を選択
+4. ダイアログで「全ての変更を適用する」を選択し、保存が成功
+5. ダイアログで「全ての変更を適用する」を選択し、保存が失敗
+6. ダイアログで「キャンセル」を選択
+7. 未保存のタブがない状態でアプリを終了（ダイアログが表示されないことを確認）
+
+## 制限事項
+1. ビルド環境の制約により、実際のアプリケーションでの動作確認は実施していない
+2. TypeScriptの型チェックは通過しているが、実行時エラーの可能性は残る
+
+## 今後の改善案
+1. ファイル名が設定されていないタブの保存ダイアログを表示する機能
+2. 個別のタブごとに保存/破棄を選択できるUIの追加
+3. 自動保存機能の実装
+4. ユーザー設定で「終了時に確認しない」オプションの追加
+
+## 関連ファイル
+- src/renderer/components/UnsavedChangesDialog.tsx (新規作成)
+- src/main/preload.ts (編集)
+- src/main/main.ts (編集)
+- src/renderer/App.tsx (編集)
+
+## 参考資料
+- Electron公式ドキュメント: https://www.electronjs.org/docs/latest/
+- workspaceStore.ts: 未保存状態管理の仕様
+- SettingsModal.tsx: 既存のモーダルコンポーネントのパターン

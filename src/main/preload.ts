@@ -23,6 +23,18 @@ import type { DocumentLoadErrorCode } from './documentLoader';
 
 
 /**
+ * @brief 未保存の変更に対するユーザーのアクション。
+ */
+export type UnsavedChangesAction = 'discard' | 'apply' | 'cancel';
+
+/**
+ * @brief 未保存の変更確認の応答。
+ */
+export type UnsavedChangesResponse = {
+  action: UnsavedChangesAction;
+};
+
+/**
  * @brief window.appで公開するAPI型定義。
  * @details
  * ping: メインプロセスへメッセージ送信し、応答をPromiseで返す。
@@ -69,6 +81,12 @@ type AppAPI = {
   };
   document: {
     pickSource: () => Promise<PickDocumentResult>;
+  };
+  unsavedChanges: {
+    /** 未保存の変更確認イベントのリスナーを設定。 */
+    onCheckUnsavedChanges: (callback: () => void) => void;
+    /** 未保存の変更に対するユーザーの選択を送信。 */
+    sendResponse: (response: UnsavedChangesResponse) => void;
   };
 };
 
@@ -132,6 +150,14 @@ const api: AppAPI = {
   },
   document: {
     pickSource: async () => ipcRenderer.invoke('document:pickSource'),
+  },
+  unsavedChanges: {
+    onCheckUnsavedChanges: (callback: () => void) => {
+      ipcRenderer.on('app:checkUnsavedChanges', callback);
+    },
+    sendResponse: (response: UnsavedChangesResponse) => {
+      ipcRenderer.send('app:unsavedChangesResponse', response);
+    },
   },
 };
 

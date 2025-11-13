@@ -45,6 +45,7 @@ import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { ConversionModal } from './components/ConversionModal';
+import { UnsavedChangesDialog, type UnsavedChangesAction } from './components/UnsavedChangesDialog';
 import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
 import { createSearchMatcher, buildSnippet } from './utils/search';
@@ -539,6 +540,31 @@ export const App = () => {
       return { ...prev, selectedStrategy: appSettings.converter.strategy } satisfies ConversionModalDisplayState;
     });
   }, [appSettings]);
+
+  /**
+   * @brief 未保存の変更確認IPCイベントリスナーを設定。
+   * @details
+   * メインプロセスからの未保存の変更確認要求を受け取り、
+   * 未保存のタブがあればダイアログを表示する。
+   */
+  useEffect(() => {
+    const handleCheckUnsavedChanges = () => {
+      const dirtyTabsCount = Object.values(tabs).filter((tab) => tab.isDirty).length;
+
+      if (dirtyTabsCount > 0) {
+        //! 未保存のタブがある場合はダイアログを表示
+        setUnsavedChangesDialogOpen(true);
+      } else {
+        //! 未保存のタブがない場合はそのまま終了を許可
+        window.app.unsavedChanges.sendResponse({ action: 'discard' });
+      }
+    };
+
+    window.app.unsavedChanges.onCheckUnsavedChanges(handleCheckUnsavedChanges);
+
+    //! クリーンアップ関数は不要（ipcRenderer.onはリスナーを上書きするため）
+  }, [tabs]);
+
   const [searchScope, setSearchScope] = useState<SearchScope>('current');
   const [searchUseRegex, setSearchUseRegex] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
@@ -547,6 +573,8 @@ export const App = () => {
   const [traceBusy, setTraceBusy] = useState<boolean>(false); ///< トレース操作中フラグ。
   const [isTraceFilterOpen, setTraceFilterOpen] = useState<boolean>(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
+  const [isUnsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false); ///< 未保存の変更確認ダイアログの表示状態。
+  const [isSavingForClose, setSavingForClose] = useState(false); ///< クローズ前の保存処理中フラグ。
   const searchScopeEntries = useMemo(() => Object.entries(SEARCH_SCOPE_LABELS) as [SearchScope, string][], []);
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
@@ -579,6 +607,84 @@ export const App = () => {
     const parsed = new Date(activeTab.lastSavedAt);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }, [activeTab?.lastSavedAt]);
+
+  /**
+   * @brief 未保存のタブ数を計算。
+   * @details
+   * 全タブの isDirty フラグをチェックして、未保存のタブ数を返す。
+   * @return 未保存のタブ数
+   */
+  const unsavedTabCount = useMemo(() => {
+    return Object.values(tabs).filter((tab) => tab.isDirty).length;
+  }, [tabs]);
+
+  /**
+   * @brief 未保存の変更に対するユーザーアクションを処理。
+   * @details
+   * - 'discard': 未保存の変更を破棄してアプリを終了
+   * - 'apply': 未保存の変更を保存してアプリを終了
+   * - 'cancel': アプリの終了をキャンセル
+   * @param action ユーザーが選択したアクション
+   */
+  const handleUnsavedChangesAction = useCallback(
+    async (action: UnsavedChangesAction) => {
+      if (action === 'cancel') {
+        //! 終了をキャンセル
+        setUnsavedChangesDialogOpen(false);
+        window.app.unsavedChanges.sendResponse({ action: 'cancel' });
+        pushLog('info', 'アプリの終了をキャンセルしました');
+        return;
+      }
+
+      if (action === 'discard') {
+        //! 変更を破棄して終了
+        setUnsavedChangesDialogOpen(false);
+        window.app.unsavedChanges.sendResponse({ action: 'discard' });
+        pushLog('info', '未保存の変更を破棄してアプリを終了します');
+        return;
+      }
+
+      if (action === 'apply') {
+        //! 変更を保存してから終了
+        setUnsavedChangesDialogOpen(false);
+        setSavingForClose(true);
+        pushLog('info', '未保存の変更を保存してからアプリを終了します');
+
+        try {
+          //! 未保存のタブを全て保存
+          const dirtyTabs = Object.values(tabs).filter((tab) => tab.isDirty);
+
+          for (const tab of dirtyTabs) {
+            if (!tab.fileName) {
+              pushLog('warn', `タブ「${tab.title}」はファイル名が未設定のため保存をスキップしました`);
+              continue;
+            }
+
+            const snapshot: WorkspaceSnapshot = {
+              cards: tab.cards,
+              savedAt: new Date().toISOString(),
+            };
+
+            await window.app.workspace.saveCardFile(tab.fileName, snapshot);
+            markSaved(tab.id, snapshot.savedAt);
+            pushLog('info', `カードファイル「${tab.fileName}」を保存しました`);
+          }
+
+          //! 全てのタブを保存後、終了を通知
+          window.app.unsavedChanges.sendResponse({ action: 'apply' });
+          pushLog('info', '全ての変更を保存しました。アプリを終了します');
+        } catch (error) {
+          pushLog('error', `保存中にエラーが発生しました: ${String(error)}`);
+          notify('error', '保存に失敗しました。アプリの終了をキャンセルします');
+          //! エラーが発生した場合は終了をキャンセル
+          window.app.unsavedChanges.sendResponse({ action: 'cancel' });
+        } finally {
+          setSavingForClose(false);
+        }
+      }
+    },
+    [tabs, markSaved, pushLog, notify],
+  );
 
   const sanitizeSnapshotCards = useCallback(
     (input: Card[]) => {
@@ -2662,6 +2768,12 @@ export const App = () => {
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
       <NotificationCenter />
+      <UnsavedChangesDialog
+        isOpen={isUnsavedChangesDialogOpen}
+        unsavedTabCount={unsavedTabCount}
+        isSaving={isSavingForClose}
+        onAction={handleUnsavedChangesAction}
+      />
       <SettingsModal
         isOpen={settingsModalState.open}
         isLoading={settingsModalState.loading}
