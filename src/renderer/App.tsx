@@ -1766,47 +1766,50 @@ export const App = () => {
     const originalStatus = selectedCard.status;
     const proposedNextStatus = getNextCardStatus(originalStatus);
 
-    // 廃止ステータスへの変更を試みる場合、トレースがあるかチェック
-    if (proposedNextStatus === 'deprecated' && (selectedCard.hasLeftTrace || selectedCard.hasRightTrace)) {
-      const confirmed = window.confirm(
-        `カード「${selectedCard.title}」にはトレースが存在します。\n\n廃止ステータスに変更するには、トレースを削除する必要があります。\n強制的にトレースを削除しますか？`
-      );
+    // 廃止ステータスへの変更を試みる場合、実際にトレースが存在するかチェック
+    if (proposedNextStatus === 'deprecated') {
+      const traceState = useTraceStore.getState();
+      const cache = traceState.cache;
+      const fileName = activeTabState.fileName;
+      const cardId = selectedCard.id;
 
-      if (!confirmed) {
-        pushLog({
-          id: `cycle-cancelled-${Date.now()}`,
-          level: 'INFO',
-          message: `カード「${selectedCard.title}」の廃止ステータスへの変更をキャンセルしました。`,
-          timestamp: new Date(),
-        });
-        return;
-      }
+      // 対象カードが含まれるすべてのファイルペアを収集
+      const affectedPairs: Array<{ leftFile: string; rightFile: string; key: string }> = [];
 
-      // すべてのトレースを削除
-      try {
-        const traceState = useTraceStore.getState();
-        const workspaceActions = useWorkspaceStore.getState();
-        const cache = traceState.cache;
-        const fileName = activeTabState.fileName;
-        const cardId = selectedCard.id;
+      Object.values(cache).forEach((entry) => {
+        if (entry.status !== 'ready') return;
 
-        // 対象カードが含まれるすべてのファイルペアを収集
-        const affectedPairs: Array<{ leftFile: string; rightFile: string; key: string }> = [];
+        const hasInLeft = entry.leftFile === fileName && entry.relations.some(r => r.left_ids.includes(cardId));
+        const hasInRight = entry.rightFile === fileName && entry.relations.some(r => r.right_ids.includes(cardId));
 
-        Object.values(cache).forEach((entry) => {
-          if (entry.status !== 'ready') return;
+        if (hasInLeft || hasInRight) {
+          affectedPairs.push({
+            leftFile: entry.leftFile,
+            rightFile: entry.rightFile,
+            key: entry.key,
+          });
+        }
+      });
 
-          const hasInLeft = entry.leftFile === fileName && entry.relations.some(r => r.left_ids.includes(cardId));
-          const hasInRight = entry.rightFile === fileName && entry.relations.some(r => r.right_ids.includes(cardId));
+      // 実際にトレースが存在する場合のみ確認ダイアログを表示
+      if (affectedPairs.length > 0) {
+        const confirmed = window.confirm(
+          `カード「${selectedCard.title}」にはトレースが存在します。\n\n廃止ステータスに変更するには、トレースを削除する必要があります。\n強制的にトレースを削除しますか？`
+        );
 
-          if (hasInLeft || hasInRight) {
-            affectedPairs.push({
-              leftFile: entry.leftFile,
-              rightFile: entry.rightFile,
-              key: entry.key,
-            });
-          }
-        });
+        if (!confirmed) {
+          pushLog({
+            id: `cycle-cancelled-${Date.now()}`,
+            level: 'INFO',
+            message: `カード「${selectedCard.title}」の廃止ステータスへの変更をキャンセルしました。`,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        // すべてのトレースを削除
+        try {
+          const workspaceActions = useWorkspaceStore.getState();
 
         // 各ファイルペアのトレースを更新
         for (const pair of affectedPairs) {
@@ -1852,21 +1855,22 @@ export const App = () => {
           }
         }
 
-        pushLog({
-          id: `trace-removed-${Date.now()}`,
-          level: 'INFO',
-          message: `カード「${selectedCard.title}」のトレースを削除しました（${affectedPairs.length}件のファイルペア）。`,
-          timestamp: new Date(),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'unknown error';
-        pushLog({
-          id: `trace-remove-error-${Date.now()}`,
-          level: 'ERROR',
-          message: `トレース削除中にエラーが発生しました: ${message}`,
-          timestamp: new Date(),
-        });
-        return;
+          pushLog({
+            id: `trace-removed-${Date.now()}`,
+            level: 'INFO',
+            message: `カード「${selectedCard.title}」のトレースを削除しました（${affectedPairs.length}件のファイルペア）。`,
+            timestamp: new Date(),
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'unknown error';
+          pushLog({
+            id: `trace-remove-error-${Date.now()}`,
+            level: 'ERROR',
+            message: `トレース削除中にエラーが発生しました: ${message}`,
+            timestamp: new Date(),
+          });
+          return;
+        }
       }
     }
 
