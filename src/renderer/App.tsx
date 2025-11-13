@@ -475,6 +475,7 @@ export const App = () => {
   const openTab = useWorkspaceStore((state) => state.openTab);
   const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
+  const updateCard = useWorkspaceStore((state) => state.updateCard);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
@@ -1752,6 +1753,38 @@ export const App = () => {
     }
 
     const originalStatus = selectedCard.status;
+    const proposedNextStatus = getNextCardStatus(originalStatus);
+
+    // 廃止ステータスへの変更を試みる場合、トレースがあるかチェック
+    if (proposedNextStatus === 'deprecated' && (selectedCard.hasLeftTrace || selectedCard.hasRightTrace)) {
+      const confirmed = window.confirm(
+        `カード「${selectedCard.title}」にはトレースが存在します。\n\n廃止ステータスに変更するには、トレースを削除する必要があります。\n強制的にトレースを削除しますか？`
+      );
+
+      if (!confirmed) {
+        pushLog({
+          id: `cycle-cancelled-${Date.now()}`,
+          level: 'INFO',
+          message: `カード「${selectedCard.title}」の廃止ステータスへの変更をキャンセルしました。`,
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      // トレースを削除
+      updateCard(targetLeafId, activeTabId, selectedCard.id, {
+        hasLeftTrace: false,
+        hasRightTrace: false,
+      });
+
+      pushLog({
+        id: `trace-removed-${Date.now()}`,
+        level: 'INFO',
+        message: `カード「${selectedCard.title}」のトレースを削除しました。`,
+        timestamp: new Date(),
+      });
+    }
+
     const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
 
     if (!nextStatus) {
@@ -1764,12 +1797,12 @@ export const App = () => {
       return;
     }
 
-    // ステータスが変更されなかった場合、トレースがあって阻止された可能性を確認
-    if (nextStatus === originalStatus && getNextCardStatus(originalStatus) === 'deprecated') {
+    // ステータスが変更されなかった場合（予期しないエラー）
+    if (nextStatus === originalStatus) {
       pushLog({
-        id: `cycle-blocked-${Date.now()}`,
+        id: `cycle-failed-${Date.now()}`,
         level: 'WARN',
-        message: `カード「${selectedCard.title}」はトレースがあるため、廃止ステータスに変更できません。先にトレースを削除してください。`,
+        message: `カード「${selectedCard.title}」のステータス変更に失敗しました。`,
         timestamp: new Date(),
       });
       return;
@@ -1781,7 +1814,7 @@ export const App = () => {
       message: `カード「${selectedCard.title}」のステータスを ${nextStatus} に変更しました。`,
       timestamp: new Date(),
     });
-  }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard]);
+  }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard, updateCard]);
 
   /**
    * @brief テーマを切り替える。
