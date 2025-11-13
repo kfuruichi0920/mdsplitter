@@ -807,3 +807,262 @@ const handleToggleDisplayMode = useCallback(() => {
 - `src/renderer/store/uiStore.ts` - UI設定ストア
 - `src/renderer/components/CardPanel.tsx` - カードパネルコンポーネント
 - `tests/e2e/card-display-mode.spec.ts` - カード表示モードのE2Eテスト（スキップ中）
+
+---
+
+## カードID自動付与機能の実装
+
+### 作業概要
+将来機能として計画されていた「4. ID自動付与 (cardIdフィールド追加)」を実装。
+カード変換時に、ユーザー指定の接頭語と番号でカードIDを自動付与できるようにした。
+
+### 実施内容
+
+#### 1. Card型にcardIdフィールドを追加
+
+**目的**: カードにユーザー向け識別子を追加
+
+**実施内容**:
+- workspace.tsのCard型に`cardId?: string`フィールドを追加
+- cardIdはオプショナルフィールド（既存カードとの互換性を維持）
+- バリデーション関数isWorkspaceSnapshotも更新
+
+**変更ファイル**:
+- `src/shared/workspace.ts:59` - cardIdフィールドを追加
+- `src/shared/workspace.ts:139` - バリデーション関数を更新
+
+**実装の詳細**:
+```typescript
+export interface Card {
+  id: string;              ///< 一意ID（UUID）
+  cardId?: string;         ///< ユーザー向け識別子（例: REQ-001, SPEC-042）
+  // ... 他のフィールド
+}
+```
+
+**根拠**:
+- `doc/implementation_plan_future_features.md:175-189` - フェーズ1のID自動付与仕様
+
+**期待効果**:
+- ユーザーがカードを識別しやすくなる
+- トレーサビリティ管理が向上
+- 検索・フィルタ機能の拡張が可能
+
+---
+
+#### 2. ConversionModal.tsxにID設定UIを追加
+
+**目的**: カード変換時にID設定を指定できるようにする
+
+**実施内容**:
+- CardIdAssignmentRule型を定義（'all' | 'heading' | 'manual'）
+- ConversionModalDisplayState型にID設定フィールドを追加（cardIdPrefix, cardIdStartNumber, cardIdDigits, cardIdAssignmentRule）
+- ConversionModal.tsxにID設定セクション（セクション3）を追加
+- 接頭語、開始番号、桁数、付与ルールの入力UI
+- プレビュー表示（例: REQ-001, REQ-002, REQ-003, ...）
+
+**変更ファイル**:
+- `src/renderer/types/conversion.ts:18-43` - CardIdAssignmentRule型とConversionModalDisplayState型を更新
+- `src/renderer/components/ConversionModal.tsx:3` - CardIdAssignmentRule型をインポート
+- `src/renderer/components/ConversionModal.tsx:13-16` - propsにID設定コールバックを追加
+- `src/renderer/components/ConversionModal.tsx:164-253` - ID設定セクションのUIを追加
+- `src/renderer/App.tsx:53` - CardIdAssignmentRule型をインポート
+- `src/renderer/App.tsx:402-405` - buildConversionStateにID設定デフォルト値を追加
+- `src/renderer/App.tsx:1457-1471` - ID設定変更用のコールバック関数を追加
+- `src/renderer/App.tsx:2681-2684` - ConversionModalのpropsにコールバックを追加
+
+**実装の詳細**:
+```typescript
+// 接頭語入力
+<input
+  id="card-id-prefix"
+  type="text"
+  value={state.cardIdPrefix}
+  onChange={(e) => onCardIdPrefixChange(e.target.value)}
+  placeholder="例: REQ, SPEC, TEST"
+  maxLength={10}
+/>
+
+// 付与ルール選択
+<label>
+  <input
+    type="radio"
+    value="all"
+    checked={state.cardIdAssignmentRule === 'all'}
+    onChange={() => onCardIdAssignmentRuleChange('all')}
+  />
+  すべてのカード
+</label>
+```
+
+**根拠**:
+- `doc/implementation_plan_future_features.md:190-220` - ID設定UIの仕様
+
+**期待効果**:
+- ユーザーがカード変換時にID設定を柔軟に指定できる
+- プレビュー表示により、IDの形式を事前に確認可能
+
+---
+
+#### 3. ID自動生成ロジックをpipeline.tsに実装
+
+**目的**: カード変換時にIDを自動付与する
+
+**実施内容**:
+- CardIdOptions型を定義
+- ConversionPipelineOptionsにcardIdOptionsフィールドを追加
+- generateCardId関数を実装（接頭語と番号からIDを生成）
+- assignCardIds関数を実装（カード配列にIDを自動付与）
+- convertDocument関数を更新してID自動付与処理を追加
+- App.tsxのhandleConversionExecuteでcardIdOptionsを渡す
+
+**変更ファイル**:
+- `src/shared/conversion/pipeline.ts:12-24` - CardIdAssignmentRule型、CardIdOptions型、ConversionPipelineOptions型を更新
+- `src/shared/conversion/pipeline.ts:50-100` - generateCardId関数とassignCardIds関数を追加
+- `src/shared/conversion/pipeline.ts:102-142` - convertDocument関数を更新
+- `src/renderer/App.tsx:1630-1636` - handleConversionExecuteでcardIdOptionsを渡す
+
+**実装の詳細**:
+```typescript
+const generateCardId = (prefix: string, number: number, digits: number): string => {
+  if (!prefix) {
+    return String(number).padStart(digits, '0');
+  }
+  return `${prefix}-${String(number).padStart(digits, '0')}`;
+};
+
+const assignCardIds = <T extends { kind?: string; cardId?: string }>(
+  cards: T[],
+  options: CardIdOptions,
+): T[] => {
+  const { prefix, startNumber, digits, assignmentRule } = options;
+
+  if (assignmentRule === 'manual') {
+    return cards;
+  }
+
+  let currentNumber = startNumber;
+
+  return cards.map((card) => {
+    if (card.cardId) {
+      return card;
+    }
+
+    if (assignmentRule === 'heading' && card.kind !== 'heading') {
+      return card;
+    }
+
+    const cardId = generateCardId(prefix, currentNumber, digits);
+    currentNumber++;
+
+    return { ...card, cardId };
+  });
+};
+```
+
+**根拠**:
+- `doc/implementation_plan_future_features.md:203-207` - ID生成ロジックの仕様
+
+**期待効果**:
+- カード変換時にIDが自動付与される
+- 付与ルール（すべて/見出しのみ/手動）に応じた柔軟なID付与
+- 接頭語、開始番号、桁数を指定可能
+
+---
+
+#### 4. CardPanel.tsxにカードID表示エリアを追加
+
+**目的**: カードにIDが付与されている場合に表示する
+
+**実施内容**:
+- CardListItemコンポーネントにcardID表示を追加
+- コンパクトモードと詳細モードの両方に対応
+- カードIDがある場合のみ表示（条件付きレンダリング）
+- React.memoのカスタム比較関数にcardIdのチェックを追加
+
+**変更ファイル**:
+- `src/renderer/components/CardPanel.tsx:1544` - コンパクトモードにcardID表示を追加
+- `src/renderer/components/CardPanel.tsx:1557` - 詳細モードにcardID表示を追加
+- `src/renderer/components/CardPanel.tsx:1622` - React.memoの比較関数にcardIdチェックを追加
+
+**実装の詳細**:
+```typescript
+// コンパクトモード
+{card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
+<span className="card__title card__title--truncate">{card.title}</span>
+
+// 詳細モード
+<header className="card__header">
+  {/* ... */}
+  {card.cardId && <span className="card__card-id">[{card.cardId}]</span>}
+  <span className="card__title">{card.title}</span>
+  {/* ... */}
+</header>
+```
+
+**根拠**:
+- `doc/implementation_plan_future_features.md:208-212` - カードID表示エリアの仕様
+
+**期待効果**:
+- ユーザーがカードIDを視覚的に確認できる
+- カードの識別が容易になる
+
+---
+
+## 決定事項
+
+### 1. cardIdフィールドの位置
+- Card型の2番目のフィールドとして配置
+- 理由: id（内部識別子）の直後に配置することで、識別子としての役割を明確化
+
+### 2. cardIdのフォーマット
+- 接頭語 + ハイフン + 番号（ゼロパディング）
+- 例: REQ-001, SPEC-042, TEST-123
+- 接頭語が空の場合は番号のみ（001, 042, 123）
+
+### 3. 付与ルールのデフォルト
+- デフォルトは'manual'（手動指定のみ）
+- 理由: 既存のワークフローに影響を与えないため
+
+### 4. cardID表示位置
+- タイトルの前に表示（[cardId] タイトル）
+- 理由: タイトルと一体化して表示することで、カードの識別が容易
+
+---
+
+## 期待される効果
+
+### ユーザビリティ
+- カードの識別が容易になる
+- トレーサビリティ管理が向上
+- 検索・フィルタ機能の拡張が可能
+
+### 開発効率
+- カードID編集機能、重複チェック機能など、将来の拡張が容易
+- 他の将来機能（マトリクス編集、未トレースカード数表示など）の前提条件が整う
+
+---
+
+## 次のステップ
+
+### 将来機能（未実装）
+- カードID編集機能（ダブルクリックで編集可能）
+- 重複チェック機能
+- ID検索機能
+- カードIDでのソート機能
+
+### テスト
+- カード変換時のID自動付与のテスト
+- 付与ルール（すべて/見出しのみ/手動）のテスト
+- カードID表示のテスト
+
+### コミット
+- 変更内容をコミット
+- ブランチ: `claude/add-card-id-field-011CV4KUq5mE5162Tvm9WEPE`
+
+---
+
+## 参考資料
+- `doc/implementation_plan_future_features.md` - 将来機能の開発計画書
+- `doc/software_requirement.md:505-507` - ID自動付与の要件
+- `AGENT.md` - 作業プロトコル

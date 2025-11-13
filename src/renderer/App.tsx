@@ -50,7 +50,7 @@ import { findVerticalPairForLeaf } from './utils/traceLayout';
 import { createSearchMatcher, buildSnippet } from './utils/search';
 import { convertDocument } from '@/shared/conversion/pipeline';
 import type { NormalizedDocument } from '@/shared/conversion/types';
-import type { ConversionModalDisplayState, ConversionSourceSummary } from './types/conversion';
+import type { CardIdAssignmentRule, ConversionModalDisplayState, ConversionSourceSummary } from './types/conversion';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -398,6 +398,11 @@ const buildConversionState = (strategy: ConverterStrategy): ConversionModalDispl
   selectedStrategy: strategy,
   progressPercent: 0,
   progressMessage: '待機中',
+  // カードID設定のデフォルト値
+  cardIdPrefix: '',
+  cardIdStartNumber: 1,
+  cardIdDigits: 3,
+  cardIdAssignmentRule: 'all', // デフォルトを'all'に変更（すべてのカードにIDを付与）
 });
 
 /**
@@ -1449,6 +1454,22 @@ export const App = () => {
     setConversionState((prev) => ({ ...prev, warnAcknowledged: ack }));
   }, []);
 
+  const handleCardIdPrefixChange = useCallback((prefix: string) => {
+    setConversionState((prev) => ({ ...prev, cardIdPrefix: prefix }));
+  }, []);
+
+  const handleCardIdStartNumberChange = useCallback((startNumber: number) => {
+    setConversionState((prev) => ({ ...prev, cardIdStartNumber: startNumber }));
+  }, []);
+
+  const handleCardIdDigitsChange = useCallback((digits: number) => {
+    setConversionState((prev) => ({ ...prev, cardIdDigits: digits }));
+  }, []);
+
+  const handleCardIdAssignmentRuleChange = useCallback((rule: CardIdAssignmentRule) => {
+    setConversionState((prev) => ({ ...prev, cardIdAssignmentRule: rule }));
+  }, []);
+
   const handleConversionCancel = useCallback(() => {
     if (conversionState.converting) {
       setConversionState((prev) => ({ ...prev, cancelRequested: true, error: null }));
@@ -1605,6 +1626,13 @@ export const App = () => {
             complete: '変換結果を整えています…',
           };
           updateConversionProgress(event.percent, phaseMessages[event.phase] ?? '処理しています…');
+        },
+        // カードID自動付与設定を渡す
+        cardIdOptions: {
+          prefix: conversionState.cardIdPrefix,
+          startNumber: conversionState.cardIdStartNumber,
+          digits: conversionState.cardIdDigits,
+          assignmentRule: conversionState.cardIdAssignmentRule,
         },
       });
 
@@ -2657,6 +2685,10 @@ export const App = () => {
         onConvert={handleConversionExecute}
         onAcknowledgeWarning={handleConversionWarningAck}
         onCancelConversion={handleConversionCancel}
+        onCardIdPrefixChange={handleCardIdPrefixChange}
+        onCardIdStartNumberChange={handleCardIdStartNumberChange}
+        onCardIdDigitsChange={handleCardIdDigitsChange}
+        onCardIdAssignmentRuleChange={handleCardIdAssignmentRuleChange}
       />
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">

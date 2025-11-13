@@ -15,6 +15,15 @@ export interface ConversionSourceSummary {
   workspacePath: string | null;
 }
 
+/**
+ * @brief カードID付与ルール。
+ * @details
+ * - 'all': すべてのカードにIDを付与
+ * - 'heading': 見出しカードのみIDを付与
+ * - 'manual': 手動指定のみ（自動付与しない）
+ */
+export type CardIdAssignmentRule = 'all' | 'heading' | 'manual';
+
 export interface ConversionModalDisplayState {
   isOpen: boolean;
   picking: boolean;
@@ -26,4 +35,9 @@ export interface ConversionModalDisplayState {
   selectedStrategy: ConverterStrategy;
   progressPercent: number;
   progressMessage: string;
+  // カードID自動付与設定
+  cardIdPrefix: string;                     ///< ID接頭語（例: REQ, SPEC, TEST）
+  cardIdStartNumber: number;                ///< 開始番号（デフォルト: 1）
+  cardIdDigits: number;                     ///< 桁数（ゼロパディング、デフォルト: 3）
+  cardIdAssignmentRule: CardIdAssignmentRule; ///< 付与ルール
 }

@@ -21,7 +21,7 @@ import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '.
 import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEngagementStore';
 import { useSplitStore } from '../store/splitStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
-import { CARD_KIND_VALUES } from '@/shared/workspace';
+import { CARD_KIND_VALUES, parseCardId } from '@/shared/workspace';
 import { useVirtualizedCards } from '../hooks/useVirtualizedCards';
 
 /** ステータスラベル表示用マッピング。 */
@@ -107,6 +107,9 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [isKindFilterOpen, setKindFilterOpen] = useState(false);
   const kindFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const kindFilterPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [isBulkPrefixEditOpen, setIsBulkPrefixEditOpen] = useState(false);
+  const [bulkPrefixOldValue, setBulkPrefixOldValue] = useState('');
+  const [bulkPrefixNewValue, setBulkPrefixNewValue] = useState('');
   const handleFilterTextChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setFilterText(event.target.value);
   }, []);
@@ -491,6 +494,80 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       onLog?.('WARN', 'カードを削除できませんでした。');
     }
   }, [activeTabId, deleteCards, leafId, onLog, selectedCardIds]);
+
+  const handleOpenBulkPrefixEdit = useCallback(() => {
+    if (!activeTab || !activeTab.cards || activeTab.cards.length === 0) {
+      onLog?.('WARN', 'カードが存在しません。');
+      return;
+    }
+    // 既存のカードから最も一般的な接頭語を取得
+    const prefixCounts = new Map<string, number>();
+    for (const card of activeTab.cards) {
+      if (card.cardId) {
+        const parsed = parseCardId(card.cardId);
+        if (parsed) {
+          const count = prefixCounts.get(parsed.prefix) ?? 0;
+          prefixCounts.set(parsed.prefix, count + 1);
+        }
+      }
+    }
+    let mostCommonPrefix = '';
+    let maxCount = 0;
+    for (const [prefix, count] of prefixCounts.entries()) {
+      if (count > maxCount) {
+        mostCommonPrefix = prefix;
+        maxCount = count;
+      }
+    }
+    setBulkPrefixOldValue(mostCommonPrefix);
+    setBulkPrefixNewValue('');
+    setIsBulkPrefixEditOpen(true);
+  }, [activeTab, onLog]);
+
+  const handleBulkPrefixEditSave = useCallback(() => {
+    if (!activeTabId || !activeTab) {
+      return;
+    }
+
+    const oldPrefix = bulkPrefixOldValue;
+    const newPrefix = bulkPrefixNewValue;
+
+    let updatedCount = 0;
+    for (const card of activeTab.cards) {
+      if (!card.cardId) {
+        continue;
+      }
+
+      const parsed = parseCardId(card.cardId);
+      if (!parsed || parsed.prefix !== oldPrefix) {
+        continue;
+      }
+
+      // 新しいIDを生成
+      const paddedNumber = String(parsed.number).padStart(3, '0');
+      const newCardId = newPrefix ? `${newPrefix}-${paddedNumber}` : paddedNumber;
+
+      // 更新
+      updateCard(leafId, activeTabId, card.id, { cardId: newCardId });
+      updatedCount++;
+    }
+
+    setIsBulkPrefixEditOpen(false);
+    setBulkPrefixOldValue('');
+    setBulkPrefixNewValue('');
+
+    if (updatedCount > 0) {
+      onLog?.('INFO', `${updatedCount}件のカードIDの接頭語を変更しました。`);
+    } else {
+      onLog?.('WARN', '該当するカードが見つかりませんでした。');
+    }
+  }, [activeTab, activeTabId, bulkPrefixNewValue, bulkPrefixOldValue, leafId, onLog, updateCard]);
+
+  const handleBulkPrefixEditCancel = useCallback(() => {
+    setIsBulkPrefixEditOpen(false);
+    setBulkPrefixOldValue('');
+    setBulkPrefixNewValue('');
+  }, []);
 
   const handleCardContextMenu = useCallback(
     (card: Card, event: React.MouseEvent) => {
@@ -1002,6 +1079,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             📥
           </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={handleOpenBulkPrefixEdit}
+            disabled={!activeTabId}
+            aria-disabled={!activeTabId}
+            title="カードID接頭語一括編集"
+          >
+            🏷️
+          </button>
         </div>
         <div className="panel-toolbar__group">
           <input
@@ -1213,6 +1300,56 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           </div>
         </div>
       ) : null}
+
+      {/* カードID接頭語一括編集ダイアログ */}
+      {isBulkPrefixEditOpen ? (
+        <div className="modal-overlay" onClick={handleBulkPrefixEditCancel}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">カードID接頭語一括編集</h2>
+            <p className="modal-description">
+              指定した接頭語を持つすべてのカードIDの接頭語を一括で変更します。
+            </p>
+            <div className="modal-form">
+              <label className="modal-label">
+                変更前の接頭語:
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={bulkPrefixOldValue}
+                  onChange={(e) => setBulkPrefixOldValue(e.target.value)}
+                  placeholder="例: REQ"
+                />
+              </label>
+              <label className="modal-label">
+                変更後の接頭語:
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={bulkPrefixNewValue}
+                  onChange={(e) => setBulkPrefixNewValue(e.target.value)}
+                  placeholder="例: SPEC"
+                />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-button modal-button--primary"
+                onClick={handleBulkPrefixEditSave}
+              >
+                変更
+              </button>
+              <button
+                type="button"
+                className="modal-button modal-button--secondary"
+                onClick={handleBulkPrefixEditCancel}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -1389,6 +1526,101 @@ const CardListItem = React.memo(({
 }: CardListItemProps) => {
   const anchorRef = useCardConnectorAnchor({ cardId: card.id, leafId, fileName, scrollContainerRef: panelScrollRef });
 
+  // 現在のタブのカード一覧を取得（重複チェック用）
+  const allCardsInTab = useWorkspaceStore(
+    useCallback((state) => {
+      const leaf = state.leafs[leafId];
+      if (!leaf || !leaf.activeTabId) {
+        return [];
+      }
+      const tab = state.tabs[leaf.activeTabId];
+      return tab?.cards ?? [];
+    }, [leafId]),
+  );
+
+  // カードID編集用のローカルstate
+  const [isEditingCardId, setIsEditingCardId] = useState(false);
+  const [editingCardIdValue, setEditingCardIdValue] = useState('');
+  const [cardIdError, setCardIdError] = useState<string | null>(null);
+  const cardIdInputRef = useRef<HTMLInputElement>(null);
+
+  // カードID編集開始
+  const handleCardIdClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsEditingCardId(true);
+    setEditingCardIdValue(card.cardId || '');
+    setCardIdError(null);
+  };
+
+  // カードID編集のキーダウンハンドラ
+  const handleCardIdKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCardIdSave();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCardIdCancel();
+    }
+  };
+
+  // カードID保存
+  const handleCardIdSave = () => {
+    const newCardId = editingCardIdValue.trim();
+
+    // 空文字の場合は許可（ID削除）
+    if (!newCardId) {
+      onUpdateCard(card.id, { cardId: undefined });
+      setIsEditingCardId(false);
+      setCardIdError(null);
+      return;
+    }
+
+    // 重複チェック（自分自身以外）
+    const isDuplicate = allCardsInTab.some(
+      (c) => c.id !== card.id && c.cardId === newCardId,
+    );
+
+    if (isDuplicate) {
+      setCardIdError(`ID "${newCardId}" は既に使用されています`);
+      return;
+    }
+
+    // 保存
+    onUpdateCard(card.id, { cardId: newCardId });
+    setIsEditingCardId(false);
+    setCardIdError(null);
+  };
+
+  // カードID編集キャンセル
+  const handleCardIdCancel = () => {
+    setIsEditingCardId(false);
+    setEditingCardIdValue('');
+    setCardIdError(null);
+  };
+
+  // カードID編集中にフォーカスを外した時の処理
+  const handleCardIdBlur = () => {
+    // わずかに遅延させてクリックイベントが完了するのを待つ
+    setTimeout(() => {
+      // エラーがある場合はキャンセル
+      if (cardIdError) {
+        handleCardIdCancel();
+      } else {
+        handleCardIdSave();
+      }
+    }, 100);
+  };
+
+  // カードID編集モードに入ったときにinputにフォーカス
+  useEffect(() => {
+    if (isEditingCardId && cardIdInputRef.current) {
+      cardIdInputRef.current.focus();
+      cardIdInputRef.current.select();
+    }
+  }, [isEditingCardId]);
+
   const renderConnector = (
     side: TraceConnectorSide,
     hasTrace: boolean,
@@ -1534,6 +1766,59 @@ const CardListItem = React.memo(({
   const isCompact = displayMode === 'compact';
   const compactTooltip = isCompact && card.body ? card.body : undefined;
 
+  // カードID表示/編集コンポーネント
+  const renderCardId = () => {
+    if (isEditingCardId) {
+      return (
+        <span
+          className="card__card-id-edit-container"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <input
+            ref={cardIdInputRef}
+            type="text"
+            className={`card__card-id-input${cardIdError ? ' card__card-id-input--error' : ''}`}
+            value={editingCardIdValue}
+            onChange={(e) => setEditingCardIdValue(e.target.value)}
+            onKeyDown={handleCardIdKeyDown}
+            onBlur={handleCardIdBlur}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="ID未設定"
+            title={cardIdError || undefined}
+          />
+          {cardIdError && (
+            <span className="card__card-id-error" title={cardIdError}>
+              ⚠
+            </span>
+          )}
+        </span>
+      );
+    }
+    if (card.cardId) {
+      return (
+        <span
+          className="card__card-id card__card-id--editable"
+          onClick={handleCardIdClick}
+          title="クリックして編集"
+        >
+          [{card.cardId}]
+        </span>
+      );
+    }
+    return (
+      <span
+        className="card__card-id card__card-id--empty card__card-id--editable"
+        onClick={handleCardIdClick}
+        title="クリックしてIDを設定"
+      >
+        [ID未設定]
+      </span>
+    );
+  };
+
   const articleContent = isCompact
     ? (
         <>
@@ -1541,6 +1826,7 @@ const CardListItem = React.memo(({
           {leftConnectorNode}
           <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
           <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+          {renderCardId()}
           <span className="card__title card__title--truncate">{card.title}</span>
           {markdownButton}
           {rightConnectorNode}
@@ -1553,6 +1839,7 @@ const CardListItem = React.memo(({
             {leftConnectorNode}
             <span className="card__icon">{CARD_KIND_ICON[card.kind]}</span>
             <span className={CARD_STATUS_CLASS[card.status]}>{CARD_STATUS_LABEL[card.status]}</span>
+            {renderCardId()}
             <span className="card__title">{card.title}</span>
             {markdownButton}
             {rightConnectorNode}
@@ -1617,6 +1904,7 @@ const CardListItem = React.memo(({
 
   // カード本体の変更チェック
   if (prevProps.card.id !== nextProps.card.id) return false;
+  if (prevProps.card.cardId !== nextProps.card.cardId) return false;
   if (prevProps.card.updatedAt !== nextProps.card.updatedAt) return false;
   if (prevProps.card.title !== nextProps.card.title) return false;
   if (prevProps.card.body !== nextProps.card.body) return false;

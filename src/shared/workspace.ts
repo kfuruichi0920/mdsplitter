@@ -55,7 +55,8 @@ export const CARD_KIND_VALUES: readonly CardKind[] = [
  * @ingroup workspace
  */
 export interface Card {
-  id: string;              ///< 一意ID
+  id: string;              ///< 一意ID（UUID）
+  cardId?: string;         ///< ユーザー向け識別子（例: REQ-001, SPEC-042）
   title: string;           ///< タイトル
   body: string;            ///< 本文
   status: CardStatus;      ///< ステータス
@@ -135,6 +136,7 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
     const target = card as Partial<Card>;
     return (
       typeof target.id === 'string' &&
+      (target.cardId === undefined || typeof target.cardId === 'string') &&
       typeof target.title === 'string' &&
       typeof target.body === 'string' &&
       typeof target.status === 'string' &&
@@ -149,5 +151,171 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
       (target.next_id === null || typeof target.next_id === 'string') &&
       typeof target.level === 'number'
     );
+  });
+};
+
+/**
+ * @brief カードIDから接頭語と番号を抽出する。
+ * @details
+ * カードIDのフォーマット: "PREFIX-NNN" または "NNN"
+ * @param cardId カードID（例: "REQ-001", "042"）
+ * @return 接頭語と番号のオブジェクト、パース失敗時はnull
+ * @throws なし
+ */
+export const parseCardId = (cardId: string): { prefix: string; number: number } | null => {
+  if (!cardId) {
+    return null;
+  }
+
+  const match = cardId.match(/^(.+?)-(\d+)$/);
+  if (match) {
+    const prefix = match[1];
+    const number = parseInt(match[2], 10);
+    if (!isNaN(number)) {
+      return { prefix, number };
+    }
+  }
+
+  // 接頭語なしの場合（数値のみ）
+  const numberOnly = parseInt(cardId, 10);
+  if (!isNaN(numberOnly)) {
+    return { prefix: '', number: numberOnly };
+  }
+
+  return null;
+};
+
+/**
+ * @brief 同じ接頭語を持つカードの最大番号を取得する。
+ * @details
+ * 指定された接頭語を持つカードIDから最大番号を抽出。
+ * 接頭語が指定されない場合は、すべてのカードIDから最大番号を取得。
+ * @param cards カード配列
+ * @param prefix 接頭語（省略時はすべてのカードIDを対象）
+ * @return 最大番号（該当するカードがない場合は0）
+ * @throws なし
+ */
+export const findMaxCardNumber = (cards: Card[], prefix?: string): number => {
+  let maxNumber = 0;
+
+  for (const card of cards) {
+    if (!card.cardId) {
+      continue;
+    }
+
+    const parsed = parseCardId(card.cardId);
+    if (!parsed) {
+      continue;
+    }
+
+    // 接頭語が指定されている場合は、同じ接頭語のみを対象
+    if (prefix !== undefined && parsed.prefix !== prefix) {
+      continue;
+    }
+
+    if (parsed.number > maxNumber) {
+      maxNumber = parsed.number;
+    }
+  }
+
+  return maxNumber;
+};
+
+/**
+ * @brief 既存カードから最も一般的な接頭語を取得する。
+ * @details
+ * カードID付きのカードから接頭語を抽出し、最も頻度の高いものを返す。
+ * @param cards カード配列
+ * @return 最も一般的な接頭語（カードIDがない場合は空文字）
+ * @throws なし
+ */
+export const getMostCommonPrefix = (cards: Card[]): string => {
+  const prefixCounts = new Map<string, number>();
+
+  for (const card of cards) {
+    if (!card.cardId) {
+      continue;
+    }
+
+    const parsed = parseCardId(card.cardId);
+    if (parsed) {
+      const count = prefixCounts.get(parsed.prefix) ?? 0;
+      prefixCounts.set(parsed.prefix, count + 1);
+    }
+  }
+
+  if (prefixCounts.size === 0) {
+    return '';
+  }
+
+  let mostCommonPrefix = '';
+  let maxCount = 0;
+
+  for (const [prefix, count] of prefixCounts.entries()) {
+    if (count > maxCount) {
+      mostCommonPrefix = prefix;
+      maxCount = count;
+    }
+  }
+
+  return mostCommonPrefix;
+};
+
+/**
+ * @brief 次のカードIDを生成する。
+ * @details
+ * 既存カードのパターンを分析し、適切な次のIDを生成。
+ * 接頭語が指定されている場合はそれを使用し、指定がない場合は最も一般的な接頭語を使用。
+ * @param cards 既存カード配列
+ * @param preferredPrefix 優先する接頭語（省略時は自動判定）
+ * @param digits 桁数（ゼロパディング、デフォルト: 3）
+ * @return 生成されたカードID（例: "REQ-001", "042"）
+ * @throws なし
+ */
+export const generateNextCardId = (
+  cards: Card[],
+  preferredPrefix?: string,
+  digits: number = 3,
+): string => {
+  // 接頭語の決定
+  const prefix = preferredPrefix !== undefined ? preferredPrefix : getMostCommonPrefix(cards);
+
+  // 最大番号を取得
+  const maxNumber = findMaxCardNumber(cards, prefix);
+  const nextNumber = maxNumber + 1;
+
+  // IDを生成
+  const paddedNumber = String(nextNumber).padStart(digits, '0');
+  if (prefix) {
+    return `${prefix}-${paddedNumber}`;
+  }
+  return paddedNumber;
+};
+
+/**
+ * @brief カードID重複チェック。
+ * @details
+ * 指定されたカードIDが既存カードと重複していないかチェック。
+ * excludeCardIdを指定すると、そのIDを持つカードは重複チェックから除外される（編集時に使用）。
+ * @param cards カード配列
+ * @param cardId チェック対象のカードID
+ * @param excludeCardId チェックから除外するカードのID（編集時に自分自身を除外）
+ * @return 重複している場合true
+ * @throws なし
+ */
+export const isCardIdDuplicate = (
+  cards: Card[],
+  cardId: string,
+  excludeCardId?: string,
+): boolean => {
+  if (!cardId) {
+    return false;
+  }
+
+  return cards.some((card) => {
+    if (excludeCardId && card.id === excludeCardId) {
+      return false;
+    }
+    return card.cardId === cardId;
   });
 };
