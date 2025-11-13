@@ -402,7 +402,7 @@ const buildConversionState = (strategy: ConverterStrategy): ConversionModalDispl
   cardIdPrefix: '',
   cardIdStartNumber: 1,
   cardIdDigits: 3,
-  cardIdAssignmentRule: 'manual',
+  cardIdAssignmentRule: 'all', // デフォルトを'all'に変更（すべてのカードにIDを付与）
 });
 
 /**

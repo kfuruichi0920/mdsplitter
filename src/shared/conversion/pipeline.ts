@@ -73,8 +73,9 @@ const assignCardIds = <T extends { kind?: string; cardId?: string }>(
 ): T[] => {
   const { prefix, startNumber, digits, assignmentRule } = options;
 
-  // 手動指定のみの場合は何もしない
-  if (assignmentRule === 'manual') {
+  // 手動指定のみの場合、かつ接頭語が空の場合は何もしない
+  // （接頭語が設定されている場合は、IDを付与したい意図があると推測）
+  if (assignmentRule === 'manual' && !prefix) {
     return cards;
   }
 
@@ -128,7 +129,8 @@ export const convertDocument = async (
   }
 
   // カードID自動付与処理
-  if (options?.cardIdOptions && options.cardIdOptions.assignmentRule !== 'manual') {
+  // assignCardIds関数内で付与ルールと接頭語のチェックを行う
+  if (options?.cardIdOptions) {
     ensureNotAborted(signal);
     emitProgress({ phase: 'convert', percent: 70 });
     cards = assignCardIds(cards, options.cardIdOptions);
