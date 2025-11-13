@@ -423,6 +423,8 @@ export const App = () => {
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(true); ///< サイドバー表示/非表示。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
+  const [logAreaCollapsed, setLogAreaCollapsed] = useState<boolean>(false); ///< ログエリア開閉状態。
+  const logAreaBodyRef = useRef<HTMLPreElement | null>(null); ///< ログエリア本体への参照。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
   const [ipcStatus, setIpcStatus] = useState<string>('起動準備中...'); ///< IPC 状態メッセージ。
   const [logs, setLogs] = useState<LogEntry[]>(() => [
@@ -456,6 +458,23 @@ export const App = () => {
       },
     ]);
   }, []);
+
+  /**
+   * @brief ログエリアの自動スクロール処理。
+   * @details ログが追加されたとき、スクロールバーが最下部にある場合は自動的に追従する。
+   */
+  useEffect(() => {
+    const logBody = logAreaBodyRef.current;
+    if (!logBody || logAreaCollapsed) return;
+
+    // スクロールバーが最下部付近（5px以内）にあるかチェック
+    const isNearBottom = logBody.scrollHeight - logBody.scrollTop - logBody.clientHeight < 5;
+
+    if (isNearBottom) {
+      // 最下部にスクロール
+      logBody.scrollTop = logBody.scrollHeight;
+    }
+  }, [displayedLogs, logAreaCollapsed]);
 
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -3167,6 +3186,15 @@ export const App = () => {
         <section className="log-area" aria-label="動作ログ">
           <header className="log-area__header">
             <div className="log-area__title">
+              <button
+                type="button"
+                className="log-area__toggle"
+                onClick={() => setLogAreaCollapsed(!logAreaCollapsed)}
+                aria-expanded={!logAreaCollapsed}
+                aria-label={logAreaCollapsed ? 'ログを開く' : 'ログを閉じる'}
+              >
+                {logAreaCollapsed ? '▶' : '▼'}
+              </button>
               <span>動作ログ</span>
               <span className="log-area__counter">
                 {displayedLogs.length} / {logs.length}
@@ -3204,18 +3232,20 @@ export const App = () => {
               </button>
             </div>
           </header>
-          <pre className="log-area__body" aria-live="polite">
-            {displayedLogs.length === 0 ? (
-              <span key="log-empty">該当するログがありません。</span>
-            ) : (
-              displayedLogs.map((entry) => (
-                <span key={entry.id}>
-                  {`[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`}
-                  {'\n'}
-                </span>
-              ))
-            )}
-          </pre>
+          {!logAreaCollapsed && (
+            <pre className="log-area__body" aria-live="polite" ref={logAreaBodyRef}>
+              {displayedLogs.length === 0 ? (
+                <span key="log-empty">該当するログがありません。</span>
+              ) : (
+                displayedLogs.map((entry) => (
+                  <span key={entry.id}>
+                    {`[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`}
+                    {'\n'}
+                  </span>
+                ))
+              )}
+            </pre>
+          )}
         </section>
       </section>
 
