@@ -79,6 +79,19 @@ const formatUpdatedAt = (value: string): string => {
 };
 
 /**
+ * @brief 未トレースカード数を計算する。
+ * @param cards カードリスト。
+ * @param side トレース方向（左/右）。
+ * @return 未トレースカード数。
+ */
+const countUntracedCards = (cards: Card[], side: 'left' | 'right'): number => {
+  return cards.filter((card) => {
+    const hasTrace = side === 'left' ? card.hasLeftTrace : card.hasRightTrace;
+    return !hasTrace && card.status !== 'deprecated';
+  }).length;
+};
+
+/**
  * @brief カードパネルコンポーネントのプロパティ。
  */
 export interface CardPanelProps {
@@ -224,6 +237,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const hasSelection = selectedCardIds.size > 0;
   const visualDropTarget = dropTarget ?? previewIndicator;
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
+  
+  /**
+   * @brief 未トレースカード数を計算。
+   * @details
+   * 左側・右側それぞれの未トレースカード数を計算する。
+   * 廃止カードは除外する。
+   */
+  const untracedLeftCount = useMemo(() => countUntracedCards(cards, 'left'), [cards]);
+  const untracedRightCount = useMemo(() => countUntracedCards(cards, 'right'), [cards]);
   const isFileTraceVisible = useTracePreferenceStore(
     useCallback((state) => (activeFileName ? state.isFileVisible(activeFileName) : true), [activeFileName]),
   );
@@ -1158,6 +1180,14 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         <div className="panel-toolbar__meta">
           カード総数: {cardCount}
           {filterActive ? `（表示: ${visibleCards.length}）` : ''}
+          {cardCount > 0 && (
+            <>
+              {' | '}
+              <span title="左側未トレースカード数 / 右側未トレースカード数">
+                未トレース: {untracedLeftCount} / {untracedRightCount}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
