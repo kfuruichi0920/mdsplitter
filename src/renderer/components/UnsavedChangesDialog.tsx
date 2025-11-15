@@ -10,7 +10,9 @@
  * @copyright MIT
  */
 
-export type UnsavedChangesAction = 'discard' | 'apply' | 'cancel';
+import type { UnsavedChangesAction } from '@/shared/unsavedChanges';
+
+export type { UnsavedChangesAction };
 
 export interface UnsavedChangesDialogProps {
   /**

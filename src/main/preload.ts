@@ -19,20 +19,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
+import type { UnsavedChangesResponse } from '../shared/unsavedChanges';
 import type { DocumentLoadErrorCode } from './documentLoader';
-
-
-/**
- * @brief 未保存の変更に対するユーザーのアクション。
- */
-export type UnsavedChangesAction = 'discard' | 'apply' | 'cancel';
-
-/**
- * @brief 未保存の変更確認の応答。
- */
-export type UnsavedChangesResponse = {
-  action: UnsavedChangesAction;
-};
 
 /**
  * @brief window.appで公開するAPI型定義。
