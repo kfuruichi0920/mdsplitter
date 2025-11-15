@@ -17,6 +17,7 @@ import type {
   LogLevel,
   ThemeModeSetting,
   ThemeSettings,
+  SerendieColorTheme,
 } from '@/shared/settings';
 
 export type SettingsSection = 'theme' | 'input' | 'logging' | 'workspace';
@@ -98,6 +99,21 @@ export const SettingsModal = ({
     onPreviewTheme(mode, next.theme);
   };
 
+  const handleColorThemeChange = (colorTheme: SerendieColorTheme) => {
+    if (!settings) {
+      return;
+    }
+    const next: AppSettings = {
+      ...settings,
+      theme: {
+        ...settings.theme,
+        colorTheme,
+      },
+    };
+    onChange(next);
+    onPreviewTheme(next.theme.mode, next.theme);
+  };
+
   const handleSplitterWidthChange = (value: number) => {
     if (!settings) {
       return;
@@ -161,6 +177,29 @@ export const SettingsModal = ({
                   value={option.value}
                   checked={settings.theme.mode === option.value}
                   onChange={() => handleThemeModeChange(option.value as ThemeModeSetting)}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="settings-field">
+          <label className="settings-field__label">カラーテーマ</label>
+          <div className="settings-radio-group" role="radiogroup" aria-label="カラーテーマ">
+            {[
+              { value: 'konjo', label: '紺青 (Konjo)' },
+              { value: 'asagi', label: '浅葱 (Asagi)' },
+              { value: 'sumire', label: '菫 (Sumire)' },
+              { value: 'tsutsuji', label: '躑躅 (Tsutsuji)' },
+              { value: 'kurikawa', label: '栗皮 (Kurikawa)' },
+            ].map((option) => (
+              <label key={option.value} className="settings-radio">
+                <input
+                  type="radio"
+                  name="color-theme"
+                  value={option.value}
+                  checked={settings.theme.colorTheme === option.value}
+                  onChange={() => handleColorThemeChange(option.value as SerendieColorTheme)}
                 />
                 <span>{option.label}</span>
               </label>

@@ -25,7 +25,7 @@ import {
   type InsertPosition,
   type WorkspaceStore,
 } from './store/workspaceStore';
-import { useUiStore, type ThemeMode } from './store/uiStore';
+import { useUiStore, type ThemeMode, type SerendieColorTheme } from './store/uiStore';
 import { useNotificationStore } from './store/notificationStore';
 import { useSplitStore } from './store/splitStore';
 import type { SplitNode } from './store/splitStore';
@@ -40,6 +40,7 @@ import { TRACE_RELATION_KINDS } from '@/shared/traceability';
 import type { TraceDirection, TraceRelationKind, TraceabilityRelation } from '@/shared/traceability';
 
 import './styles.css';
+import { Button } from '@serendie/ui';
 import { NotificationCenter } from './components/NotificationCenter';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
@@ -530,6 +531,8 @@ export const App = () => {
   const setCreationRelationKind = useTracePreferenceStore((state) => state.setCreationRelationKind);
   const theme = useUiStore((state) => state.theme);
   const setThemeStore = useUiStore((state) => state.setTheme);
+  const colorTheme = useUiStore((state) => state.colorTheme);
+  const setColorTheme = useUiStore((state) => state.setColorTheme);
   const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
   const toggleMarkdownPreviewGlobal = useUiStore((state) => state.toggleMarkdownPreviewGlobal);
   const notify = useNotificationStore((state) => state.add);
@@ -2751,7 +2754,7 @@ export const App = () => {
   ]);
 
   return (
-    <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
+    <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'} data-panda-theme={colorTheme}>
       <NotificationCenter />
       <SettingsModal
         isOpen={settingsModalState.open}
