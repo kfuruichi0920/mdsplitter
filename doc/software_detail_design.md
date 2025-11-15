@@ -1,6 +1,6 @@
 # mdsplitter 詳細設計
 
-最終更新日: 2025-11-09  
+最終更新日: 2025-11-15  
 対象リポジトリ: `mdsplitter_copy_codex`
 
 ## 1. システム概要
@@ -311,7 +311,7 @@ Deprecated --> Draft : 再利用
   - `connectorLayoutStore` ではアンカー登録時に「スクロールビューポート内に表示されているか」を判定して `isVisible` を保持し、`TraceConnectorLayer` はこのフラグが真のアンカー同士に限定して線を描画することで、スクロールアウトしたカードのコネクタを自動的に抑制する。
   - 新設した `showOffscreenConnectors` フラグ（🛰️ トグル）は `tracePreferenceStore` で管理し、ON の場合は `TraceConnectorLayer` が `isVisible` 判定をスキップしてビューポート外カード間のコネクタも描画する。
   - カードパネルツールバーの ⛓️ トグルは、対象ファイル内の全カードIDを取得して `toggleFileVisibility(fileName, cardIds)` を呼び出し、左右接合点の `mutedCards` 状態を一括で書き換える。これにより、UI 上でも各トレース接合点ボタンの状態が即時反映され、仕様どおり「トレース接合点のコネクタ表示の有無」を通じてファイル全体の表示を制御する。
-  - `Card` モデルに `markdownPreviewEnabled` を追加し、カード単位で Markdown プレビューのON/OFFを保持する。`normalizeCardOrder` で既存ファイルを読み込む際もデフォルト値（true）を適用。
+  - `Card` モデルに `markdownPreviewEnabled` を追加し、カード単位で Markdown プレビューのON/OFFを保持する。`normalizeCardOrder` で既存ファイルを読み込む際もデフォルト値（true）を適用。2025-11-15 時点では `createdAt?: string` も導入しており、`workspaceStore.addCard`/`materializeClipboardNode` が新規カードに `createdAt` と `updatedAt` の同一タイムスタンプを付与する。JSON に `createdAt` が無い既存データは undefined のまま保持され、統計ダイアログでは `---` 表示にフォールバックする。
   - `renderer/utils/markdown.ts` に簡易Markdownレンダラを実装し、危険なHTMLをエスケープしたうえで `CardPanel` が `dangerouslySetInnerHTML` に渡す。ヘッダの `MD` ボタンと上部ツールバーの 🅼 トグルで `markdownPreviewEnabled` と `uiStore.markdownPreviewGlobalEnabled` を参照し、描画可否を決定する。
 
 ### 8.7 P6 フィーチャ実装サマリ
@@ -330,3 +330,8 @@ Deprecated --> Draft : 再利用
 - **P6-05 ショートカット/ヘルプオーバーレイ**
   - `App.tsx` に `SHORTCUT_GROUPS` を定義し、トップツールバー右端へ「❔」ボタンを追加。ボタンまたは `Esc` で開閉できるモーダルをレンダリングし、グローバルショートカット・カード挿入操作・コンテキストメニュー操作を二列レイアウトで提示する。
   - `styles.css` に `.help-overlay*` を定義し、バックドロップ/カード風リスト/クローズボタンの外観を統一。アクセシビリティ確保のため `aria-modal` とフォーカストラップを備えた。
+- **P6-06 右クリックメニュー/統計ダイアログ拡張 (2025-11-15)**
+  - `src/renderer/components/ContextMenu.tsx` を新設し、カード右クリック時のメニューをセクション単位でレンダリング。画面端では `useLayoutEffect` で座標を補正し、外側クリック/`Esc` で自動クローズする。メニュー項目は編集・コピー・削除・挿入・貼り付け・情報系に分割し、貼り付け可否や選択状態で `disabled` を切り替える。
+  - `CardPanel.tsx` では `contextMenuSections` を `useMemo` で組み立て、コピー/貼り付け/追加/削除に既存ハンドラを再利用。`handleCopyCardsAsText` が `navigator.clipboard` + `execCommand` フォールバックで選択カードを整形 (`[cardId] タイトル\n本文` + `---` 区切り) し、`handleCopyCardUuid` が UUID をコピーする。履歴表示はフェーズ4待ちのため `disabled` 項目で予約済み。
+  - カード統計は `src/renderer/components/CardStatsDialog.tsx` に切り出し、`CardStatsDialog` がカードID/UUID/種別/ステータス/作成日時/最終更新/左&右トレース件数/階層レベル/子カード数/文字数/単語数/行数を表示。`renderer/constants/cardPresentation.ts` にアイコン・ステータスラベル・種別ラベルを集約し、`renderer/utils/cardUtils.ts` の `calculateCardContentStatistics` を使ってプレーンテキスト統計を算出、`__tests__/cardUtils.test.ts` で単体テスト済み。
+  - `styles.css` へ `.panel-context-menu__section-label`/`__icon`/`__shortcut` と統計ダイアログ (`.card-stats-dialog*`) を追加し、ライト/ダーク両テーマで視認性を確保した。

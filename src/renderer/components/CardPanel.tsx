@@ -12,7 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ChangeEvent } from 'react';
 import { shallow } from 'zustand/shallow';
-import type { Card, CardKind, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
+import type { Card, CardKind, CardPatch, CardStatus, PanelTabState, InsertPosition } from '../store/workspaceStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUiStore } from '../store/uiStore';
 import { useCardConnectorAnchor } from '../hooks/useConnectorLayout';
@@ -22,35 +22,11 @@ import { usePanelEngagementStore, type PanelVisualState } from '../store/panelEn
 import { useSplitStore } from '../store/splitStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
 import { CARD_KIND_VALUES, parseCardId } from '@/shared/workspace';
+import { CARD_KIND_ICON, CARD_STATUS_CLASS, CARD_STATUS_LABEL } from '../constants/cardPresentation';
 import { useVirtualizedCards } from '../hooks/useVirtualizedCards';
 import { countUntracedCards } from '../utils/cardUtils';
-
-/** ステータスラベル表示用マッピング。 */
-const CARD_STATUS_LABEL: Record<CardStatus, string> = {
-  draft: 'Draft',
-  review: 'Review',
-  approved: 'Approved',
-  deprecated: 'Deprecated',
-};
-
-/** ステータスバッジ用クラス名マッピング。 */
-const CARD_STATUS_CLASS: Record<CardStatus, string> = {
-  draft: 'card__status card__status--draft',
-  review: 'card__status card__status--review',
-  approved: 'card__status card__status--approved',
-  deprecated: 'card__status card__status--deprecated',
-};
-
-/** カード種別に応じたアイコン。 */
-const CARD_KIND_ICON: Record<CardKind, string> = {
-  heading: '🔖',
-  paragraph: '📝',
-  bullet: '📍',
-  figure: '📊',
-  table: '📅',
-  test: '🧪',
-  qa: '💬',
-};
+import { ContextMenu, type ContextMenuSection } from './ContextMenu';
+import { CardStatsDialog } from './CardStatsDialog';
 
 const createKindFilterState = (): Record<CardKind, boolean> => {
   return CARD_KIND_VALUES.reduce<Record<CardKind, boolean>>((acc, kind) => {
@@ -100,7 +76,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [draggedCardIds, setDraggedCardIds] = useState<string[]>([]);
   const [dropTarget, setDropTarget] = useState<{ cardId: string; position: 'before' | 'after' | 'child' } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ card: Card; x: number; y: number } | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const [statsTargetCardId, setStatsTargetCardId] = useState<string | null>(null);
   const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
   const [previewIndicator, setPreviewIndicator] = useState<{ cardId: string | null; position: InsertPosition; highlightIds: string[] } | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -239,12 +215,19 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const cards = activeTab?.cards ?? [];
   const dirtyCardIds = activeTab?.dirtyCardIds ?? new Set<string>();
   const selectedCardIds = activeTab?.selectedCardIds ?? new Set<string>();
+  const selectedCardsList = useMemo(() => cards.filter((card) => selectedCardIds.has(card.id)), [cards, selectedCardIds]);
   const expandedCardIds = activeTab?.expandedCardIds ?? new Set<string>();
   const editingCardId = activeTab?.editingCardId ?? null;
   const cardCount = cards.length;
   const hasSelection = selectedCardIds.size > 0;
   const visualDropTarget = dropTarget ?? previewIndicator;
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
+  const statsTargetCard = useMemo(() => {
+    if (!statsTargetCardId) {
+      return null;
+    }
+    return cards.find((card) => card.id === statsTargetCardId) ?? null;
+  }, [cards, statsTargetCardId]);
   
   /**
    * @brief 未トレースカード数を計算。
@@ -623,6 +606,10 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     [activeTabId, leafId, selectCard, selectedCardIds],
   );
 
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, [setContextMenu]);
+
   const handleContextAction = useCallback(
     (position: InsertPosition) => {
       if (!activeTabId || !contextMenu) {
@@ -634,33 +621,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       }
       setContextMenu(null);
     },
-    [activeTabId, addCard, contextMenu, leafId, onLog],
+    [activeTabId, addCard, contextMenu, leafId, onLog, setContextMenu],
   );
-
-  useEffect(() => {
-    if (!contextMenu) {
-      return;
-    }
-    const handleClose = (event: MouseEvent) => {
-      if (contextMenuRef.current?.contains(event.target as Node)) {
-        return;
-      }
-      setContextMenu(null);
-    };
-    const handleEsc = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setContextMenu(null);
-      }
-    };
-    window.addEventListener('mousedown', handleClose);
-    window.addEventListener('contextmenu', handleClose);
-    window.addEventListener('keydown', handleEsc);
-    return () => {
-      window.removeEventListener('mousedown', handleClose);
-      window.removeEventListener('contextmenu', handleClose);
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [contextMenu]);
 
   useEffect(() => {
     if (!isKindFilterOpen) {
@@ -820,6 +782,93 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     onLog?.('INFO', 'すべてのカードを折畳みました。');
   }, [activeTabId, leafId, onLog]);
 
+  const copyPlainText = useCallback(async (text: string) => {
+    if (!text) {
+      return false;
+    }
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (error) {
+      console.warn('[CardPanel] navigator.clipboard failed', error);
+    }
+    if (typeof document === 'undefined') {
+      return false;
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return success;
+    } catch (error) {
+      console.warn('[CardPanel] execCommand copy failed', error);
+      return false;
+    }
+  }, []);
+
+  const handleCopyCardsAsText = useCallback(
+    async (fallbackCard?: Card) => {
+      const targets = selectedCardsList.length > 0 ? selectedCardsList : fallbackCard ? [fallbackCard] : [];
+      if (targets.length === 0) {
+        onLog?.('WARN', 'コピーするカードが選択されていません。');
+        return;
+      }
+
+      const payload = targets
+        .map((card) => {
+          const identifier = card.cardId ? `[${card.cardId}] ` : '';
+          const header = `${identifier}${card.title || '（無題カード）'}`.trim();
+          const body = card.body?.trim();
+          return body ? `${header}\n${body}` : header;
+        })
+        .join('\n\n---\n\n');
+
+      const success = await copyPlainText(payload);
+      if (success) {
+        onLog?.('INFO', `${targets.length}件のカード内容をテキストとしてコピーしました。`);
+      } else {
+        onLog?.('ERROR', 'テキストとしてコピーできませんでした。');
+      }
+    },
+    [copyPlainText, onLog, selectedCardsList],
+  );
+
+  const handleCopyCardUuid = useCallback(
+    async (card: Card) => {
+      const success = await copyPlainText(card.id);
+      if (success) {
+        onLog?.('INFO', `カードUUID(${card.id})をコピーしました。`);
+      } else {
+        onLog?.('ERROR', 'カードUUIDをコピーできませんでした。');
+      }
+    },
+    [copyPlainText, onLog],
+  );
+
+  const handleContextEdit = useCallback(
+    (card: Card) => {
+      if (!activeTabId) {
+        return;
+      }
+      setEditingCard(leafId, activeTabId, card.id);
+      onLog?.('INFO', `カード「${card.title || card.id}」を編集モードにしました。`);
+    },
+    [activeTabId, leafId, onLog, setEditingCard],
+  );
+
+  const handleOpenStatsDialog = useCallback((card: Card) => {
+    setStatsTargetCardId(card.id);
+    onLog?.('INFO', `カード「${card.title || card.id}」の統計情報を開きました。`);
+  }, [onLog, setStatsTargetCardId]);
+
   const handleCopySelected = useCallback(() => {
     if (!activeTabId) {
       return;
@@ -831,7 +880,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       onLog?.('WARN', 'コピーするカードが選択されていません。');
     }
     setContextMenu(null);
-  }, [activeTabId, copySelection, leafId, onLog]);
+  }, [activeTabId, copySelection, leafId, onLog, setContextMenu]);
 
   const handlePasteIntoSelection = useCallback(() => {
     if (!activeTabId) {
@@ -863,8 +912,54 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       }
       setContextMenu(null);
     },
-    [activeTabId, hasClipboardItems, leafId, onLog, pasteClipboard],
+    [activeTabId, hasClipboardItems, leafId, onLog, pasteClipboard, setContextMenu],
   );
+
+  const contextMenuSections = useMemo<ContextMenuSection[]>(() => {
+    if (!contextMenu) {
+      return [];
+    }
+    const target = contextMenu.card;
+    return [
+      {
+        key: 'card-actions',
+        title: 'カード操作',
+        items: [
+          { key: 'edit', label: '編集', icon: '✏️', onSelect: () => handleContextEdit(target) },
+          { key: 'copy', label: 'コピー', icon: '📋', onSelect: handleCopySelected, disabled: !hasSelection },
+          { key: 'delete', label: '削除', icon: '🗑️', onSelect: handleDeleteCards, disabled: !hasSelection, variant: 'danger' },
+        ],
+      },
+      {
+        key: 'add-card',
+        title: 'カード追加',
+        items: [
+          { key: 'add-before', label: '前に追加', icon: '⬆︎', onSelect: () => handleContextAction('before') },
+          { key: 'add-after', label: '後に追加', icon: '⬇︎', onSelect: () => handleContextAction('after') },
+          { key: 'add-child', label: '子として追加', icon: '➡︎', onSelect: () => handleContextAction('child') },
+        ],
+      },
+      {
+        key: 'paste',
+        title: '貼り付け',
+        items: [
+          { key: 'paste-before', label: '前に貼り付け', icon: '⬆︎', onSelect: () => handleContextPaste('before', target.id), disabled: !hasClipboardItems },
+          { key: 'paste-after', label: '後に貼り付け', icon: '⬇︎', onSelect: () => handleContextPaste('after', target.id), disabled: !hasClipboardItems },
+          { key: 'paste-child', label: '子として貼り付け', icon: '➡︎', onSelect: () => handleContextPaste('child', target.id), disabled: !hasClipboardItems },
+        ],
+      },
+      {
+        key: 'info',
+        title: '情報/コピー',
+        items: [
+          { key: 'copy-text', label: 'テキストとしてコピー', icon: '📄', onSelect: () => { void handleCopyCardsAsText(target); } },
+          { key: 'copy-id', label: 'IDをコピー (UUID)', icon: '🔗', onSelect: () => { void handleCopyCardUuid(target); } },
+          { key: 'stats', label: '統計情報', icon: '📊', onSelect: () => handleOpenStatsDialog(target) },
+          { key: 'history', label: '履歴を表示 (準備中)', icon: '🕘', disabled: true, closeOnSelect: false },
+        ],
+      },
+    ];
+  }, [contextMenu, handleContextAction, handleContextEdit, handleCopyCardUuid, handleCopyCardsAsText, handleCopySelected, handleDeleteCards, handleOpenStatsDialog, handleContextPaste, hasClipboardItems, hasSelection]);
 
   /**
    * @brief ドラッグ開始時の処理。
@@ -942,7 +1037,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
    * @param patch カードの変更内容。
    */
   const handleUpdateCard = useCallback(
-    (cardId: string, patch: { title?: string; body?: string }) => {
+    (cardId: string, patch: CardPatch) => {
       if (!activeTabId) {
         return;
       }
@@ -1344,54 +1439,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         )}
       </div>
       {contextMenu ? (
-        <div
-          ref={contextMenuRef}
-          className="panel-context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          role="menu"
-        >
-          <div className="panel-context-menu__section">
-            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('before')}>
-              ⬆︎ 選択カードの前に追加
-            </button>
-            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('after')}>
-              ⬇︎ 選択カードの後に追加
-            </button>
-            <button type="button" className="panel-context-menu__item" onClick={() => handleContextAction('child')}>
-              ➡︎ 子として追加
-            </button>
-          </div>
-          <div className="panel-context-menu__divider" />
-          <div className="panel-context-menu__section">
-            <button type="button" className="panel-context-menu__item" onClick={handleCopySelected}>
-              📋 選択中カードをコピー
-            </button>
-            <button
-              type="button"
-              className="panel-context-menu__item"
-              onClick={() => handleContextPaste('before', contextMenu.card.id)}
-              disabled={!hasClipboardItems}
-            >
-              ⬆︎ ここに貼り付け (前)
-            </button>
-            <button
-              type="button"
-              className="panel-context-menu__item"
-              onClick={() => handleContextPaste('after', contextMenu.card.id)}
-              disabled={!hasClipboardItems}
-            >
-              ⬇︎ ここに貼り付け (後)
-            </button>
-            <button
-              type="button"
-              className="panel-context-menu__item"
-              onClick={() => handleContextPaste('child', contextMenu.card.id)}
-              disabled={!hasClipboardItems}
-            >
-              ➡︎ 子として貼り付け
-            </button>
-          </div>
-        </div>
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} sections={contextMenuSections} onClose={handleCloseContextMenu} />
+      ) : null}
+
+      {statsTargetCard ? (
+        <CardStatsDialog
+          card={statsTargetCard}
+          leftTraceCount={leftTraceCounts[statsTargetCard.id] ?? 0}
+          rightTraceCount={rightTraceCounts[statsTargetCard.id] ?? 0}
+          onClose={() => setStatsTargetCardId(null)}
+        />
       ) : null}
 
       {/* カードID接頭語一括編集ダイアログ */}
@@ -1554,7 +1611,7 @@ interface CardListItemProps {
   onKeyDown: (event: ReactKeyboardEvent<HTMLElement>, card: Card) => void;
   onToggleExpand: () => void; ///< 展開/折畳トグルコールバック。
   onDoubleClick: (card: Card) => void; ///< ダブルクリックハンドラ（編集モード移行）。
-  onUpdateCard: (cardId: string, patch: { title?: string; body?: string }) => void; ///< カード更新ハンドラ。
+  onUpdateCard: (cardId: string, patch: CardPatch) => void; ///< カード更新ハンドラ。
   onCancelEdit: () => void; ///< 編集キャンセルハンドラ。
   onDragStart?: (cardId: string) => void; ///< ドラッグ開始ハンドラ。
   onDragOver?: (cardId: string, position: 'before' | 'after' | 'child') => void; ///< ドラッグオーバーハンドラ。

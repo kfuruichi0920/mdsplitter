@@ -17,6 +17,7 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { TextDecoder } from 'node:util';
 
 import type { AppSettings, EncodingFallback } from '@/shared/settings';
 

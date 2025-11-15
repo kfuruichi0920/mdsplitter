@@ -64,6 +64,7 @@ export interface Card {
   hasLeftTrace: boolean;   ///< 左トレース有無
   hasRightTrace: boolean;  ///< 右トレース有無
   markdownPreviewEnabled: boolean; ///< Markdownプレビュー有無
+  createdAt?: string;      ///< 作成日時（任意。未設定ならundefined）
   updatedAt: string;       ///< 最終更新日時（ISO8601）
   parent_id: string | null;  ///< 親カードID（ルートの場合null）
   child_ids: string[];       ///< 子カード（1階層下）IDリスト
@@ -144,6 +145,7 @@ export const isWorkspaceSnapshot = (value: unknown): value is WorkspaceSnapshot 
       typeof target.hasLeftTrace === 'boolean' &&
       typeof target.hasRightTrace === 'boolean' &&
       typeof target.markdownPreviewEnabled === 'boolean' &&
+      (target.createdAt === undefined || typeof target.createdAt === 'string') &&
       typeof target.updatedAt === 'string' &&
       (target.parent_id === null || typeof target.parent_id === 'string') &&
       Array.isArray(target.child_ids) &&

@@ -83,7 +83,7 @@ export const buildSnippet = (text: string, match: SearchMatchResult, radius = 40
     return '';
   }
   if (match.firstIndex < 0) {
-    return text.length > radius * 2 ? `${text.slice(0, radius * 2)}…` : text;
+    return text;
   }
   const start = Math.max(match.firstIndex - radius, 0);
   const end = Math.min(match.firstIndex + match.matchLength + radius, text.length);

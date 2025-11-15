@@ -46,6 +46,8 @@ describe('TraceConnectorLayer', () => {
       lastSavedAt: null,
       expandedCardIds: new Set<string>(),
       editingCardId: null,
+      dirtyCardIds: new Set<string>(),
+      displayMode: 'detailed' as const,
     };
     const tabRight = {
       id: 'tab-right',
@@ -58,6 +60,8 @@ describe('TraceConnectorLayer', () => {
       lastSavedAt: null,
       expandedCardIds: new Set<string>(),
       editingCardId: null,
+      dirtyCardIds: new Set<string>(),
+      displayMode: 'detailed' as const,
     };
     useWorkspaceStore.setState((state) => ({
       ...state,

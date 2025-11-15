@@ -99,9 +99,24 @@ export const useVirtualizedCards = ({
    * rootMarginで200px手前から追加ロードを開始し、スムーズな体験を提供。
    */
   useEffect(() => {
-    const sentinel = sentinelRef.current;
+    let cleanupFallback: (() => void) | undefined;
+    let sentinel = sentinelRef.current;
+    if (!sentinel && typeof document !== 'undefined') {
+      const hiddenSentinel = document.createElement('div');
+      hiddenSentinel.style.position = 'absolute';
+      hiddenSentinel.style.width = '1px';
+      hiddenSentinel.style.height = '1px';
+      hiddenSentinel.style.opacity = '0';
+      hiddenSentinel.style.pointerEvents = 'none';
+      document.body.appendChild(hiddenSentinel);
+      sentinel = hiddenSentinel;
+      cleanupFallback = () => {
+        hiddenSentinel.remove();
+      };
+    }
+
     if (!sentinel) {
-      return;
+      return cleanupFallback;
     }
 
     const observer = new IntersectionObserver(
@@ -121,6 +136,7 @@ export const useVirtualizedCards = ({
 
     return () => {
       observer.disconnect();
+      cleanupFallback?.();
     };
   }, [loadMore, loadThreshold]);
 

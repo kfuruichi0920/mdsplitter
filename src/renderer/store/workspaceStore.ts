@@ -631,6 +631,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       // 既存カードから次のカードIDを生成
       const cardId = generateNextCardId(tab.cards);
+      const timestamp = new Date().toISOString();
 
       const newCard: Card = {
         id: nanoid(),
@@ -642,7 +643,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         hasLeftTrace: false,
         hasRightTrace: false,
         markdownPreviewEnabled: true,
-        updatedAt: new Date().toISOString(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
         parent_id: parentId,
         child_ids: [],
         prev_id: null,
@@ -1763,6 +1765,7 @@ function materializeClipboardNode(node: ClipboardCardNode, parentId: string | nu
     hasLeftTrace: node.data.hasLeftTrace,
     hasRightTrace: node.data.hasRightTrace,
     markdownPreviewEnabled: node.data.markdownPreviewEnabled,
+    createdAt: now,
     updatedAt: now,
     parent_id: parentId,
     child_ids: [],

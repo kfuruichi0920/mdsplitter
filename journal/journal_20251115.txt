@@ -1,0 +1,25 @@
+# 作業記録 2025-11-15
+
+## 作業概要
+右クリックコンテキストメニューを専用コンポーネント化し、カード統計ダイアログとコピー系ユーティリティを実装。併せて `Card` モデルに `createdAt` を導入し、詳細設計書を更新。
+
+## 実施内容
+### 1. 右クリックメニュー/統計ダイアログの実装
+- `src/renderer/components/ContextMenu.tsx:1-135` に汎用メニューコンポーネントを追加。表示位置補正と外側クリック/ESCクローズ、セクション/アイテムの Variant・Disable 判定を実装。
+- `src/renderer/components/CardPanel.tsx:600-930` でコンテキストメニュー制御を刷新。`contextMenuSections` に編集/追加/貼り付け/情報セクションを構成し、`copyPlainText`・`handleCopyCardsAsText`・`handleCopyCardUuid` でカード本文/UUID コピーを提供。`CardStatsDialog` を開くハンドラや `statsTargetCardId` 管理も追加。
+- `src/renderer/components/CardStatsDialog.tsx:1-120` に統計ダイアログを新設し、カードID/UUID/種別/ステータス/作成・更新日時/トレース件数/階層/文字数・単語数・行数を表示。
+- `src/renderer/constants/cardPresentation.ts:1-46` でステータス/種別ラベルとアイコンを一元化し、`CardPanel`/`CardStatsDialog` 双方で利用。
+- `src/renderer/utils/cardUtils.ts:1-57` に `CardContentStatistics` と `calculateCardContentStatistics` を実装、`src/renderer/utils/__tests__/cardUtils.test.ts:1-32` で単体テストを追加。
+- `src/renderer/styles.css:513-548,1287-1345` へメニューのセクションラベル/アイコン/ショートカットと統計ダイアログのスタイルを追加し、ライト/ダークテーマで視認性を整えた。
+
+### 2. データモデルと生成処理の拡張
+- `src/shared/workspace.ts:60-140` に `Card` の `createdAt?: string` を追加し、`isWorkspaceSnapshot` で型チェックを拡張。
+- `src/renderer/store/workspaceStore.ts:636-660,1764-1786` で `addCard` と `materializeClipboardNode` が `createdAt`/`updatedAt` を同一タイムスタンプで採番するよう更新。貼り付け生成カードにも反映。
+
+### 3. ドキュメント更新
+- `doc/software_detail_design.md:3` で最終更新日を 2025-11-15 に更新。
+- 同ファイル `:314` に `createdAt` 追加と既存データの扱いを追記し、`:333-340` に P6-06（右クリックメニュー/統計ダイアログ拡張）の設計概要を追加。
+
+## 次のアクション
+- Jest ユニットテストを実行し、ContextMenu/統計機能追加後のリグレッションを確認する。
+- カード右クリック時にメニューが即時クローズしていたため、`ContextMenu` の `contextmenu` リスナーを削除し、`mousedown` ベースの閉じ処理に統一した（WSL 環境含めて表示が安定）。
