@@ -926,6 +926,22 @@
     @apply text-blue-600 underline dark:text-blue-300;
   }
 
+  .card__body--markdown .markdown-table {
+    @apply mb-2 w-full border-collapse overflow-hidden rounded-md border border-slate-300 text-xs dark:border-slate-600;
+  }
+
+  .card__body--markdown .markdown-table th {
+    @apply border border-slate-300 bg-slate-100 px-2 py-1 font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .card__body--markdown .markdown-table td {
+    @apply border border-slate-300 bg-white px-2 py-1 text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200;
+  }
+
+  .card__body--markdown .markdown-table tbody tr:hover {
+    @apply bg-slate-50 dark:bg-slate-800/50;
+  }
+
   .card__footer {
     @apply text-[0.65rem] text-slate-400 dark:text-slate-500;
   }
