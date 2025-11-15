@@ -726,6 +726,37 @@ export const App = () => {
     }
   }, []);
 
+  const copyLogs = useCallback(async () => {
+    if (displayedLogs.length === 0) {
+      notify('info', 'コピーするログがありません。');
+      return;
+    }
+    
+    const logText = displayedLogs
+      .map((entry) => `[${entry.timestamp.toLocaleString()}] ${entry.level}: ${entry.message}`)
+      .join('\n');
+    
+    try {
+      await navigator.clipboard.writeText(logText);
+      notify('success', `${displayedLogs.length}件のログをクリップボードにコピーしました。`);
+      pushLog({
+        id: `log-copy-${Date.now()}`,
+        level: 'INFO',
+        message: `${displayedLogs.length}件のログをクリップボードにコピーしました。`,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      console.error('[renderer] failed to copy logs', error);
+      notify('error', 'ログのコピーに失敗しました。');
+      pushLog({
+        id: `log-copy-failed-${Date.now()}`,
+        level: 'ERROR',
+        message: 'ログのコピーに失敗しました。',
+        timestamp: new Date(),
+      });
+    }
+  }, [displayedLogs, notify, pushLog]);
+
   const handleTraceMutation = useCallback(
     async (operation: { type: 'create'; direction: TraceDirection } | { type: 'delete' }) => {
       if (traceBusy) {
@@ -3271,6 +3302,9 @@ export const App = () => {
                 value={logFilterKeyword}
                 onChange={(event) => setLogFilterKeyword(event.target.value)}
               />
+              <button type="button" className="log-area__copy" onClick={copyLogs}>
+                ログをコピー
+              </button>
               <button type="button" className="log-area__clear" onClick={clearLogs}>
                 ログをクリア
               </button>
