@@ -23,6 +23,7 @@ import { useSplitStore } from '../store/splitStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
 import { CARD_KIND_VALUES, parseCardId } from '@/shared/workspace';
 import { useVirtualizedCards } from '../hooks/useVirtualizedCards';
+import { countUntracedCards } from '../utils/cardUtils';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -76,19 +77,6 @@ const formatUpdatedAt = (value: string): string => {
     return '---';
   }
   return date.toLocaleString();
-};
-
-/**
- * @brief 未トレースカード数を計算する。
- * @param cards カードリスト。
- * @param side トレース方向（左/右）。
- * @return 未トレースカード数。
- */
-const countUntracedCards = (cards: Card[], side: 'left' | 'right'): number => {
-  return cards.filter((card) => {
-    const hasTrace = side === 'left' ? card.hasLeftTrace : card.hasRightTrace;
-    return !hasTrace && card.status !== 'deprecated';
-  }).length;
 };
 
 /**
