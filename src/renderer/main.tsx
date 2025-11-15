@@ -14,14 +14,19 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { App } from './App';
+import { MatrixApp } from './MatrixApp';
+
+const isMatrixWindow = window.location.hash === '#matrix';
 
 /**
  * @brief Reactアプリケーションを#root要素にレンダリングする。
  * @details
  * StrictModeでAppコンポーネントを描画します。
  */
+const RootComponent = isMatrixWindow ? MatrixApp : App;
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <RootComponent />
   </React.StrictMode>
 );

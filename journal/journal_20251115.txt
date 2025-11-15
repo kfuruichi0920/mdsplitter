@@ -40,3 +40,10 @@
 - `src/main/main.ts` / `src/main/preload.ts` を再確認し、現状IPCはメインウィンドウのみを対象に `workspace:*` / `history:*` / `document:*` などを expose していることを整理。マトリクス機能ではここに `matrix:open`/`matrix:close`/`trace:changed`/`card-selection:changed` を追加する必要がある。
 - Phase1では `main/matrixWindowManager.ts`（BrowserWindow生成・ブロードキャスト管理）と `renderer/store/matrixStore.ts`（ウィンドウ状態＋IPCフック）を新設する方針で、既存 `traceStore` は `getTraceMatrix` 相当のデータ生成APIを拡張する計画。
 - 実装済み: `src/main/matrixWindowManager.ts` と `matrix:open/close` IPC を追加し、preload/global.d.ts で `window.app.matrix` API を公開。`src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` で初期データロード・ハイライト更新・beforeunload時のクリーンアップを実装し、`npm run test:unit` でリグレッション確認済み。
+
+## Phase2ログ
+- `src/renderer/MatrixApp.tsx` と `src/renderer/main.tsx` を更新し、`#matrix` ウィンドウでは専用UIを描画するよう分離。`MatrixApp` 内で `useMatrixIPC` を起動し、ロード・エラー表示を担当。
+- `TraceMatrixDialog/Header/Toolbar/Cell` を実装し、CSS Grid ベースの2Dグリッドで行/列ヘッダ・セル操作・統計バーを表示。セルクリックで `toggleTraceRelation`、右クリックで `TRACE_RELATION_KINDS` のコンテキストメニューを表示。
+- `src/renderer/store/matrixStore.ts` にトレースファイル名/ヘッダ管理と stats 更新を追加し、`TraceMatrixDialog` から`window.app.workspace.saveTraceFile` + `window.app.matrix.broadcastTraceChange` を呼べるよう整備。`src/renderer/hooks/useMatrixIPC.ts` は `loadTraceFile` から得たメタ情報をストアへ反映。
+- `src/renderer/utils/matrixRelations.ts` とJestテストを追加し、セル単位トグル/種別変更のロジックを単体テストで担保。
+- `src/renderer/styles.css` にトレースマトリクス用スタイルを追加し、提示されたimage.pngのライトモード配色/セル色分けを再現。

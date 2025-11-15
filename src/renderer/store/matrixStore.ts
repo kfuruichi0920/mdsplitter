@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import type { Card } from '@/shared/workspace';
-import type { TraceabilityRelation } from '@/shared/traceability';
+import type { TraceabilityRelation, TraceabilityHeader } from '@/shared/traceability';
 import type { MatrixInitPayload, TraceChangeEvent } from '@/shared/matrixProtocol';
 
 const computeStats = (
@@ -28,6 +28,8 @@ export interface MatrixState {
   windowId: string | null;
   leftFile: string | null;
   rightFile: string | null;
+  traceFileName: string | null;
+  traceHeader: TraceabilityHeader | null;
   leftCards: Card[];
   rightCards: Card[];
   relations: TraceabilityRelation[];
@@ -40,6 +42,7 @@ export interface MatrixState {
   isLoading: boolean;
   error: string | null;
   initializeFromPayload: (payload: MatrixInitPayload) => void;
+  setTraceMetadata: (fileName: string | null, header: TraceabilityHeader | null) => void;
   setCards: (side: 'left' | 'right', cards: Card[]) => void;
   setRelations: (relations: TraceabilityRelation[]) => void;
   applyTraceChange: (event: TraceChangeEvent) => void;
@@ -55,6 +58,8 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   windowId: null,
   leftFile: null,
   rightFile: null,
+  traceFileName: null,
+  traceHeader: null,
   leftCards: [],
   rightCards: [],
   relations: [],
@@ -71,6 +76,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       error: null,
       highlightedCardIds: new Set<string>(),
     })),
+  setTraceMetadata: (fileName, header) => set(() => ({ traceFileName: fileName, traceHeader: header ?? null })),
   setCards: (side, cards) =>
     set((state) => {
       const leftCards = side === 'left' ? cards : state.leftCards;
@@ -102,6 +108,8 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       windowId: null,
       leftFile: null,
       rightFile: null,
+      traceFileName: null,
+      traceHeader: null,
       leftCards: [],
       rightCards: [],
       relations: [],

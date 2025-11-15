@@ -7,9 +7,13 @@ const loadCards = async (fileName: string) => {
   return snapshot?.cards ?? [];
 };
 
-const loadRelations = async (leftFile: string, rightFile: string) => {
+const loadTraceBundle = async (leftFile: string, rightFile: string) => {
   const traceFile = await window.app.workspace.loadTraceFile(leftFile, rightFile);
-  return traceFile?.payload.relations ?? [];
+  return {
+    relations: traceFile?.payload.relations ?? [],
+    fileName: traceFile?.fileName ?? null,
+    header: traceFile?.payload.header ?? null,
+  };
 };
 
 export const useMatrixIPC = (): void => {
@@ -18,14 +22,15 @@ export const useMatrixIPC = (): void => {
       const store = useMatrixStore.getState();
       store.initializeFromPayload(payload);
       try {
-        const [leftCards, rightCards, relations] = await Promise.all([
+        const [leftCards, rightCards, traceBundle] = await Promise.all([
           loadCards(payload.leftFile),
           loadCards(payload.rightFile),
-          loadRelations(payload.leftFile, payload.rightFile),
+          loadTraceBundle(payload.leftFile, payload.rightFile),
         ]);
         useMatrixStore.getState().setCards('left', leftCards);
         useMatrixStore.getState().setCards('right', rightCards);
-        useMatrixStore.getState().setRelations(relations);
+        useMatrixStore.getState().setTraceMetadata(traceBundle.fileName, traceBundle.header);
+        useMatrixStore.getState().setRelations(traceBundle.relations);
       } catch (error) {
         useMatrixStore.getState().setError(error instanceof Error ? error.message : 'マトリクス初期化に失敗しました');
       } finally {

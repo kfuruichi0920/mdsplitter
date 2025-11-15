@@ -1521,4 +1521,121 @@
   .card__card-id--empty {
     @apply text-slate-400 dark:text-slate-500;
   }
+
+  /* Trace Matrix */
+  .trace-matrix-app {
+    @apply flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+  }
+
+  .trace-matrix-status {
+    @apply px-6 py-2 text-sm text-slate-600 dark:text-slate-300;
+  }
+
+  .trace-matrix-status--error {
+    @apply text-rose-500;
+  }
+
+  .trace-matrix-dialog {
+    @apply flex h-full flex-col gap-2 px-4 pb-4;
+  }
+
+  .trace-matrix-header {
+    @apply flex flex-wrap gap-6 rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .trace-matrix-header__label {
+    @apply text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .trace-matrix-header__value {
+    @apply block text-base font-semibold text-slate-900 dark:text-white;
+  }
+
+  .trace-matrix-header__count {
+    @apply ml-2 text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .trace-matrix-toolbar {
+    @apply flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .trace-matrix-toolbar__stats {
+    @apply flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300;
+  }
+
+  .trace-matrix-toolbar__actions {
+    @apply flex gap-3;
+  }
+
+  .trace-matrix-grid {
+    @apply relative flex-1 overflow-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .trace-matrix-grid__inner {
+    @apply grid min-w-full;
+  }
+
+  .trace-matrix-grid__corner {
+    @apply sticky top-0 z-20 bg-slate-100 font-semibold uppercase text-slate-500 dark:bg-slate-700 dark:text-slate-200;
+  }
+
+  .trace-matrix-grid__column-header {
+    @apply sticky top-0 z-10 flex flex-col gap-1 border-b border-l border-slate-200 bg-slate-100 px-2 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .trace-matrix-grid__row-header {
+    @apply sticky left-0 z-10 flex flex-col gap-1 border-b border-r border-slate-200 bg-slate-100 px-2 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200;
+  }
+
+  .trace-matrix-grid__card-id {
+    @apply font-mono text-[0.65rem] uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .trace-matrix-grid__title {
+    @apply text-xs font-medium text-slate-800 dark:text-slate-100;
+  }
+
+  .trace-matrix-cell {
+    @apply flex h-12 w-full items-center justify-center border-b border-l border-slate-200 text-sm transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-blue-500 dark:border-slate-700 dark:hover:bg-slate-700;
+  }
+
+  .trace-matrix-cell--active {
+    @apply font-semibold text-slate-900 dark:text-white;
+  }
+
+  .trace-matrix-cell--row-highlight {
+    @apply bg-emerald-50 dark:bg-emerald-500/10;
+  }
+
+  .trace-matrix-cell--column-highlight {
+    @apply ring-1 ring-emerald-200 dark:ring-emerald-400/40;
+  }
+
+  .trace-matrix-cell--kind-trace {
+    @apply bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-100;
+  }
+
+  .trace-matrix-cell--kind-refines {
+    @apply bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-100;
+  }
+
+  .trace-matrix-cell--kind-tests {
+    @apply bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-100;
+  }
+
+  .trace-matrix-cell--kind-duplicates {
+    @apply bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-100;
+  }
+
+  .trace-matrix-cell--kind-satisfy {
+    @apply bg-teal-50 text-teal-700 dark:bg-teal-500/20 dark:text-teal-100;
+  }
+
+  .trace-matrix-cell--kind-relate {
+    @apply bg-slate-100 text-slate-700 dark:bg-slate-600/40 dark:text-slate-100;
+  }
+
+  .trace-matrix-cell--kind-specialize {
+    @apply bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-100;
+  }
 }

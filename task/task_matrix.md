@@ -67,3 +67,10 @@
 - 現状のIPCは `src/main/main.ts:31-230` で一元管理され、`workspace:loadTraceFile/saveTraceFile` のように `ipcMain.handle` から `workspace.*` API を公開している。`src/main/preload.ts:18-120` では `contextBridge` により `window.app.workspace` へ `loadTraceFile`/`saveTraceFile` をエクスポート済み。Phase1ではここに `matrix:open` / `matrix:close` / ブロードキャスト系イベントを追加し、`MatrixWindowManager` で複数 `BrowserWindow` を追跡する。
 - レンダラー側状態管理は `useWorkspaceStore`/`useTraceStore` が既に稼働。マトリクス専用の `matrixStore` と IPCフックは未実装のため、Phase1.1で `src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` を新規に追加する計画。
 - Phase1実装：`src/main/matrixWindowManager.ts` を新設し、`matrix:open/close` によるモーダレスウィンドウ生成と `matrix:init`/`matrix:trace-changed`/`matrix:card-selection` ブロードキャストを `src/main/main.ts:200-270` へ追加。preload/global.d.tsには `window.app.matrix.*` API を公開。レンダラー側では `src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` を実装し、カード/トレース初期ロード、ハイライト反映、beforeunload時のClose通知までの基盤を整備した。
+
+## 9. Phase2実装ログ（2025-11-15）
+- `src/renderer/MatrixApp.tsx` を追加し、`index.html#matrix` で起動したウィンドウでは `App` の代わりにマトリクス専用UIをレンダリングするよう分岐。`useMatrixIPC` の購読で初期データロード・エラー表示を制御。
+- `TraceMatrixDialog/Header/Toolbar/Cell` を実装（`src/renderer/components/*`）。TanStack Table/ react-window はネットワーク制限で導入できなかったため、CSS Grid ベースの簡易仮想グリッドで代替し、セルクリック/右クリック操作・ステータス表示・統計バーを組み込んだ。
+- `matrixStore` にトレースファイル名・ヘッダ・統計の管理APIを追加し、`useMatrixIPC` が `window.app.workspace.loadTraceFile` から取得したメタデータを保持。`window.app.matrix.broadcastTraceChange`/`window.app.workspace.saveTraceFile` を呼び出す `TraceMatrixDialog` の操作と接続。
+- `src/renderer/utils/matrixRelations.ts` とJestテスト（`matrixRelations.test.ts`）でセル単位のトグル/種別変更ロジックを共通化し、Phase2要求のセル操作振る舞いを保証。
+- `src/renderer/styles.css` にマトリクスUI用スタイルを追加し、提供されたimage.pngの配色レイアウトをベースにヘッダ/ツールバー/セル色分けを再現。
