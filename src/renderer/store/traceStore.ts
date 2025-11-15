@@ -29,7 +29,7 @@ export interface TraceSeed {
   cardId: string;
 }
 
-interface TraceCacheEntry {
+export interface TraceCacheEntry {
   key: string; ///< キャッシュキー（left|||right）
   status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; ///< 現在の状態。
   timestamp: number; ///< 最終更新時刻。
@@ -76,6 +76,7 @@ interface TraceState {
   getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
   getRelatedCards: (seeds: TraceSeed[]) => Record<string, Set<string>>;
   getRelatedNodeKeys: (seeds: TraceSeed[]) => Set<string>;
+  getMatrixData: (leftFile: string, rightFile: string) => Promise<TraceCacheEntry>;
 }
 
 
@@ -375,6 +376,7 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
     set((state) => ({ cache: { ...state.cache, [key]: entry } }));
     return entry;
   },
+  getMatrixData: async (leftFile, rightFile) => get().loadTraceForPair(leftFile, rightFile),
 }));
 
 

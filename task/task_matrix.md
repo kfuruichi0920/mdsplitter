@@ -61,3 +61,9 @@
 1. Phase0チェックリストをjournalに記録し、cardId/deprecated機能の反映状況を確認。
 2. matrixStoreとIPC骨組みを作成し、Jestテストを先行で用意（TDD開始）。
 3. UI実装に入る前に画面イメージの配色トークンを `styles.css` / Tailwind設定へ落とし込み、ライトモード再現を確認。
+
+## 8. Phase1着手ログ（2025-11-15）
+- `src/renderer/store/workspaceStore.test.ts` の `mergeCards` シナリオでスコープ外宣言だった `mergeCandidates` と型取得ロジックを修正し、`MergeCardsReturn` 型エイリアスを導入。`npm run test:unit` が再度パスしたことを確認。
+- 現状のIPCは `src/main/main.ts:31-230` で一元管理され、`workspace:loadTraceFile/saveTraceFile` のように `ipcMain.handle` から `workspace.*` API を公開している。`src/main/preload.ts:18-120` では `contextBridge` により `window.app.workspace` へ `loadTraceFile`/`saveTraceFile` をエクスポート済み。Phase1ではここに `matrix:open` / `matrix:close` / ブロードキャスト系イベントを追加し、`MatrixWindowManager` で複数 `BrowserWindow` を追跡する。
+- レンダラー側状態管理は `useWorkspaceStore`/`useTraceStore` が既に稼働。マトリクス専用の `matrixStore` と IPCフックは未実装のため、Phase1.1で `src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` を新規に追加する計画。
+- Phase1実装：`src/main/matrixWindowManager.ts` を新設し、`matrix:open/close` によるモーダレスウィンドウ生成と `matrix:init`/`matrix:trace-changed`/`matrix:card-selection` ブロードキャストを `src/main/main.ts:200-270` へ追加。preload/global.d.tsには `window.app.matrix.*` API を公開。レンダラー側では `src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` を実装し、カード/トレース初期ロード、ハイライト反映、beforeunload時のClose通知までの基盤を整備した。

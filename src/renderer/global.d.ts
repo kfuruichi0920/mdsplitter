@@ -14,6 +14,15 @@ import type { WorkspaceSnapshot } from '@/shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '@/shared/traceability';
 import type { AppendCardHistoryRequest, CardHistory } from '@/shared/history';
 import type { DocumentLoadErrorCode } from '@/main/documentLoader';
+import type {
+  CardSelectionChangeEvent,
+  MatrixCloseRequest,
+  MatrixCloseResult,
+  MatrixInitPayload,
+  MatrixOpenRequest,
+  MatrixOpenResult,
+  TraceChangeEvent,
+} from '@/shared/matrixProtocol';
 
 export {};
 
@@ -67,6 +76,15 @@ declare global {
       history: {
         load: (fileName: string, cardId: string) => Promise<CardHistory>;
         appendVersion: (payload: AppendCardHistoryRequest) => Promise<CardHistory>;
+      };
+      matrix: {
+        open: (payload: MatrixOpenRequest) => Promise<MatrixOpenResult>;
+        close: (payload: MatrixCloseRequest) => Promise<MatrixCloseResult>;
+        onInit: (callback: (payload: MatrixInitPayload) => void) => () => void;
+        onTraceChanged: (callback: (event: TraceChangeEvent) => void) => () => void;
+        onCardSelectionChanged: (callback: (event: CardSelectionChangeEvent) => void) => () => void;
+        broadcastTraceChange: (event: TraceChangeEvent) => void;
+        broadcastCardSelection: (event: CardSelectionChangeEvent) => void;
       };
     };
   }

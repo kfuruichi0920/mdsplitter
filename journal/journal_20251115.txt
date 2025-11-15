@@ -34,3 +34,9 @@
 ## 次のアクション
 - workspaceStoreのテストデータ定義を修正して`npm run test:unit`をパスさせる。
 - TraceMatrix向けに`traceStore`へマトリクス取得APIを設計し、IPC/ストア整備(Phase1)に着手。
+
+## Phase1着手ログ
+- `src/renderer/store/workspaceStore.test.ts` の `mergeCards` テスト群で `mergeCandidates` が describe ブロック外から参照できず型推論も破綻していたため、テストデータをモジュールスコープに移動し、`WorkspaceStore['mergeCards']` 由来の `MergeCardsReturn` 型を導入。`npm run test:unit` が成功することを確認。
+- `src/main/main.ts` / `src/main/preload.ts` を再確認し、現状IPCはメインウィンドウのみを対象に `workspace:*` / `history:*` / `document:*` などを expose していることを整理。マトリクス機能ではここに `matrix:open`/`matrix:close`/`trace:changed`/`card-selection:changed` を追加する必要がある。
+- Phase1では `main/matrixWindowManager.ts`（BrowserWindow生成・ブロードキャスト管理）と `renderer/store/matrixStore.ts`（ウィンドウ状態＋IPCフック）を新設する方針で、既存 `traceStore` は `getTraceMatrix` 相当のデータ生成APIを拡張する計画。
+- 実装済み: `src/main/matrixWindowManager.ts` と `matrix:open/close` IPC を追加し、preload/global.d.ts で `window.app.matrix` API を公開。`src/renderer/store/matrixStore.ts` と `src/renderer/hooks/useMatrixIPC.ts` で初期データロード・ハイライト更新・beforeunload時のクリーンアップを実装し、`npm run test:unit` でリグレッション確認済み。

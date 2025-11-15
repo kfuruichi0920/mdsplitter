@@ -13,10 +13,12 @@ import {
   type Card,
   type InsertPosition,
   type OpenTabResult,
+  type WorkspaceStore,
 } from './workspaceStore';
 
-describe('workspaceStore (multi-panel tabs)', () => {
-  const baseCards: Card[] = [
+type MergeCardsReturn = ReturnType<WorkspaceStore['mergeCards']>;
+
+const baseCards: Card[] = [
     {
       id: 'card-001',
       title: 'カード1',
@@ -51,7 +53,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
     },
   ];
 
-  const otherCards: Card[] = [
+const otherCards: Card[] = [
     {
       id: 'card-101',
       title: '別カード1',
@@ -70,7 +72,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
     },
   ];
 
-  const mergeCandidates: Card[] = [
+const mergeCandidates: Card[] = [
     {
       id: 'merge-001',
       title: '統合候補1',
@@ -121,6 +123,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
     },
   ];
 
+describe('workspaceStore (multi-panel tabs)', () => {
   beforeEach(() => {
     resetWorkspaceStore();
     jest.useRealTimers();
@@ -783,7 +786,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      let result: MergeCardsReturn = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-002'], {
           title: '統合後タイトル',
@@ -816,7 +819,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      let result: MergeCardsReturn = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-003'], {
           title: 'invalid',
@@ -844,7 +847,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      let result: MergeCardsReturn = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-002', 'merge-003'], {
           title: '保持用',

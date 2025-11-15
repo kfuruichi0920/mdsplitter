@@ -44,6 +44,14 @@ import { DocumentLoadError, loadDocumentFromPath } from './documentLoader';
 import type { LoadedDocument } from './documentLoader';
 import { appendCardHistoryVersion, loadCardHistory } from './history';
 import type { AppendCardHistoryRequest } from '../shared/history';
+import { MatrixWindowManager } from './matrixWindowManager';
+import type {
+  CardSelectionChangeEvent,
+  MatrixCloseRequest,
+  MatrixOpenRequest,
+  MatrixOpenResult,
+  TraceChangeEvent,
+} from '../shared/matrixProtocol';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -60,6 +68,7 @@ const resolveRendererIndexFile = () => path.resolve(__dirname, '../renderer/inde
 const resolvePreloadPath = () => path.join(__dirname, 'preload.js');
 
 let mainWindow: BrowserWindow | null = null; ///< メインウィンドウ参照
+const matrixWindowManager = new MatrixWindowManager();
 
 /**
  * @brief メインウィンドウを生成・初期化。
@@ -234,6 +243,40 @@ ipcMain.handle('workspace:saveTraceFile', async (_event, payload: TraceFileSaveR
   const result = await saveTraceFile(payload);
   logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
   return result;
+});
+
+ipcMain.handle('matrix:open', async (_event, payload: MatrixOpenRequest): Promise<MatrixOpenResult> => {
+  if (!payload || typeof payload.leftFile !== 'string' || typeof payload.rightFile !== 'string') {
+    throw new Error('matrix:open payload is invalid');
+  }
+  const windowId = matrixWindowManager.openFromRequest(payload);
+  logMessage('info', `マトリクスウィンドウを生成しました: ${windowId}`);
+  return { windowId };
+});
+
+ipcMain.handle('matrix:close', async (_event, payload: MatrixCloseRequest) => {
+  if (!payload || typeof payload.windowId !== 'string') {
+    throw new Error('matrix:close payload is invalid');
+  }
+  matrixWindowManager.closeMatrixWindow(payload.windowId);
+  return { ok: true };
+});
+
+ipcMain.on('matrix:trace-change', (_event, payload: TraceChangeEvent) => {
+  if (!payload?.leftFile || !payload?.rightFile || !Array.isArray(payload.relations)) {
+    return;
+  }
+  matrixWindowManager.broadcastTraceChange(payload);
+  mainWindow?.webContents.send('trace:changed', payload);
+});
+
+ipcMain.on('matrix:card-selection', (event, payload: CardSelectionChangeEvent) => {
+  if (!payload?.fileName || !Array.isArray(payload.selectedCardIds)) {
+    return;
+  }
+  const senderWindowId = matrixWindowManager.getWindowIdByWebContentsId(event.sender.id);
+  matrixWindowManager.broadcastCardSelection(payload, { excludeWindowId: senderWindowId });
+  mainWindow?.webContents.send('matrix:card-selection', payload);
 });
 
 ipcMain.handle('document:pickSource', async () => {

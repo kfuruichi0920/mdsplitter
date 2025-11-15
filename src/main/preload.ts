@@ -21,6 +21,15 @@ import type { WorkspaceSnapshot } from '../shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
 import type { AppendCardHistoryRequest, CardHistory } from '../shared/history';
 import type { DocumentLoadErrorCode } from './documentLoader';
+import type {
+  CardSelectionChangeEvent,
+  MatrixCloseRequest,
+  MatrixCloseResult,
+  MatrixInitPayload,
+  MatrixOpenRequest,
+  MatrixOpenResult,
+  TraceChangeEvent,
+} from '../shared/matrixProtocol';
 
 
 /**
@@ -74,6 +83,15 @@ type AppAPI = {
   history: {
     load: (fileName: string, cardId: string) => Promise<CardHistory>;
     appendVersion: (payload: AppendCardHistoryRequest) => Promise<CardHistory>;
+  };
+  matrix: {
+    open: (payload: MatrixOpenRequest) => Promise<MatrixOpenResult>;
+    close: (payload: MatrixCloseRequest) => Promise<MatrixCloseResult>;
+    onInit: (callback: (payload: MatrixInitPayload) => void) => () => void;
+    onTraceChanged: (callback: (event: TraceChangeEvent) => void) => () => void;
+    onCardSelectionChanged: (callback: (event: CardSelectionChangeEvent) => void) => () => void;
+    broadcastTraceChange: (event: TraceChangeEvent) => void;
+    broadcastCardSelection: (event: CardSelectionChangeEvent) => void;
   };
 };
 
@@ -141,6 +159,27 @@ const api: AppAPI = {
   history: {
     load: async (fileName: string, cardId: string) => ipcRenderer.invoke('history:load', { fileName, cardId }),
     appendVersion: async (payload: AppendCardHistoryRequest) => ipcRenderer.invoke('history:appendVersion', payload),
+  },
+  matrix: {
+    open: async (payload: MatrixOpenRequest) => ipcRenderer.invoke('matrix:open', payload),
+    close: async (payload: MatrixCloseRequest) => ipcRenderer.invoke('matrix:close', payload),
+    onInit: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: MatrixInitPayload) => callback(payload);
+      ipcRenderer.on('matrix:init', listener);
+      return () => ipcRenderer.removeListener('matrix:init', listener);
+    },
+    onTraceChanged: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: TraceChangeEvent) => callback(payload);
+      ipcRenderer.on('matrix:trace-changed', listener);
+      return () => ipcRenderer.removeListener('matrix:trace-changed', listener);
+    },
+    onCardSelectionChanged: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: CardSelectionChangeEvent) => callback(payload);
+      ipcRenderer.on('matrix:card-selection', listener);
+      return () => ipcRenderer.removeListener('matrix:card-selection', listener);
+    },
+    broadcastTraceChange: (event) => ipcRenderer.send('matrix:trace-change', event),
+    broadcastCardSelection: (event) => ipcRenderer.send('matrix:card-selection', event),
   },
 };
 
