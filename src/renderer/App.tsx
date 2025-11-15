@@ -1739,7 +1739,7 @@ export const App = () => {
   /**
    * @brief 選択カードのステータスを次段へ遷移させる。
    */
-  const handleCycleStatus = useCallback(() => {
+  const handleCycleStatus = useCallback(async () => {
     const targetLeafId = effectiveLeafId;
     if (!selectedCard || !targetLeafId || !activeTabId) {
       pushLog({
@@ -1751,8 +1751,105 @@ export const App = () => {
       return;
     }
 
-    const nextStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
-    if (!nextStatus) {
+    // 現在のステータスと次のステータスを確認
+    const currentStatus = selectedCard.status;
+    const currentStatusIndex = CARD_STATUS_SEQUENCE.indexOf(currentStatus);
+    const nextStatusIndex = currentStatusIndex === -1 ? 0 : (currentStatusIndex + 1) % CARD_STATUS_SEQUENCE.length;
+    const nextStatus = CARD_STATUS_SEQUENCE[nextStatusIndex];
+
+    // deprecatedに変更する場合、トレースをチェック
+    if (nextStatus === 'deprecated') {
+      const activeTab = useWorkspaceStore.getState().tabs[activeTabId];
+      const fileName = activeTab?.fileName;
+
+      if (fileName) {
+        // このカードに関連するトレースを収集
+        const traceCache = useTraceStore.getState().cache;
+        const relatedTraces: { leftFile: string; rightFile: string; traceType: string }[] = [];
+
+        Object.values(traceCache).forEach((entry) => {
+          if (entry.status !== 'ready') return;
+
+          entry.relations.forEach((relation) => {
+            // 左側ファイルがこのファイルで、カードIDが含まれている場合
+            if (entry.leftFile === fileName && relation.left_ids.includes(selectedCard.id)) {
+              relation.right_ids.forEach((rightId) => {
+                relatedTraces.push({
+                  leftFile: entry.leftFile,
+                  rightFile: entry.rightFile,
+                  traceType: `${selectedCard.cardId || selectedCard.id} → ${rightId} (${relation.kind})`,
+                });
+              });
+            }
+            // 右側ファイルがこのファイルで、カードIDが含まれている場合
+            if (entry.rightFile === fileName && relation.right_ids.includes(selectedCard.id)) {
+              relation.left_ids.forEach((leftId) => {
+                relatedTraces.push({
+                  leftFile: entry.leftFile,
+                  rightFile: entry.rightFile,
+                  traceType: `${leftId} → ${selectedCard.cardId || selectedCard.id} (${relation.kind})`,
+                });
+              });
+            }
+          });
+        });
+
+        // トレースがある場合は確認ダイアログを表示
+        if (relatedTraces.length > 0) {
+          const traceList = relatedTraces.map((t) => t.traceType).join('\n');
+          const confirmed = window.confirm(
+            `トレース接続が削除されます。続行しますか?\n\n削除するトレースリストは以下。\n${traceList}`
+          );
+
+          if (!confirmed) {
+            pushLog({
+              id: `cycle-cancelled-${Date.now()}`,
+              level: 'INFO',
+              message: 'ステータス変更をキャンセルしました。',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // トレースを削除
+          for (const entry of Object.values(traceCache)) {
+            if (entry.status !== 'ready') continue;
+
+            let modified = false;
+            const newRelations = entry.relations.filter((relation) => {
+              // 左側ファイルがこのファイルで、カードIDが含まれている場合は削除
+              if (entry.leftFile === fileName && relation.left_ids.includes(selectedCard.id)) {
+                modified = true;
+                return false;
+              }
+              // 右側ファイルがこのファイルで、カードIDが含まれている場合は削除
+              if (entry.rightFile === fileName && relation.right_ids.includes(selectedCard.id)) {
+                modified = true;
+                return false;
+              }
+              return true;
+            });
+
+            if (modified) {
+              await useTraceStore.getState().saveRelationsForPair({
+                leftFile: entry.leftFile,
+                rightFile: entry.rightFile,
+                relations: newRelations,
+              });
+              pushLog({
+                id: `trace-deleted-${Date.now()}`,
+                level: 'INFO',
+                message: `トレースファイル ${entry.leftFile} / ${entry.rightFile} から関連トレースを削除しました。`,
+                timestamp: new Date(),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const finalStatus = cycleCardStatus(targetLeafId, activeTabId, selectedCard.id);
+    if (!finalStatus) {
       pushLog({
         id: `cycle-missing-${Date.now()}`,
         level: 'WARN',
@@ -1765,7 +1862,7 @@ export const App = () => {
     pushLog({
       id: `cycle-${selectedCard.id}-${Date.now()}`,
       level: 'INFO',
-      message: `カード「${selectedCard.title}」のステータスを ${nextStatus} に変更しました。`,
+      message: `カード「${selectedCard.title}」のステータスを ${finalStatus} に変更しました。`,
       timestamp: new Date(),
     });
   }, [activeTabId, cycleCardStatus, effectiveLeafId, pushLog, selectedCard]);
