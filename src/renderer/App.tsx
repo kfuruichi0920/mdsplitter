@@ -146,6 +146,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Ctrl + Shift + S', description: '名前を付けて保存' },
       { keys: 'Ctrl + ,', description: '設定モーダルを開く' },
       { keys: 'Ctrl + F', description: '検索パネルを開いて検索を実行' },
+      { keys: 'Ctrl + B', description: 'サイドバー表示/非表示' },
+      { keys: 'Ctrl + L', description: '動作ログ表示/非表示' },
       { keys: 'Ctrl + C / Ctrl + V', description: '選択カードをコピー / 貼り付け' },
       { keys: 'Ctrl + Z', description: '直前の操作を取り消し' },
       { keys: 'Ctrl + Y / Ctrl + Shift + Z', description: '取り消した操作をやり直し' },
@@ -423,6 +425,7 @@ export const App = () => {
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(true); ///< サイドバー表示/非表示。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
+  const [logVisible, setLogVisible] = useState<boolean>(true); ///< 動作ログ表示/非表示。
   const [dragTarget, setDragTarget] = useState<'sidebar' | 'log' | null>(null); ///< ドラッグ中ターゲット。
   const [ipcStatus, setIpcStatus] = useState<string>('起動準備中...'); ///< IPC 状態メッセージ。
   const [logs, setLogs] = useState<LogEntry[]>(() => [
@@ -2042,10 +2045,15 @@ export const App = () => {
 
   /** ワークスペースの行レイアウトスタイル。 */
   const workspaceStyle = useMemo<CSSProperties>(() => {
+    if (!logVisible) {
+      return {
+        gridTemplateRows: `minmax(${MAIN_MIN_HEIGHT}px, 1fr)`,
+      } satisfies CSSProperties;
+    }
     return {
       gridTemplateRows: `minmax(${MAIN_MIN_HEIGHT}px, 1fr) ${H_SEPARATOR}px ${logHeight}px`,
     } satisfies CSSProperties;
-  }, [logHeight]);
+  }, [logHeight, logVisible]);
 
   /**
    * @brief サイドバーのリサイズ開始処理。
@@ -2194,6 +2202,25 @@ export const App = () => {
       notify('info', message);
       pushLog({
         id: `sidebar-toggle-${now.valueOf()}`,
+        level: 'INFO',
+        message,
+        timestamp: now,
+      });
+      return next;
+    });
+  }, [notify, pushLog]);
+
+  /**
+   * @brief 動作ログ表示/非表示トグル。
+   */
+  const handleLogToggle = useCallback(() => {
+    setLogVisible((prev) => {
+      const next = !prev;
+      const now = new Date();
+      const message = next ? '動作ログを表示しました。' : '動作ログを非表示にしました。';
+      notify('info', message);
+      pushLog({
+        id: `log-toggle-${now.valueOf()}`,
         level: 'INFO',
         message,
         timestamp: now,
@@ -2559,6 +2586,12 @@ export const App = () => {
             return;
           }
 
+          if (key === 'l' && !event.shiftKey) {
+            event.preventDefault();
+            handleLogToggle();
+            return;
+          }
+
           if (event.key === '\\' && !event.shiftKey) {
             event.preventDefault();
             handleSplit('vertical');
@@ -2647,6 +2680,7 @@ export const App = () => {
     handleSaveAs,
     handleSettingsOpen,
     handleSidebarToggle,
+    handleLogToggle,
     handleSplit,
     hasClipboard,
     isSettingsOpen,
@@ -2709,6 +2743,15 @@ export const App = () => {
             onClick={handleSidebarToggle}
           >
             🔖
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${logVisible ? ' toolbar-button--active' : ''}`}
+            title="動作ログ表示/非表示 (Ctrl+L)"
+            aria-label="動作ログ表示/非表示"
+            onClick={handleLogToggle}
+          >
+            📋
           </button>
           <button
             type="button"
@@ -3152,19 +3195,22 @@ export const App = () => {
           </section>
         </div>
 
-        <div
-          className="workspace__separator workspace__separator--horizontal"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-valuemin={LOG_MIN}
-          aria-valuemax={999}
-          aria-valuenow={Math.round(logHeight)}
-          onPointerDown={handleLogPointerDown}
-          onPointerMove={handleLogPointerMove}
-          onPointerUp={handleLogPointerUp}
-        />
+        {logVisible && (
+          <div
+            className="workspace__separator workspace__separator--horizontal"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-valuemin={LOG_MIN}
+            aria-valuemax={999}
+            aria-valuenow={Math.round(logHeight)}
+            onPointerDown={handleLogPointerDown}
+            onPointerMove={handleLogPointerMove}
+            onPointerUp={handleLogPointerUp}
+          />
+        )}
 
-        <section className="log-area" aria-label="動作ログ">
+        {logVisible && (
+          <section className="log-area" aria-label="動作ログ">
           <header className="log-area__header">
             <div className="log-area__title">
               <span>動作ログ</span>
@@ -3217,6 +3263,7 @@ export const App = () => {
             )}
           </pre>
         </section>
+        )}
       </section>
 
       <footer className="status-bar" aria-label="ステータスバー">
