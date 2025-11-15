@@ -648,6 +648,8 @@ export const App = () => {
         //! 変更を保存してから終了
         setUnsavedChangesDialogOpen(false);
         setSavingForClose(true);
+        //! まず'apply'応答を送信してメインプロセスに通知
+        window.app.unsavedChanges.sendResponse({ action: 'apply' });
         pushLog('info', '未保存の変更を保存してからアプリを終了します');
 
         try {
@@ -670,9 +672,9 @@ export const App = () => {
             pushLog('info', `カードファイル「${tab.fileName}」を保存しました`);
           }
 
-          //! 全てのタブを保存後、終了を通知
-          window.app.unsavedChanges.sendResponse({ action: 'apply' });
+          //! 全てのタブを保存後、終了準備完了を通知
           pushLog('info', '全ての変更を保存しました。アプリを終了します');
+          window.app.unsavedChanges.notifySavedAndReadyToQuit();
         } catch (error) {
           pushLog('error', `保存中にエラーが発生しました: ${String(error)}`);
           notify('error', '保存に失敗しました。アプリの終了をキャンセルします');

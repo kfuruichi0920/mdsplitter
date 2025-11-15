@@ -138,13 +138,26 @@ ipcMain.on('app:unsavedChangesResponse', (_event, response: { action: 'discard' 
     app.quit();
   } else if (action === 'apply') {
     //! 変更を適用（レンダラー側で保存処理を実行）
-    //! 保存完了後、レンダラー側から再度終了要求を送信する
+    //! レンダラー側で保存が完了したら'app:savedAndReadyToQuit'イベントが送信される
     logMessage('info', 'ユーザーが変更を保存してアプリを終了します');
   } else if (action === 'cancel') {
     //! 終了をキャンセル
     logMessage('info', 'ユーザーがアプリの終了をキャンセルしました');
     userClosingDecision = null;
   }
+});
+
+/**
+ * @brief レンダラー側で保存が完了し、アプリ終了の準備ができたことを通知。
+ * @details
+ * 'apply'アクション選択後、レンダラー側で全ての保存が完了したら
+ * このイベントが送信され、アプリを安全に終了する。
+ */
+ipcMain.on('app:savedAndReadyToQuit', () => {
+  logMessage('info', '全ての変更を保存しました。アプリを終了します');
+  isQuitting = true;
+  mainWindow?.close();
+  app.quit();
 });
 
 ipcMain.handle('settings:load', async () => {

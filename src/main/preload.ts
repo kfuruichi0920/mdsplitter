@@ -87,6 +87,8 @@ type AppAPI = {
     onCheckUnsavedChanges: (callback: () => void) => void;
     /** 未保存の変更に対するユーザーの選択を送信。 */
     sendResponse: (response: UnsavedChangesResponse) => void;
+    /** 保存完了後、アプリ終了の準備ができたことを通知。 */
+    notifySavedAndReadyToQuit: () => void;
   };
 };
 
@@ -157,6 +159,9 @@ const api: AppAPI = {
     },
     sendResponse: (response: UnsavedChangesResponse) => {
       ipcRenderer.send('app:unsavedChangesResponse', response);
+    },
+    notifySavedAndReadyToQuit: () => {
+      ipcRenderer.send('app:savedAndReadyToQuit');
     },
   },
 };
