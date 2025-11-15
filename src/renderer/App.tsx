@@ -420,6 +420,7 @@ export const App = () => {
   const traceFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const traceFilterPopoverRef = useRef<HTMLDivElement | null>(null);
   const conversionAbortControllerRef = useRef<AbortController | null>(null);
+  const logAreaRef = useRef<HTMLPreElement | null>(null); ///< ログエリア。
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(true); ///< サイドバー表示/非表示。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
@@ -445,6 +446,21 @@ export const App = () => {
       return levelMatch && keywordMatch;
     });
   }, [logFilterKeyword, logLevelFilter, logs]);
+
+  // Auto-scroll log area when new logs are added (only if already at bottom)
+  useEffect(() => {
+    const logElement = logAreaRef.current;
+    if (!logElement) return;
+
+    // Check if user is already at the bottom (with 50px threshold)
+    const isAtBottom = logElement.scrollHeight - logElement.scrollTop - logElement.clientHeight <= 50;
+
+    // Only auto-scroll if the user is at the bottom
+    if (isAtBottom) {
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+  }, [displayedLogs]);
+
   const logLevelOptions: Array<'ALL' | LogEntry['level']> = ['ALL', 'INFO', 'WARN', 'ERROR', 'DEBUG'];
   const clearLogs = useCallback(() => {
     setLogs([
@@ -3204,7 +3220,7 @@ export const App = () => {
               </button>
             </div>
           </header>
-          <pre className="log-area__body" aria-live="polite">
+          <pre ref={logAreaRef} className="log-area__body" aria-live="polite">
             {displayedLogs.length === 0 ? (
               <span key="log-empty">該当するログがありません。</span>
             ) : (
