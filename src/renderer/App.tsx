@@ -546,10 +546,16 @@ export const App = () => {
    * @details
    * メインプロセスからの未保存の変更確認要求を受け取り、
    * 未保存のタブがあればダイアログを表示する。
+   *
+   * 注意: この useEffect は tabs に依存していないため、
+   * マウント時に1回だけ実行されます。これにより、イベントリスナーの
+   * 重複登録を防ぎます。tabs の最新状態は useRef で保持します。
    */
   useEffect(() => {
     const handleCheckUnsavedChanges = () => {
-      const dirtyTabsCount = Object.values(tabs).filter((tab) => tab.isDirty).length;
+      //! 最新のtabsの状態を取得（useWorkspaceStoreから直接取得）
+      const currentTabs = useWorkspaceStore.getState().tabs;
+      const dirtyTabsCount = Object.values(currentTabs).filter((tab) => tab.isDirty).length;
 
       if (dirtyTabsCount > 0) {
         //! 未保存のタブがある場合はダイアログを表示
@@ -563,7 +569,8 @@ export const App = () => {
     window.app.unsavedChanges.onCheckUnsavedChanges(handleCheckUnsavedChanges);
 
     //! クリーンアップ関数は不要（ipcRenderer.onはリスナーを上書きするため）
-  }, [tabs]);
+    //! また、このuseEffectはマウント時に1回だけ実行される（依存配列が空）
+  }, []);
 
   const [searchScope, setSearchScope] = useState<SearchScope>('current');
   const [searchUseRegex, setSearchUseRegex] = useState(false);
