@@ -12,6 +12,7 @@
 import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '@/shared/traceability';
+import type { AppendCardHistoryRequest, CardHistory } from '@/shared/history';
 import type { DocumentLoadErrorCode } from '@/main/documentLoader';
 
 export {};
@@ -62,6 +63,10 @@ declare global {
               error: { message: string; code: DocumentLoadErrorCode | 'READ_FAILED' };
             }
         >;
+      };
+      history: {
+        load: (fileName: string, cardId: string) => Promise<CardHistory>;
+        appendVersion: (payload: AppendCardHistoryRequest) => Promise<CardHistory>;
       };
     };
   }

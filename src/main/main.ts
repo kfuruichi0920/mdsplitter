@@ -42,6 +42,8 @@ import type { TraceFileSaveRequest } from '../shared/traceability';
 import { initLogger, logMessage, updateLoggerSettings } from './logger';
 import { DocumentLoadError, loadDocumentFromPath } from './documentLoader';
 import type { LoadedDocument } from './documentLoader';
+import { appendCardHistoryVersion, loadCardHistory } from './history';
+import type { AppendCardHistoryRequest } from '../shared/history';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -196,6 +198,23 @@ ipcMain.handle('workspace:loadOutputFile', async (_event, fileName: string) => {
     logMessage('warn', `出力ファイルの読み込みに失敗しました: ${fileName}`);
   }
   return snapshot;
+});
+
+ipcMain.handle('history:load', async (_event, payload: { fileName: string; cardId: string }) => {
+  const { fileName, cardId } = payload ?? {};
+  if (typeof fileName !== 'string' || typeof cardId !== 'string') {
+    throw new Error('Invalid history load payload');
+  }
+  return loadCardHistory(fileName, cardId);
+});
+
+ipcMain.handle('history:appendVersion', async (_event, payload: AppendCardHistoryRequest) => {
+  if (!payload || typeof payload.fileName !== 'string' || typeof payload.cardId !== 'string' || typeof payload.version !== 'object') {
+    throw new Error('Invalid history append payload');
+  }
+  const saved = await appendCardHistoryVersion(payload);
+  logMessage('info', `カード履歴を更新しました: ${payload.fileName} / ${payload.cardId}`);
+  return saved;
 });
 
 ipcMain.handle('workspace:loadTraceFile', async (_event, args: { leftFile: string; rightFile: string }) => {

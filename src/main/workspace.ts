@@ -44,6 +44,7 @@ export interface WorkspacePaths {
   inputDir: string;
   outputDir: string;
   logsDir: string;
+  historyDir: string;
   settingsFile: string;
 }
 
@@ -74,6 +75,7 @@ const resolveWorkspacePaths = (): WorkspacePaths => {
     inputDir: path.join(root, '_input'),
     outputDir: path.join(root, '_out'),
     logsDir: path.join(root, '_logs'),
+    historyDir: path.join(root, '_history'),
     settingsFile: path.join(root, 'settings.json'),
   } satisfies WorkspacePaths;
   return cachedPaths;
@@ -277,6 +279,7 @@ export const initializeWorkspace = async (): Promise<WorkspacePaths> => {
     ensureDirectory(paths.inputDir),
     ensureDirectory(paths.outputDir),
     ensureDirectory(paths.logsDir),
+    ensureDirectory(paths.historyDir),
   ]);
   //! サンプルファイル群を生成
   await createSampleFiles(paths);
@@ -287,6 +290,7 @@ export const initializeWorkspace = async (): Promise<WorkspacePaths> => {
     input: paths.inputDir,
     output: paths.outputDir,
     logs: paths.logsDir,
+    history: paths.historyDir,
     settings: paths.settingsFile,
   });
   return paths;

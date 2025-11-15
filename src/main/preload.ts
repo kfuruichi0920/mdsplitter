@@ -19,6 +19,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
+import type { AppendCardHistoryRequest, CardHistory } from '../shared/history';
 import type { DocumentLoadErrorCode } from './documentLoader';
 
 
@@ -69,6 +70,10 @@ type AppAPI = {
   };
   document: {
     pickSource: () => Promise<PickDocumentResult>;
+  };
+  history: {
+    load: (fileName: string, cardId: string) => Promise<CardHistory>;
+    appendVersion: (payload: AppendCardHistoryRequest) => Promise<CardHistory>;
   };
 };
 
@@ -132,6 +137,10 @@ const api: AppAPI = {
   },
   document: {
     pickSource: async () => ipcRenderer.invoke('document:pickSource'),
+  },
+  history: {
+    load: async (fileName: string, cardId: string) => ipcRenderer.invoke('history:load', { fileName, cardId }),
+    appendVersion: async (payload: AppendCardHistoryRequest) => ipcRenderer.invoke('history:appendVersion', payload),
   },
 };
 
