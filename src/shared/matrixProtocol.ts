@@ -34,3 +34,15 @@ export interface MatrixCloseRequest {
 export interface MatrixCloseResult {
   ok: boolean;
 }
+
+export type MatrixExportFormat = 'csv' | 'excel';
+
+export interface MatrixExportRequest {
+  fileName: string;
+  content: string;
+  format: MatrixExportFormat;
+}
+
+export interface MatrixExportResult {
+  savedPath: string;
+}

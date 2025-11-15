@@ -18,11 +18,8 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
       <span>未トレース（列）: {untracedRightCount}</span>
     </div>
     <div className="trace-matrix-toolbar__actions">
-      <button type="button" className="btn-secondary" disabled>
-        フィルタ (準備中)
-      </button>
       <button type="button" className="btn-primary" onClick={onExport} disabled={!onExport}>
-        エクスポート
+        CSVエクスポート
       </button>
     </div>
   </div>

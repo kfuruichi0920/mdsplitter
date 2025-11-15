@@ -74,3 +74,8 @@
 - `matrixStore` にトレースファイル名・ヘッダ・統計の管理APIを追加し、`useMatrixIPC` が `window.app.workspace.loadTraceFile` から取得したメタデータを保持。`window.app.matrix.broadcastTraceChange`/`window.app.workspace.saveTraceFile` を呼び出す `TraceMatrixDialog` の操作と接続。
 - `src/renderer/utils/matrixRelations.ts` とJestテスト（`matrixRelations.test.ts`）でセル単位のトグル/種別変更ロジックを共通化し、Phase2要求のセル操作振る舞いを保証。
 - `src/renderer/styles.css` にマトリクスUI用スタイルを追加し、提供されたimage.pngの配色レイアウトをベースにヘッダ/ツールバー/セル色分けを再現。
+
+## 10. Phase3-5実装ログ（2025-11-15）
+- Phase3: `matrixStore` にフィルタ状態（カードID/タイトル検索、ステータス、行/列トレース注目）と行列ハイライトセットを導入し、`TraceMatrixFilterPanel.tsx` と `TraceMatrixDialog.tsx` に検索UI・CSSを追加。カードパネルから `window.app.matrix.broadcastCardSelection` を発火してマトリクスに選択カードを送信し、マトリクス側は `useMatrixIPC` で受信して行/列を強調表示する。
+- Phase4: `matrixExport.ts` でCSV文字列生成を実装し、`matrix:export` IPC（`src/main/main.ts`／`preload.ts`／`global.d.ts`）経由で `_out` ディレクトリへ保存するフローを構築。Excel出力は `xlsx@0.18.5` のインストールが継続して `EAI_AGAIN` となるため未対応だが、CSVボタンから即時保存できる。
+- Phase5: `CardPanel.tsx` で選択セットを `broadcastCardSelection` へ送信し、マトリクスからの選択イベントを購読してカード一覧側にもハイライトを反映。マトリクスのセル操作は既存の `broadcastTraceChange` でカード一覧のトレースキャッシュを更新し、双方向のリアルタイム連動が成立した。

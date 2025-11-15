@@ -18,6 +18,8 @@ import type {
   CardSelectionChangeEvent,
   MatrixCloseRequest,
   MatrixCloseResult,
+  MatrixExportRequest,
+  MatrixExportResult,
   MatrixInitPayload,
   MatrixOpenRequest,
   MatrixOpenResult,
@@ -85,6 +87,7 @@ declare global {
         onCardSelectionChanged: (callback: (event: CardSelectionChangeEvent) => void) => () => void;
         broadcastTraceChange: (event: TraceChangeEvent) => void;
         broadcastCardSelection: (event: CardSelectionChangeEvent) => void;
+        export: (payload: MatrixExportRequest) => Promise<MatrixExportResult>;
       };
     };
   }

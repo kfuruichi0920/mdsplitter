@@ -47,3 +47,8 @@
 - `src/renderer/store/matrixStore.ts` にトレースファイル名/ヘッダ管理と stats 更新を追加し、`TraceMatrixDialog` から`window.app.workspace.saveTraceFile` + `window.app.matrix.broadcastTraceChange` を呼べるよう整備。`src/renderer/hooks/useMatrixIPC.ts` は `loadTraceFile` から得たメタ情報をストアへ反映。
 - `src/renderer/utils/matrixRelations.ts` とJestテストを追加し、セル単位トグル/種別変更のロジックを単体テストで担保。
 - `src/renderer/styles.css` にトレースマトリクス用スタイルを追加し、提示されたimage.pngのライトモード配色/セル色分けを再現。
+
+## Phase3-5ログ
+- Phase3: `matrixStore` にフィルタ状態と行/列ハイライトセットを追加し、`TraceMatrixFilterPanel.tsx` と `TraceMatrixDialog.tsx` にカードID/タイトル検索、ステータスチェック、行列トレース注目フィルタを実装。カードパネル側から `window.app.matrix.broadcastCardSelection` を送信し、マトリクスで行・列をハイライトできるようにした。
+- Phase4: `matrixExport.ts` でCSV生成を実装し、`matrix:export` IPCで `_out` への保存を実現。Excel出力は `npm install xlsx@0.18.5` が DNSエラー（`EAI_AGAIN`）で失敗したため保留だが、CSVボタンからは即保存可能。
+- Phase5: `CardPanel.tsx` でマトリクス選択イベントの送受信を実装し、Matrix→カード一覧→Matrix の双方向ハイライトを達成。マトリクス上のセル操作後に `broadcastTraceChange` でカード一覧のトレースキャッシュを更新する仕組みも動作確認済み。

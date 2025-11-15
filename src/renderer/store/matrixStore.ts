@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { Card } from '@/shared/workspace';
+import type { Card, CardStatus } from '@/shared/workspace';
 import type { TraceabilityRelation, TraceabilityHeader } from '@/shared/traceability';
 import type { MatrixInitPayload, TraceChangeEvent } from '@/shared/matrixProtocol';
 
@@ -24,6 +24,33 @@ const computeStats = (
   };
 };
 
+type StatusMap = Record<CardStatus, boolean>;
+
+const CARD_STATUSES: CardStatus[] = ['draft', 'review', 'approved', 'deprecated'];
+
+export interface MatrixFilter {
+  cardIdQuery: string;
+  titleQuery: string;
+  status: StatusMap;
+  columnTraceFocus: string | null; // right card id
+  rowTraceFocus: string | null; // left card id
+}
+
+const createInitialStatusMap = (): StatusMap => ({
+  draft: true,
+  review: true,
+  approved: true,
+  deprecated: true,
+});
+
+const initialFilter: MatrixFilter = {
+  cardIdQuery: '',
+  titleQuery: '',
+  status: createInitialStatusMap(),
+  columnTraceFocus: null,
+  rowTraceFocus: null,
+};
+
 export interface MatrixState {
   windowId: string | null;
   leftFile: string | null;
@@ -33,7 +60,8 @@ export interface MatrixState {
   leftCards: Card[];
   rightCards: Card[];
   relations: TraceabilityRelation[];
-  highlightedCardIds: Set<string>;
+  highlightedRowCardIds: Set<string>;
+  highlightedColumnCardIds: Set<string>;
   stats: {
     totalTraces: number;
     untracedLeftCount: number;
@@ -41,14 +69,20 @@ export interface MatrixState {
   };
   isLoading: boolean;
   error: string | null;
+  filter: MatrixFilter;
   initializeFromPayload: (payload: MatrixInitPayload) => void;
   setTraceMetadata: (fileName: string | null, header: TraceabilityHeader | null) => void;
   setCards: (side: 'left' | 'right', cards: Card[]) => void;
   setRelations: (relations: TraceabilityRelation[]) => void;
   applyTraceChange: (event: TraceChangeEvent) => void;
-  setHighlightedCardIds: (cardIds: string[]) => void;
+  setHighlightedRowCardIds: (cardIds: string[]) => void;
+  setHighlightedColumnCardIds: (cardIds: string[]) => void;
   setError: (message: string | null) => void;
   finishLoading: () => void;
+  setFilterQuery: (field: 'cardIdQuery' | 'titleQuery', value: string) => void;
+  toggleFilterStatus: (status: CardStatus) => void;
+  setTraceFocus: (side: 'row' | 'column', cardId: string | null) => void;
+  resetFilter: () => void;
   reset: () => void;
 }
 
@@ -63,10 +97,12 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   leftCards: [],
   rightCards: [],
   relations: [],
-  highlightedCardIds: new Set<string>(),
+  highlightedRowCardIds: new Set<string>(),
+  highlightedColumnCardIds: new Set<string>(),
   stats: initialStats,
   isLoading: false,
   error: null,
+  filter: initialFilter,
   initializeFromPayload: (payload) =>
     set(() => ({
       windowId: payload.windowId,
@@ -74,7 +110,8 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       rightFile: payload.rightFile,
       isLoading: true,
       error: null,
-      highlightedCardIds: new Set<string>(),
+      highlightedRowCardIds: new Set<string>(),
+      highlightedColumnCardIds: new Set<string>(),
     })),
   setTraceMetadata: (fileName, header) => set(() => ({ traceFileName: fileName, traceHeader: header ?? null })),
   setCards: (side, cards) =>
@@ -99,10 +136,30 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
     }
     get().setRelations(event.relations);
   },
-  setHighlightedCardIds: (cardIds) =>
-    set(() => ({ highlightedCardIds: new Set(cardIds) })),
+  setHighlightedRowCardIds: (cardIds) =>
+    set(() => ({ highlightedRowCardIds: new Set(cardIds) })),
+  setHighlightedColumnCardIds: (cardIds) =>
+    set(() => ({ highlightedColumnCardIds: new Set(cardIds) })),
   setError: (message) => set(() => ({ error: message })),
   finishLoading: () => set(() => ({ isLoading: false })),
+  setFilterQuery: (field, value) =>
+    set((state) => ({ filter: { ...state.filter, [field]: value } })),
+  toggleFilterStatus: (status) =>
+    set((state) => ({
+      filter: {
+        ...state.filter,
+        status: { ...state.filter.status, [status]: !state.filter.status[status] },
+      },
+    })),
+  setTraceFocus: (side, cardId) =>
+    set((state) => ({
+      filter: {
+        ...state.filter,
+        columnTraceFocus: side === 'column' ? cardId : state.filter.columnTraceFocus,
+        rowTraceFocus: side === 'row' ? cardId : state.filter.rowTraceFocus,
+      },
+    })),
+  resetFilter: () => set(() => ({ filter: initialFilter })),
   reset: () =>
     set(() => ({
       windowId: null,
@@ -113,9 +170,11 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       leftCards: [],
       rightCards: [],
       relations: [],
-      highlightedCardIds: new Set<string>(),
+      highlightedRowCardIds: new Set<string>(),
+      highlightedColumnCardIds: new Set<string>(),
       stats: initialStats,
       isLoading: false,
       error: null,
+      filter: initialFilter,
     })),
 }));

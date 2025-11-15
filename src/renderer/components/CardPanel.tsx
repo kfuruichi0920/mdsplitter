@@ -368,6 +368,44 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     return set.size > 0 ? set : null;
   }, [activeFileName, excludeSelfTrace, globalSelections, selectionSeeds, traceCacheSnapshot]);
 
+  const [matrixSelectionIds, setMatrixSelectionIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!window.app?.matrix) {
+      return;
+    }
+    const unsubscribe = window.app.matrix.onCardSelectionChanged((event) => {
+      if (event.fileName !== activeFileName) {
+        return;
+      }
+      setMatrixSelectionIds(new Set(event.selectedCardIds));
+    });
+    return () => {
+      unsubscribe?.();
+      setMatrixSelectionIds(new Set());
+    };
+  }, [activeFileName]);
+
+  useEffect(() => {
+    if (!window.app?.matrix || !activeFileName) {
+      return;
+    }
+    window.app.matrix.broadcastCardSelection({
+      fileName: activeFileName,
+      selectedCardIds: Array.from(selectedCardIds),
+      source: 'cards-panel',
+    });
+  }, [activeFileName, selectedCardIds]);
+
+  const combinedHighlightIds = useMemo(() => {
+    const merged = new Set<string>();
+    if (traceHighlightIds) {
+      traceHighlightIds.forEach((id) => merged.add(id));
+    }
+    matrixSelectionIds.forEach((id) => merged.add(id));
+    return merged.size > 0 ? merged : traceHighlightIds;
+  }, [traceHighlightIds, matrixSelectionIds]);
+
   const reassignTracesForMerge = useCallback(
     async (fileName: string, sourceIds: string[], targetId: string) => {
       if (!fileName || sourceIds.length === 0) {
@@ -1580,7 +1618,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             currentDropTarget={visualDropTarget}
             draggedCardIds={draggedCardIds}
             highlightIds={highlightedIds}
-            traceHighlightIds={traceHighlightIds ?? undefined}
+            traceHighlightIds={combinedHighlightIds ?? undefined}
             leftTraceCount={activeFileName ? leftTraceCounts[card.id] ?? 0 : 0}
             rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
             leftConnectorVisible={getCardSideVisibility(card.id, 'left')}

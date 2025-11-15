@@ -50,6 +50,8 @@ import type {
   MatrixCloseRequest,
   MatrixOpenRequest,
   MatrixOpenResult,
+  MatrixExportRequest,
+  MatrixExportResult,
   TraceChangeEvent,
 } from '../shared/matrixProtocol';
 
@@ -277,6 +279,21 @@ ipcMain.on('matrix:card-selection', (event, payload: CardSelectionChangeEvent) =
   const senderWindowId = matrixWindowManager.getWindowIdByWebContentsId(event.sender.id);
   matrixWindowManager.broadcastCardSelection(payload, { excludeWindowId: senderWindowId });
   mainWindow?.webContents.send('matrix:card-selection', payload);
+});
+
+ipcMain.handle('matrix:export', async (_event, payload: MatrixExportRequest): Promise<MatrixExportResult> => {
+  if (!payload || typeof payload.fileName !== 'string' || typeof payload.content !== 'string') {
+    throw new Error('matrix:export payload is invalid');
+  }
+  if (payload.format !== 'csv') {
+    throw new Error('Excelエクスポートは未対応です（依存関係未導入）。');
+  }
+  const paths = getWorkspacePaths();
+  const safeName = payload.fileName.trim().length > 0 ? payload.fileName.trim() : 'trace-matrix.csv';
+  const resolved = path.join(paths.outputDir, safeName);
+  await fs.writeFile(resolved, payload.content, 'utf8');
+  logMessage('info', `トレースマトリクスCSVを保存しました: ${resolved}`);
+  return { savedPath: resolved } satisfies MatrixExportResult;
 });
 
 ipcMain.handle('document:pickSource', async () => {

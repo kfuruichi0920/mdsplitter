@@ -44,10 +44,12 @@ export const useMatrixIPC = (): void => {
     });
     const unsubscribeSelection = window.app.matrix.onCardSelectionChanged((event) => {
       const state = useMatrixStore.getState();
-      if (state.leftFile !== event.fileName && state.rightFile !== event.fileName) {
-        return;
+      if (state.leftFile === event.fileName) {
+        state.setHighlightedRowCardIds(event.selectedCardIds);
       }
-      state.setHighlightedCardIds(event.selectedCardIds);
+      if (state.rightFile === event.fileName) {
+        state.setHighlightedColumnCardIds(event.selectedCardIds);
+      }
     });
 
     const handleBeforeUnload = () => {

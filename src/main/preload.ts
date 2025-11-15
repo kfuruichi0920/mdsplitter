@@ -25,6 +25,8 @@ import type {
   CardSelectionChangeEvent,
   MatrixCloseRequest,
   MatrixCloseResult,
+  MatrixExportRequest,
+  MatrixExportResult,
   MatrixInitPayload,
   MatrixOpenRequest,
   MatrixOpenResult,
@@ -92,6 +94,7 @@ type AppAPI = {
     onCardSelectionChanged: (callback: (event: CardSelectionChangeEvent) => void) => () => void;
     broadcastTraceChange: (event: TraceChangeEvent) => void;
     broadcastCardSelection: (event: CardSelectionChangeEvent) => void;
+    export: (payload: MatrixExportRequest) => Promise<MatrixExportResult>;
   };
 };
 
@@ -180,6 +183,7 @@ const api: AppAPI = {
     },
     broadcastTraceChange: (event) => ipcRenderer.send('matrix:trace-change', event),
     broadcastCardSelection: (event) => ipcRenderer.send('matrix:card-selection', event),
+    export: async (payload: MatrixExportRequest) => ipcRenderer.invoke('matrix:export', payload),
   },
 };
 
