@@ -1,7 +1,22 @@
+/**
+ * @file ConversionModal.tsx
+ * @brief 入力ファイルをカードへ変換する設定モーダルコンポーネント。
+ * @details
+ * ファイル選択・変換方式・カードID採番ルールの UI を提供し、長大ファイル警告や進捗表示、
+ * 変換実行/キャンセル操作を呼び出し元へイベントで通知する。
+ * Zustand ストアの ConversionModalDisplayState を描画に利用する。
+ * @author K.Furuichi
+ * @date 2025-11-15
+ * @version 0.1
+ * @copyright MIT
+ */
 import type { ConverterStrategy } from '@/shared/settings';
 
 import type { CardIdAssignmentRule, ConversionModalDisplayState } from '../types/conversion';
 
+/**
+ * @brief 変換モーダルのプロパティ。
+ */
 interface ConversionModalProps {
   state: ConversionModalDisplayState;
   onClose: () => void;
@@ -16,6 +31,11 @@ interface ConversionModalProps {
   onCardIdAssignmentRuleChange: (rule: CardIdAssignmentRule) => void;
 }
 
+/**
+ * @brief バイト数をユーザ向けに整形する。
+ * @param bytes 表示対象バイト数。
+ * @return 読みやすい単位文字列。
+ */
 const formatFileSize = (bytes: number): string => {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -26,6 +46,13 @@ const formatFileSize = (bytes: number): string => {
   return `${bytes} B`;
 };
 
+/**
+ * @brief 入力ファイル→カード変換の設定ダイアログ。
+ * @details
+ * ファイル情報、変換方式、カードID採番設定、警告/進捗/エラー表示を行う。
+ * @param props 表示状態とコールバック群。
+ * @return JSX。
+ */
 export const ConversionModal: React.FC<ConversionModalProps> = ({
   state,
   onClose,

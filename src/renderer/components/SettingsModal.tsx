@@ -1,3 +1,15 @@
+/**
+ * @file SettingsModal.tsx
+ * @brief アプリ設定編集用モーダルコンポーネント。
+ * @details
+ * テーマ/入出力/ログ/ワークスペースの4セクションをタブ切り替えで編集し、
+ * 入力値検証や最近開いたファイル管理、テーマプレビュー呼び出しを担う。
+ * onChange で双方向バインディングし、保存/キャンセル操作を親へ通知する。
+ * @author K.Furuichi
+ * @date 2025-11-15
+ * @version 0.1
+ * @copyright MIT
+ */
 import { useMemo } from 'react';
 import type {
   AppSettings,
@@ -16,6 +28,9 @@ const SECTION_DEFINITIONS: { id: SettingsSection; label: string; icon: string }[
   { id: 'workspace', label: 'ワークスペース', icon: '🗂️' },
 ];
 
+/**
+ * @brief 設定モーダルのプロパティ。
+ */
 export interface SettingsModalProps {
   isOpen: boolean;
   isLoading: boolean;
@@ -32,8 +47,21 @@ export interface SettingsModalProps {
   onClearRecent: () => void;
 }
 
+/**
+ * @brief 数値入力を検証し、非数値時はフォールバック値に置き換える。
+ * @param value 入力値。
+ * @param fallback フォールバック数値。
+ * @return 有効な数値。
+ */
 const numberInput = (value: number, fallback: number): number => (Number.isFinite(value) ? value : fallback);
 
+/**
+ * @brief アプリ全体の設定を編集するモーダルダイアログ。
+ * @details
+ * セクション切り替え UI とフォームをレンダリングし、入力値を onChange で親ストアへ反映する。
+ * @param props モーダル状態とイベントハンドラ群。
+ * @return JSX。
+ */
 export const SettingsModal = ({
   isOpen,
   isLoading,

@@ -1,3 +1,27 @@
+/**
+ * @file TraceConnectorLayer.tsx
+ * @brief トレースリンクをSVGで描画するオーバーレイレイヤー。
+ * @details
+ * 左右のカードペイン間に存在するトレースリンクを監視し、可視状態・フィルタ条件・
+ * ビューポート座標に基づいて平滑なベジェ曲線を動的生成する。Electron/Reactの
+ * コンテキストで使用され、カードの選択状態や設定ストアと連携する。
+ * 例:
+ * @code
+ * <TraceConnectorLayer
+ *   containerRef={containerRef}
+ *   direction="vertical"
+ *   splitRatio={0.5}
+ *   nodeId="split-root"
+ *   leftLeafIds={["left"]}
+ *   rightLeafIds={["right"]}
+ * />
+ * @endcode
+ * 計測頻度の自動調整やビューポート外コネクタの抑制など、パフォーマンス最適化を内包。
+ * @author md2data
+ * @date 2024-11-17
+ * @version 0.1
+ * @copyright MIT
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
@@ -6,6 +30,11 @@ import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from
 import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
 import type { TraceabilityLink } from '@/shared/traceability';
 
+/**
+ * @brief TraceConnectorLayerが利用するプロパティ型。
+ * @details
+ * 左右リーフの識別子や分割比など、描画領域のレイアウト情報と状態同期用IDを受け取る。
+ */
 interface TraceConnectorLayerProps {
   containerRef: React.RefObject<HTMLDivElement>;
   direction: 'horizontal' | 'vertical';
@@ -15,18 +44,33 @@ interface TraceConnectorLayerProps {
   rightLeafIds: string[];
 }
 
+/**
+ * @brief SVGパス生成に使用する一時データ構造。
+ */
 interface ConnectorPathEntry {
   id: string;
   path: string;
   className: string;
 }
 
+/**
+ * @brief リンク方向を左右入れ替え時に反転するユーティリティ。
+ * @param direction 元の方向（forward/backward/bidirectional）。
+ * @return 入れ替え後の方向。双方向の場合はそのまま。
+ */
 const directionSwap = (direction: 'forward' | 'backward' | 'bidirectional'): 'forward' | 'backward' | 'bidirectional' => {
   if (direction === 'forward') return 'backward';
   if (direction === 'backward') return 'forward';
   return 'bidirectional';
 };
 
+/**
+ * @brief カードアンカーの画面座標をローカルSVG座標へ変換する。
+ * @param anchor 対象カードアンカー情報。
+ * @param rect SVGコンテナの境界ボックス。
+ * @param side 端点側（left/right）。
+ * @return SVGローカル座標系での{x, y}。
+ */
 const toLocalPoint = (anchor: CardAnchorEntry, rect: DOMRectReadOnly, side: 'left' | 'right') => {
   const x = side === 'left' ? anchor.rect.left : anchor.rect.right;
   return {
@@ -40,6 +84,14 @@ interface FilePair {
   right: string;
 }
 
+/**
+ * @brief 左右ペインでアクティブなファイルのデカルト積を返すカスタムフック。
+ * @details
+ * ファイル名文字列を連結し、依存配列が安定するようメモ化することで再レンダリングを抑制。
+ * @param leftLeafIds 左側リーフID群。
+ * @param rightLeafIds 右側リーフID群。
+ * @return FilePair配列。空リーフの場合は空配列。
+ */
 const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
   // ファイル名をソート済み文字列として取得（参照の安定性のため）
   const leftFilesStr = useWorkspaceStore(
@@ -89,6 +141,15 @@ const useActiveFiles = (leftLeafIds: string[], rightLeafIds: string[]) => {
   }, [leftFilesStr, rightFilesStr]);
 };
 
+  /**
+   * @brief トレースリンクを描画するReactコンポーネント。
+   * @details
+   * directionがverticalのときにのみSVGレイヤーを表示し、カード座標とトレース設定を元に
+   * ベジェ曲線パスを生成する。測定のスロットリング、ファイルペア毎のトレースロード、
+   * 選択ノードのハイライトを内包。O(N)でリンクを走査する。
+   * @param props TraceConnectorLayerProps。
+   * @return SVGを含むdiv。非対応方向ではnull。
+   */
 export const TraceConnectorLayer = ({
   containerRef,
   direction,

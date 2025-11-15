@@ -1,3 +1,15 @@
+/**
+ * @file documentLoader.test.ts
+ * @brief documentLoader ユーティリティの単体テスト群。
+ * @details
+ * ファイルサイズ判定・文字コード検出・ドキュメント読込処理の境界条件をカバーし、
+ * しきい値やフォールバック設定が期待通り動作することを確認する。
+ * Jest の Node 環境で実行される。
+ * @author K.Furuichi
+ * @date 2025-11-15
+ * @version 0.1
+ * @copyright MIT
+ */
 /** @jest-environment node */
 
 import path from 'node:path';
@@ -17,8 +29,17 @@ import {
 
 const fixturesDir = path.resolve(__dirname, '../../..', 'tests/fixtures');
 
+/**
+ * @brief フィクスチャファイルの絶対パスを取得。
+ * @param name フィクスチャファイル名。
+ */
 const fixture = (name: string) => path.join(fixturesDir, name);
 
+/**
+ * @brief 一時ファイルパスをフィクスチャディレクトリ内に生成。
+ * @param prefix ファイル名プレフィックス。
+ * @param ext 拡張子 (既定 .tmp)。
+ */
 const tempFile = (prefix: string, ext = '.tmp') =>
   path.join(fixturesDir, `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}${ext}`);
 

@@ -1,3 +1,14 @@
+/**
+ * @file NotificationCenter.tsx
+ * @brief 通知一覧を描画する軽量トーストコンポーネント。
+ * @details
+ * Zustand 通知ストアから通知を購読し、ARIA ライブリージョンとして画面右上に一覧表示。
+ * レベルに応じて配色を切り替え、ユーザ操作で個別削除を行う。
+ * @author K.Furuichi
+ * @date 2025-11-15
+ * @version 0.1
+ * @copyright MIT
+ */
 import { useNotificationStore } from '../store/notificationStore';
 
 const levelClassNames: Record<string, string> = {
