@@ -23,6 +23,7 @@ import { useSplitStore } from '../store/splitStore';
 import { renderMarkdownToHtml } from '../utils/markdown';
 import { CARD_KIND_VALUES, parseCardId } from '@/shared/workspace';
 import { useVirtualizedCards } from '../hooks/useVirtualizedCards';
+import { countUntracedCards } from '../utils/cardUtils';
 
 /** ステータスラベル表示用マッピング。 */
 const CARD_STATUS_LABEL: Record<CardStatus, string> = {
@@ -110,6 +111,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [isBulkPrefixEditOpen, setIsBulkPrefixEditOpen] = useState(false);
   const [bulkPrefixOldValue, setBulkPrefixOldValue] = useState('');
   const [bulkPrefixNewValue, setBulkPrefixNewValue] = useState('');
+  const [untracedFilter, setUntracedFilter] = useState<'none' | 'left' | 'right' | 'both'>('none');
   const handleFilterTextChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setFilterText(event.target.value);
   }, []);
@@ -123,6 +125,25 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         next[kind] = value;
       });
       return next;
+    });
+  }, []);
+  
+  /**
+   * @brief 未トレースフィルタを切り替える。
+   * @param side フィルタ対象のトレース方向。
+   */
+  const toggleUntracedFilter = useCallback((side: 'left' | 'right') => {
+    setUntracedFilter((prev) => {
+      if (prev === 'none') {
+        return side;
+      }
+      if (prev === side) {
+        return 'none';
+      }
+      if (prev === 'both') {
+        return side === 'left' ? 'right' : 'left';
+      }
+      return 'both';
     });
   }, []);
 
@@ -224,6 +245,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const hasSelection = selectedCardIds.size > 0;
   const visualDropTarget = dropTarget ?? previewIndicator;
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
+  
+  /**
+   * @brief 未トレースカード数を計算。
+   * @details
+   * 左側・右側それぞれの未トレースカード数を計算する。
+   * 廃止カードは除外する。
+   */
+  const untracedLeftCount = useMemo(() => countUntracedCards(cards, 'left'), [cards]);
+  const untracedRightCount = useMemo(() => countUntracedCards(cards, 'right'), [cards]);
   const isFileTraceVisible = useTracePreferenceStore(
     useCallback((state) => (activeFileName ? state.isFileVisible(activeFileName) : true), [activeFileName]),
   );
@@ -345,7 +375,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES.filter((kind) => kindFilter[kind])), [kindFilter]);
   const kindFilterActive = allowedKinds.size !== CARD_KIND_VALUES.length;
   const filterTextNormalized = filterText.trim().toLowerCase();
-  const filterActive = filterTextNormalized.length > 0 || kindFilterActive;
+  const untracedFilterActive = untracedFilter !== 'none';
+  const filterActive = filterTextNormalized.length > 0 || kindFilterActive || untracedFilterActive;
 
   const filteredCardIds = useMemo(() => {
     if (!filterActive) {
@@ -360,6 +391,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
       if (filterTextNormalized) {
         const haystack = `${card.title ?? ''}\n${card.body ?? ''}`.toLowerCase();
         if (!haystack.includes(filterTextNormalized)) {
+          return;
+        }
+      }
+      //! 未トレースフィルタ適用
+      if (untracedFilterActive) {
+        const needsLeftTrace = untracedFilter === 'left' || untracedFilter === 'both';
+        const needsRightTrace = untracedFilter === 'right' || untracedFilter === 'both';
+        const matchesLeftFilter = needsLeftTrace ? (!card.hasLeftTrace && card.status !== 'deprecated') : true;
+        const matchesRightFilter = needsRightTrace ? (!card.hasRightTrace && card.status !== 'deprecated') : true;
+        if (!matchesLeftFilter || !matchesRightFilter) {
           return;
         }
       }
@@ -381,7 +422,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     };
     matches.forEach(addAncestors);
     return visible;
-  }, [allowedKinds, cards, filterActive, filterTextNormalized]);
+  }, [allowedKinds, cards, filterActive, filterTextNormalized, untracedFilter, untracedFilterActive]);
 
   /**
    * @brief フィルタ適用後の表示カードリスト。
@@ -1158,6 +1199,58 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         <div className="panel-toolbar__meta">
           カード総数: {cardCount}
           {filterActive ? `（表示: ${visibleCards.length}）` : ''}
+          {cardCount > 0 && (
+            <>
+              {' | '}
+              <span
+                title="左側未トレースカード数をクリックでフィルタ / 右側未トレースカード数をクリックでフィルタ"
+                style={{ display: 'inline-flex', gap: '0.5em', alignItems: 'center' }}
+              >
+                <span>未トレース:</span>
+                <button
+                  type="button"
+                  className={`panel-toolbar__stat-button${untracedFilter === 'left' || untracedFilter === 'both' ? ' panel-toolbar__stat-button--active' : ''}`}
+                  onClick={() => {
+                    toggleUntracedFilter('left');
+                    onLog?.('INFO', `左側未トレースフィルタを${untracedFilter === 'left' ? '解除' : '適用'}しました。`);
+                  }}
+                  title="クリックして左側未トレースのみ表示"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: untracedFilter === 'left' || untracedFilter === 'both' ? 'underline' : 'none',
+                    fontWeight: untracedFilter === 'left' || untracedFilter === 'both' ? 'bold' : 'normal',
+                    color: 'inherit',
+                    padding: '0',
+                  }}
+                >
+                  {untracedLeftCount}
+                </button>
+                <span>/</span>
+                <button
+                  type="button"
+                  className={`panel-toolbar__stat-button${untracedFilter === 'right' || untracedFilter === 'both' ? ' panel-toolbar__stat-button--active' : ''}`}
+                  onClick={() => {
+                    toggleUntracedFilter('right');
+                    onLog?.('INFO', `右側未トレースフィルタを${untracedFilter === 'right' ? '解除' : '適用'}しました。`);
+                  }}
+                  title="クリックして右側未トレースのみ表示"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: untracedFilter === 'right' || untracedFilter === 'both' ? 'underline' : 'none',
+                    fontWeight: untracedFilter === 'right' || untracedFilter === 'both' ? 'bold' : 'normal',
+                    color: 'inherit',
+                    padding: '0',
+                  }}
+                >
+                  {untracedRightCount}
+                </button>
+              </span>
+            </>
+          )}
         </div>
       </div>
 
