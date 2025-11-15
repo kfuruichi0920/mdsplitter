@@ -24,3 +24,13 @@
 - Jest ユニットテストを実行し、ContextMenu/統計機能追加後のリグレッションを確認する。
 - カード右クリック時にメニューが即時クローズしていたため、`ContextMenu` の `contextmenu` リスナーを削除し、`mousedown` ベースの閉じ処理に統一した（WSL 環境含めて表示が安定）。
 - フューチャー機能11「カード統合」を実装。`workspaceStore.mergeCards`（`src/renderer/store/workspaceStore.ts:600-760` 付近）で同一階層かつ連続するカードのみ統合可能とし、Undo/Redo と `dirtyCardIds` を更新。`CardPanel.tsx:830-1180` に 🧩 ボタン/コンテキストメニュー項目/モーダル表示を追加し、`CardMergeDialog.tsx` でタイトル・本文・カードID・オプションを編集できるUIを提供した。`CardPanel` 内の `reassignTracesForMerge` で `useTraceStore.saveRelationsForPair` を呼び出し、ロード済みトレースに限り left/right IDs を統合。`styles.css:1287-1350` に専用スタイル、`doc/software_detail_design.md` と `doc/implementation_plan_future_features.md` を更新、`workspaceStore.test.ts` に統合の単体テストを追加。
+
+## 追加作業 (Phase0 トレースマトリクス準備)
+- `src/shared/workspace.ts:33-140` で `CardStatus` に `deprecated` が含まれ、`Card` に `cardId` フィールドが存在することを確認。`src/shared/conversion/pipeline.ts:12-138` と `src/renderer/components/ConversionModal.tsx:191-304` でカードID自動付与UI/ロジックが揃っているため、Phase3.1の前提条件が満たされていると判断。
+- `src/renderer/components/CardPanel.tsx:647-713,1906-1970` にてカードID一括接頭語変更/直接編集、`src/renderer/styles.css:868-887` にて `deprecated` バッジ配色、`src/renderer/components/CardPanel.tsx:505-512` にて未トレース集計から廃止カードを除外していることを確認。
+- `src/renderer/store/traceStore.ts:1-386` を調査し、トレースファイルのロード/保存、関連カード集計API（`getRelatedCards`, `getCountsForFile` 等）が現在のカード一覧とコネクタ描画で利用可能になっている状況を整理。マトリクス専用の `getTraceMatrix` は未実装で追加が必要。
+- `npm run test:unit` を実行したところ `src/renderer/store/workspaceStore.test.ts:779-834` で `mergeCandidates` 未定義や `result` 未初期化によるTypeScriptコンパイルエラーが発生し、スイート全体が停止。既存課題として記録（修正は未対応）。
+
+## 次のアクション
+- workspaceStoreのテストデータ定義を修正して`npm run test:unit`をパスさせる。
+- TraceMatrix向けに`traceStore`へマトリクス取得APIを設計し、IPC/ストア整備(Phase1)に着手。
