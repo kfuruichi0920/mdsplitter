@@ -315,4 +315,53 @@ describe('TraceConnectorLayer', () => {
       expect(paths.length).toBeGreaterThan(0);
     });
   });
+
+  it('does not render placeholder path when no connectors exist', async () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'getBoundingClientRect', {
+      value: jest.fn(() => ({
+        x: 0,
+        y: 0,
+        width: 600,
+        height: 400,
+        top: 0,
+        left: 0,
+        right: 600,
+        bottom: 400,
+        toJSON: () => ({}),
+      })),
+    });
+    document.body.appendChild(container);
+
+    // トレースリンクがない状態でワークスペースをセットアップ
+    seedWorkspace('leaf-left', 'leaf-right', 'no-trace-left.json', 'no-trace-right.json');
+    // トレースリンクは追加しない
+
+    render(
+      <TraceConnectorLayer
+        containerRef={{ current: container }}
+        direction="vertical"
+        splitRatio={0.5}
+        nodeId="split-node"
+        leftLeafIds={['leaf-left']}
+        rightLeafIds={['leaf-right']}
+      />,
+      { container },
+    );
+
+    await waitFor(() => {
+      // すべてのパス要素（プレースホルダーを含む）を検索
+      const allPaths = container.querySelectorAll('path');
+      // マーカー定義のパス（矢印）のみ存在し、コネクタパスは存在しないことを確認
+      const connectorPaths = container.querySelectorAll('path.trace-connector-path');
+      const placeholderPaths = container.querySelectorAll('path.trace-connector-path--placeholder');
+
+      // プレースホルダーパスが存在しないことを確認
+      expect(placeholderPaths.length).toBe(0);
+      // コネクタパスが存在しないことを確認
+      expect(connectorPaths.length).toBe(0);
+      // マーカー定義のパスのみ存在することを確認（矢印の定義）
+      expect(allPaths.length).toBe(1); // マーカーのパスのみ
+    });
+  });
 });

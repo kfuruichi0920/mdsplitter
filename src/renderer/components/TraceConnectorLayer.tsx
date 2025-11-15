@@ -497,18 +497,7 @@ export const TraceConnectorLayer = ({
             <path d="M 0 0 L 6 3 L 0 6 z" fill="#60a5fa" />
           </marker>
         </defs>
-        {connectorPaths.length === 0 ? (
-          <path
-            className="trace-connector-path trace-connector-path--placeholder"
-            d={`M ${(containerRect.width * splitRatio) / 2} ${containerRect.height / 2} C ${(containerRect.width * splitRatio) / 2 + 48} ${
-              containerRect.height / 2
-            }, ${(containerRect.width * (1 + splitRatio)) / 2 - 48} ${containerRect.height / 2}, ${(containerRect.width * (1 + splitRatio)) / 2} ${
-              containerRect.height / 2
-            }`}
-          />
-        ) : (
-          connectorPaths.map((connector) => <path key={connector.id} className={connector.className} d={connector.path} />)
-        )}
+        {connectorPaths.map((connector) => <path key={connector.id} className={connector.className} d={connector.path} />)}
       </svg>
     </div>
   );
