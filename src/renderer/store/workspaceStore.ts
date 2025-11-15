@@ -23,6 +23,8 @@ import {
   type CardPatch,
   type CardStatus,
 } from '@/shared/workspace';
+import type { CardHistoryOperation, CardVersionDiff } from '@/shared/history';
+import { useHistoryStore } from './historyStore';
 import type { CardDisplayMode } from './uiStore';
 
 export { CARD_STATUS_SEQUENCE, getNextCardStatus };
@@ -72,6 +74,44 @@ interface InsertPreview {
   highlightIds: string[];
   timestamp: number;
 }
+
+const snapshotCard = (card: Card): Card => JSON.parse(JSON.stringify(card));
+
+const cloneDiff = (diff?: CardVersionDiff): CardVersionDiff | undefined => {
+  if (!diff) {
+    return undefined;
+  }
+  return {
+    before: diff.before ? JSON.parse(JSON.stringify(diff.before)) : undefined,
+    after: diff.after ? JSON.parse(JSON.stringify(diff.after)) : undefined,
+  } satisfies CardVersionDiff;
+};
+
+const recordCardHistory = (
+  fileName: string | null | undefined,
+  card: Card | null,
+  operation: CardHistoryOperation,
+  diff?: CardVersionDiff,
+): void => {
+  if (!fileName || !card || !card.cardId) {
+    return;
+  }
+  try {
+    void useHistoryStore.getState().appendVersion({
+      fileName,
+      cardId: card.cardId,
+      version: {
+        versionId: nanoid(),
+        timestamp: new Date().toISOString(),
+        operation,
+        card: snapshotCard(card),
+        diff: cloneDiff(diff),
+      },
+    });
+  } catch (error) {
+    console.warn('[workspaceStore] failed to append card history', error);
+  }
+};
 
 /**
  * @brief タブの状態。
@@ -588,12 +628,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
   addCard: (leafId, tabId, options) => {
     let createdCard: Card | null = null;
+    let historyFileName: string | null = null;
 
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
         return state;
       }
+      historyFileName = tab.fileName ?? null;
 
       const position: InsertPosition = options?.position ?? 'after';
 
@@ -716,6 +758,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (createdCard) {
       emitCardLayoutChanged();
+      if (historyFileName) {
+        recordCardHistory(historyFileName, createdCard, 'create', { after: createdCard });
+      }
     }
 
     return createdCard;
@@ -723,12 +768,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
   deleteCards: (leafId, tabId, cardIds) => {
     let deletedCount = 0;
+    let historyFileName: string | null = null;
+    const deletedSnapshots: Card[] = [];
 
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
         return state;
       }
+      historyFileName = tab.fileName ?? null;
 
       const candidates = (cardIds && cardIds.length > 0 ? cardIds : Array.from(tab.selectedCardIds)).filter((id) =>
         tab.cards.some((card) => card.id === id),
@@ -760,6 +808,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         if (!current) {
           return;
         }
+        deletedSnapshots.push(current);
         current.child_ids.forEach((childId) => collectDescendants(childId));
       };
 
@@ -815,17 +864,26 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (deletedCount > 0) {
       emitCardLayoutChanged();
+      if (historyFileName) {
+        deletedSnapshots.forEach((card) => {
+          recordCardHistory(historyFileName, card, 'delete', { before: card });
+        });
+      }
     }
 
     return deletedCount;
   },
 
   updateCard: (leafId, tabId, cardId, patch) => {
+    let historyFileName: string | null = null;
+    let beforeSnapshot: Card | null = null;
+    let afterSnapshot: Card | null = null;
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
         return state;
       }
+      historyFileName = tab.fileName ?? null;
 
       //! Undoスタックに現在の状態を保存
       const undoEntry: UndoRedoEntry = {
@@ -844,7 +902,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           return card;
         }
         const nextUpdatedAt = patch.updatedAt ?? new Date().toISOString();
-        return { ...card, ...patch, updatedAt: nextUpdatedAt } satisfies Card;
+        const nextCard = { ...card, ...patch, updatedAt: nextUpdatedAt } satisfies Card;
+        beforeSnapshot = card;
+        afterSnapshot = nextCard;
+        return nextCard;
       });
 
       const nextDirtyIds = new Set(tab.dirtyCardIds);
@@ -860,6 +921,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         redoStack: [], //! 新しい操作を行った場合、Redoスタックはクリア
       };
     });
+
+    if (historyFileName && beforeSnapshot && afterSnapshot) {
+      recordCardHistory(historyFileName, afterSnapshot, 'update', {
+        before: beforeSnapshot,
+        after: afterSnapshot,
+      });
+    }
   },
 
   setCardTraceFlags: (fileName, updates) => {
@@ -917,12 +985,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
   mergeCards: (leafId, tabId, cardIds, options) => {
     let mergeResult: MergeCardsResult | null = null;
+    let historyFileName: string | null = null;
+    let removedSnapshots: Card[] = [];
+    let mergedSnapshot: Card | null = null;
 
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.leafId !== leafId) {
         return state;
       }
+      historyFileName = tab.fileName ?? null;
 
       const uniqueIds = Array.from(new Set(cardIds)).filter(Boolean);
       if (uniqueIds.length < 2) {
@@ -960,6 +1032,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const nextUndoStack = [...state.undoStack, undoEntry];
       const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
 
+      removedSnapshots = selectedEntries.map((entry) => entry.card);
       const removalSet = options.removeOriginals ? new Set(selectedEntries.map((entry) => entry.card.id)) : new Set<string>();
       const removedCardIds = Array.from(removalSet);
       const baseCards = removalSet.size > 0 ? tab.cards.filter((card) => !removalSet.has(card.id)) : [...tab.cards];
@@ -999,6 +1072,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         next_id: null,
         level: baseLevel,
       } satisfies Card;
+      mergedSnapshot = mergedCard;
 
       const nextCards = [
         ...baseCards.slice(0, insertIndex),
@@ -1036,6 +1110,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (mergeResult) {
       emitCardLayoutChanged();
+      if (historyFileName && mergedSnapshot) {
+        recordCardHistory(historyFileName, mergedSnapshot, 'merge', { after: mergedSnapshot });
+      }
+      if (historyFileName && options.removeOriginals) {
+        removedSnapshots.forEach((card) => {
+          recordCardHistory(historyFileName, card, 'delete', { before: card });
+        });
+      }
     }
 
     return mergeResult;
