@@ -622,6 +622,9 @@ export const App = () => {
    * @return 未保存のタブ数
    */
   const unsavedTabCount = useMemo(() => {
+    if (!tabs) {
+      return 0;
+    }
     return Object.values(tabs).filter((tab) => tab.isDirty).length;
   }, [tabs]);
 
@@ -661,7 +664,7 @@ export const App = () => {
 
         try {
           //! 未保存のタブを全て保存
-          const dirtyTabs = Object.values(tabs).filter((tab) => tab.isDirty);
+          const dirtyTabs = tabs ? Object.values(tabs).filter((tab) => tab.isDirty) : [];
 
           for (const tab of dirtyTabs) {
             if (!tab.fileName) {
