@@ -422,6 +422,8 @@ export const App = () => {
   const traceFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const traceFilterPopoverRef = useRef<HTMLDivElement | null>(null);
   const conversionAbortControllerRef = useRef<AbortController | null>(null);
+  const logBodyRef = useRef<HTMLPreElement | null>(null); ///< 動作ログ表示領域。
+  const logAutoScrollRef = useRef<boolean>(true); ///< 末尾追従フラグ。
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT); ///< サイドバー幅。
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(true); ///< サイドバー表示/非表示。
   const [logHeight, setLogHeight] = useState<number>(LOG_DEFAULT); ///< ログエリア高さ。
@@ -459,6 +461,30 @@ export const App = () => {
       },
     ]);
   }, []);
+  const handleLogScroll = useCallback(() => {
+    const element = logBodyRef.current;
+    if (!element) {
+      logAutoScrollRef.current = true;
+      return;
+    }
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    logAutoScrollRef.current = distanceFromBottom <= 4;
+  }, []);
+
+  useEffect(() => {
+    if (!logVisible) {
+      logAutoScrollRef.current = true;
+      return;
+    }
+    if (!logAutoScrollRef.current) {
+      return;
+    }
+    const element = logBodyRef.current;
+    if (!element) {
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
+  }, [logs, logVisible]);
 
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -3250,7 +3276,12 @@ export const App = () => {
               </button>
             </div>
           </header>
-          <pre className="log-area__body" aria-live="polite">
+          <pre
+            ref={logBodyRef}
+            className="log-area__body"
+            aria-live="polite"
+            onScroll={handleLogScroll}
+          >
             {displayedLogs.length === 0 ? (
               <span key="log-empty">該当するログがありません。</span>
             ) : (
