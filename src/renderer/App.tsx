@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, FormEvent as ReactFormEvent } from 'react';
 import { nanoid } from 'nanoid';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   useWorkspaceStore,
@@ -494,7 +494,7 @@ export const App = () => {
   const toggleTraceRecirculation = useTracePreferenceStore((state) => state.toggleExcludeSelfTrace);
   const showOffscreenConnectors = useTracePreferenceStore((state) => state.showOffscreenConnectors);
   const toggleOffscreenConnectors = useTracePreferenceStore((state) => state.toggleOffscreenConnectors);
-  const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
+  const enabledRelationKinds = useTracePreferenceStore(useShallow((state) => state.enabledKinds));
   const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
   const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
   const creationRelationKind = useTracePreferenceStore((state) => state.creationRelationKind);
