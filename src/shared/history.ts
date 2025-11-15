@@ -5,7 +5,7 @@
 
 import type { Card } from './workspace';
 
-export type CardHistoryOperation = 'create' | 'update' | 'delete' | 'merge' | 'split';
+export type CardHistoryOperation = 'create' | 'update' | 'delete' | 'merge' | 'split' | 'restore';
 
 export interface CardVersionDiff {
   before?: Partial<Card>;
@@ -18,6 +18,8 @@ export interface CardVersion {
   operation: CardHistoryOperation;
   card: Card;
   diff?: CardVersionDiff;
+  restoredFromVersionId?: string;
+  restoredFromTimestamp?: string;
 }
 
 export interface CardHistory {
@@ -41,13 +43,24 @@ export const isCardVersion = (value: unknown): value is CardVersion => {
     return false;
   }
   const candidate = value as Partial<CardVersion>;
-  return (
-    typeof candidate.versionId === 'string' &&
-    typeof candidate.timestamp === 'string' &&
-    typeof candidate.operation === 'string' &&
-    typeof candidate.card === 'object' &&
-    candidate.card !== null
-  );
+  if (
+    typeof candidate.versionId !== 'string' ||
+    typeof candidate.timestamp !== 'string' ||
+    typeof candidate.operation !== 'string' ||
+    typeof candidate.card !== 'object' ||
+    candidate.card === null
+  ) {
+    return false;
+  }
+
+  if (
+    (candidate.restoredFromVersionId !== undefined && typeof candidate.restoredFromVersionId !== 'string') ||
+    (candidate.restoredFromTimestamp !== undefined && typeof candidate.restoredFromTimestamp !== 'string')
+  ) {
+    return false;
+  }
+
+  return true;
 };
 
 export const isCardHistory = (value: unknown): value is CardHistory => {

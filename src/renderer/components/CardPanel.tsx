@@ -28,6 +28,7 @@ import { countUntracedCards } from '../utils/cardUtils';
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { CardStatsDialog } from './CardStatsDialog';
 import { CardMergeDialog, type CardMergeDialogPayload } from './CardMergeDialog';
+import { CardHistoryDialog } from './CardHistoryDialog';
 import type { TraceabilityRelation } from '@/shared/traceability';
 
 const createKindFilterState = (): Record<CardKind, boolean> => {
@@ -105,6 +106,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
   const [isMergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeDialogCards, setMergeDialogCards] = useState<Card[]>([]);
+  const [historyDialogCardId, setHistoryDialogCardId] = useState<string | null>(null);
   const [previewIndicator, setPreviewIndicator] = useState<{ cardId: string | null; position: InsertPosition; highlightIds: string[] } | null>(null);
   const [filterText, setFilterText] = useState('');
   const [kindFilter, setKindFilter] = useState<Record<CardKind, boolean>>(() => createKindFilterState());
@@ -293,6 +295,12 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     }
     return cards.find((card) => card.id === statsTargetCardId) ?? null;
   }, [cards, statsTargetCardId]);
+  const historyDialogCard = useMemo(() => {
+    if (!historyDialogCardId) {
+      return null;
+    }
+    return cards.find((card) => card.id === historyDialogCardId) ?? null;
+  }, [cards, historyDialogCardId]);
   
   /**
    * @brief 未トレースカード数を計算。
@@ -1030,6 +1038,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     onLog?.('INFO', `カード「${card.title || card.id}」の統計情報を開きました。`);
   }, [onLog, setStatsTargetCardId]);
 
+  const handleOpenHistoryDialog = useCallback((card: Card) => {
+    const identifier = card.cardId ?? card.id;
+    if (!identifier) {
+      onLog?.('WARN', 'カードIDが設定されていないため履歴を表示できません。');
+      return;
+    }
+    setHistoryDialogCardId(card.id);
+    onLog?.('INFO', `カード「${card.title || card.id}」の履歴を開きました。`);
+    setContextMenu(null);
+  }, [onLog]);
+
   const handleCopySelected = useCallback(() => {
     if (!activeTabId) {
       return;
@@ -1116,12 +1135,12 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         items: [
           { key: 'copy-text', label: 'テキストとしてコピー', icon: '📄', onSelect: () => { void handleCopyCardsAsText(target); } },
           { key: 'copy-id', label: 'IDをコピー (UUID)', icon: '🔗', onSelect: () => { void handleCopyCardUuid(target); } },
+          { key: 'history', label: '履歴を表示', icon: '🕘', onSelect: () => handleOpenHistoryDialog(target) },
           { key: 'stats', label: '統計情報', icon: '📊', onSelect: () => handleOpenStatsDialog(target) },
-          { key: 'history', label: '履歴を表示 (準備中)', icon: '🕘', disabled: true, closeOnSelect: false },
         ],
       },
     ];
-  }, [contextMenu, handleContextAction, handleContextEdit, handleCopyCardUuid, handleCopyCardsAsText, handleCopySelected, handleDeleteCards, handleOpenMergeDialog, handleOpenStatsDialog, handleContextPaste, hasClipboardItems, hasSelection, mergeValidation]);
+  }, [contextMenu, handleContextAction, handleContextEdit, handleCopyCardUuid, handleCopyCardsAsText, handleCopySelected, handleDeleteCards, handleOpenHistoryDialog, handleOpenMergeDialog, handleOpenStatsDialog, handleContextPaste, hasClipboardItems, hasSelection, mergeValidation]);
 
   /**
    * @brief ドラッグ開始時の処理。
@@ -1620,6 +1639,18 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           leftTraceCount={leftTraceCounts[statsTargetCard.id] ?? 0}
           rightTraceCount={rightTraceCounts[statsTargetCard.id] ?? 0}
           onClose={() => setStatsTargetCardId(null)}
+        />
+      ) : null}
+
+      {historyDialogCard && activeTab ? (
+        <CardHistoryDialog
+          card={historyDialogCard}
+          fileName={activeTab.fileName ?? null}
+          leafId={leafId}
+          tabId={activeTab.id}
+          cardIdentifier={historyDialogCard.cardId ?? historyDialogCard.id}
+          isOpen={Boolean(historyDialogCard)}
+          onClose={() => setHistoryDialogCardId(null)}
         />
       ) : null}
 

@@ -1349,6 +1349,86 @@
     @apply flex justify-end gap-2;
   }
 
+  .card-history-dialog {
+    @apply flex w-[820px] max-w-[calc(100%-2rem)] max-h-[80vh] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900;
+  }
+
+  .card-history-dialog__header {
+    @apply mb-4 flex items-start justify-between;
+  }
+
+  .card-history-dialog__eyebrow {
+    @apply text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500;
+  }
+
+  .card-history-dialog__title {
+    @apply text-lg font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .card-history-dialog__close {
+    @apply rounded-full border border-transparent bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-slate-300;
+  }
+
+  .card-history-dialog__content {
+    @apply flex min-h-0 flex-1 gap-4 overflow-hidden;
+  }
+
+  .card-history-dialog__sidebar {
+    @apply flex w-56 flex-col gap-2 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800;
+  }
+
+  .card-history-dialog__list {
+    @apply flex flex-col gap-2;
+  }
+
+  .card-history-dialog__list-button {
+    @apply w-full rounded-md border border-transparent bg-white px-2 py-1 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700;
+  }
+
+  .card-history-dialog__list-button--active {
+    @apply border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-200;
+  }
+
+  .card-history-dialog__list-title {
+    @apply block font-semibold;
+  }
+
+  .card-history-dialog__list-meta {
+    @apply block text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .card-history-dialog__details {
+    @apply flex flex-1 flex-col gap-3 overflow-y-auto rounded-xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  .card-history-dialog__version-meta {
+    @apply flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-300;
+  }
+
+  .card-history-dialog__footer {
+    @apply mt-4 flex justify-end gap-2;
+  }
+
+  .card-history-dialog__hint {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+
+  .card-diff-viewer {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  .card-diff-viewer__column {
+    @apply flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .card-diff-viewer__title {
+    @apply font-semibold text-slate-800 dark:text-slate-200;
+  }
+
+  .card-diff-viewer__body {
+    @apply min-h-[120px] whitespace-pre-wrap rounded border border-slate-300 bg-white p-2 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200;
+  }
+
   .card-stats-dialog__overlay {
     @apply z-[60];
   }

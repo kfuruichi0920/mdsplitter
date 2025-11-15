@@ -18,7 +18,18 @@ const historyKey = (fileName: string, cardId: string): string => `${fileName}::$
 const cloneHistory = (history: CardHistory): CardHistory => ({
   cardId: history.cardId,
   fileName: history.fileName,
-  versions: history.versions.map((version) => ({ ...version, card: { ...version.card } })),
+  versions: history.versions.map((version) => ({
+    ...version,
+    restoredFromVersionId: version.restoredFromVersionId,
+    restoredFromTimestamp: version.restoredFromTimestamp,
+    card: { ...version.card },
+    diff: version.diff
+      ? {
+          before: version.diff.before ? { ...version.diff.before } : undefined,
+          after: version.diff.after ? { ...version.diff.after } : undefined,
+        }
+      : undefined,
+  })),
 });
 
 const emptyHistory = (fileName: string, cardId: string): CardHistory => ({
@@ -28,6 +39,30 @@ const emptyHistory = (fileName: string, cardId: string): CardHistory => ({
 });
 
 const hasHistoryApi = (): boolean => typeof window !== 'undefined' && Boolean(window.app?.history);
+
+const sanitizeHistory = (history: CardHistory): CardHistory => {
+  const sanitizedVersions = history.versions.map((version) => {
+    const rawOperation = (version as CardHistory['versions'][number] & { operation: unknown }).operation;
+    if (typeof rawOperation === 'string') {
+      return version;
+    }
+    const fallbackDiff =
+      !version.diff && rawOperation && typeof rawOperation === 'object'
+        ? (rawOperation as CardHistory['versions'][number]['diff'])
+        : version.diff;
+    return {
+      ...version,
+      operation: 'update',
+      diff: fallbackDiff,
+    } satisfies CardHistory['versions'][number];
+  });
+
+  return {
+    cardId: history.cardId,
+    fileName: history.fileName,
+    versions: sanitizedVersions,
+  } satisfies CardHistory;
+};
 
 export const useHistoryStore = create<HistoryState>()((set, get) => ({
   histories: {},
@@ -56,7 +91,8 @@ export const useHistoryStore = create<HistoryState>()((set, get) => ({
       }
     }
 
-    const cloned = cloneHistory(history);
+    const canonical = sanitizeHistory(history);
+    const cloned = cloneHistory(canonical);
     set((state) => ({
       histories: { ...state.histories, [key]: cloned },
       status: { ...state.status, [key]: 'ready' },
@@ -88,7 +124,8 @@ export const useHistoryStore = create<HistoryState>()((set, get) => ({
       } satisfies CardHistory;
     }
 
-    const cloned = cloneHistory(updated);
+    const canonical = sanitizeHistory(updated);
+    const cloned = cloneHistory(canonical);
     set((state) => ({
       histories: { ...state.histories, [key]: cloned },
       status: { ...state.status, [key]: 'ready' },

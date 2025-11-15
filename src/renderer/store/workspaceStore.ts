@@ -23,7 +23,7 @@ import {
   type CardPatch,
   type CardStatus,
 } from '@/shared/workspace';
-import type { CardHistoryOperation, CardVersionDiff } from '@/shared/history';
+import type { AppendCardHistoryRequest, CardHistoryOperation, CardVersionDiff } from '@/shared/history';
 import { useHistoryStore } from './historyStore';
 import type { CardDisplayMode } from './uiStore';
 
@@ -87,30 +87,74 @@ const cloneDiff = (diff?: CardVersionDiff): CardVersionDiff | undefined => {
   } satisfies CardVersionDiff;
 };
 
-const recordCardHistory = (
-  fileName: string | null | undefined,
-  card: Card | null,
-  operation: CardHistoryOperation,
-  diff?: CardVersionDiff,
-): void => {
-  if (!fileName || !card || !card.cardId) {
-    return;
-  }
+type PendingHistoryEntry = Omit<AppendCardHistoryRequest, 'fileName'>;
+
+const pendingHistoryByTab = new Map<string, PendingHistoryEntry[]>();
+
+const enqueuePendingHistory = (tabId: string, entry: PendingHistoryEntry): void => {
+  const queue = pendingHistoryByTab.get(tabId) ?? [];
+  queue.push(entry);
+  pendingHistoryByTab.set(tabId, queue);
+};
+
+const persistHistoryEntry = (fileName: string, entry: PendingHistoryEntry): void => {
   try {
     void useHistoryStore.getState().appendVersion({
       fileName,
-      cardId: card.cardId,
-      version: {
-        versionId: nanoid(),
-        timestamp: new Date().toISOString(),
-        operation,
-        card: snapshotCard(card),
-        diff: cloneDiff(diff),
-      },
+      cardId: entry.cardId,
+      version: entry.version,
     });
   } catch (error) {
     console.warn('[workspaceStore] failed to append card history', error);
   }
+};
+
+const flushPendingHistory = (tabId: string, fileName: string): void => {
+  const queue = pendingHistoryByTab.get(tabId);
+  if (!queue?.length) {
+    return;
+  }
+  pendingHistoryByTab.delete(tabId);
+  queue.forEach((entry) => {
+    persistHistoryEntry(fileName, entry);
+  });
+};
+
+const discardPendingHistory = (tabId: string): void => {
+  pendingHistoryByTab.delete(tabId);
+};
+
+const recordCardHistory = (
+  tabId: string,
+  fileName: string | null | undefined,
+  card: Card | null,
+  operation: CardHistoryOperation,
+  diff?: CardVersionDiff,
+  context?: HistoryContext,
+): void => {
+  if (!card) {
+    return;
+  }
+  const entry: PendingHistoryEntry = {
+    cardId: card.cardId ?? card.id,
+    version: {
+      versionId: nanoid(),
+      timestamp: new Date().toISOString(),
+      operation,
+      card: snapshotCard(card),
+      diff: cloneDiff(diff),
+      restoredFromVersionId: context?.restoredFromVersionId,
+      restoredFromTimestamp: context?.restoredFromTimestamp,
+    },
+  } satisfies PendingHistoryEntry;
+
+  if (!fileName) {
+    enqueuePendingHistory(tabId, entry);
+    return;
+  }
+
+  flushPendingHistory(tabId, fileName);
+  persistHistoryEntry(fileName, entry);
 };
 
 /**
@@ -176,6 +220,11 @@ export interface MergeCardsResult {
   removedCardIds: string[];
 }
 
+interface HistoryContext {
+  restoredFromVersionId?: string;
+  restoredFromTimestamp?: string;
+}
+
 export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
   leafs: Record<string, LeafWorkspaceState>;
@@ -196,7 +245,7 @@ export interface WorkspaceStore {
   selectCardRange: (leafId: string, tabId: string, cardId: string) => void; ///< 範囲選択（Shift+クリック）
   addCard: (leafId: string, tabId: string, options?: { anchorCardId?: string | null; position?: InsertPosition }) => Card | null; ///< 挿入位置を指定してカードを追加
   deleteCards: (leafId: string, tabId: string, cardIds?: string[]) => number; ///< 指定または選択中カードを削除
-  updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch) => void;
+  updateCard: (leafId: string, tabId: string, cardId: string, patch: CardPatch, options?: { historyOperation?: CardHistoryOperation; historyContext?: HistoryContext }) => void;
   cycleCardStatus: (leafId: string, tabId: string, cardId: string) => CardStatus | null;
   hydrateTab: (leafId: string, tabId: string, cards: Card[], options?: { savedAt?: string }) => void;
   markSaved: (tabId: string, savedAt: string) => void;
@@ -392,6 +441,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   },
 
   closeTab: (leafId, tabId) => {
+    let removedTabId: string | null = null;
     set((state) => {
       const leaf = state.leafs[leafId];
       const tab = state.tabs[tabId];
@@ -414,6 +464,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       const nextTabs = { ...state.tabs };
       delete nextTabs[tabId];
+      removedTabId = tabId;
 
       const nextFileToLeaf = { ...state.fileToLeaf };
       if (tab?.fileName) {
@@ -429,9 +480,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         fileToLeaf: nextFileToLeaf,
       } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
     });
+
+    if (removedTabId) {
+      discardPendingHistory(removedTabId);
+    }
   },
 
   closeLeaf: (leafId) => {
+    const removedTabIds: string[] = [];
     set((state) => {
       const leaf = state.leafs[leafId];
       if (!leaf) {
@@ -447,6 +503,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           delete nextFileToLeaf[tab.fileName];
         }
         delete nextTabs[tabId];
+        removedTabIds.push(tabId);
       });
 
       const nextLeafs = { ...state.leafs };
@@ -458,6 +515,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         fileToLeaf: nextFileToLeaf,
       } satisfies Pick<WorkspaceStore, 'tabs' | 'leafs' | 'fileToLeaf'>;
     });
+
+    if (removedTabIds.length > 0) {
+      removedTabIds.forEach((tabId) => {
+        discardPendingHistory(tabId);
+      });
+    }
   },
 
   setActiveTab: (leafId, tabId) => {
@@ -758,9 +821,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (createdCard) {
       emitCardLayoutChanged();
-      if (historyFileName) {
-        recordCardHistory(historyFileName, createdCard, 'create', { after: createdCard });
-      }
+      recordCardHistory(tabId, historyFileName, createdCard, 'create', { after: createdCard });
     }
 
     return createdCard;
@@ -864,17 +925,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (deletedCount > 0) {
       emitCardLayoutChanged();
-      if (historyFileName) {
-        deletedSnapshots.forEach((card) => {
-          recordCardHistory(historyFileName, card, 'delete', { before: card });
-        });
-      }
+      deletedSnapshots.forEach((card) => {
+        recordCardHistory(tabId, historyFileName, card, 'delete', { before: card });
+      });
     }
 
     return deletedCount;
   },
 
-  updateCard: (leafId, tabId, cardId, patch) => {
+  updateCard: (leafId, tabId, cardId, patch, options) => {
     let historyFileName: string | null = null;
     let beforeSnapshot: Card | null = null;
     let afterSnapshot: Card | null = null;
@@ -922,11 +981,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     });
 
-    if (historyFileName && beforeSnapshot && afterSnapshot) {
-      recordCardHistory(historyFileName, afterSnapshot, 'update', {
+    if (beforeSnapshot && afterSnapshot) {
+      const historyOperation = options?.historyOperation ?? 'update';
+      recordCardHistory(tabId, historyFileName, afterSnapshot, historyOperation, {
         before: beforeSnapshot,
         after: afterSnapshot,
-      });
+      }, options?.historyContext);
     }
   },
 
@@ -1110,12 +1170,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
     if (mergeResult) {
       emitCardLayoutChanged();
-      if (historyFileName && mergedSnapshot) {
-        recordCardHistory(historyFileName, mergedSnapshot, 'merge', { after: mergedSnapshot });
+      if (mergedSnapshot) {
+        recordCardHistory(tabId, historyFileName, mergedSnapshot, 'merge', { after: mergedSnapshot });
       }
-      if (historyFileName && options.removeOriginals) {
+      if (options.removeOriginals) {
         removedSnapshots.forEach((card) => {
-          recordCardHistory(historyFileName, card, 'delete', { before: card });
+          recordCardHistory(tabId, historyFileName, card, 'delete', { before: card });
         });
       }
     }
@@ -1612,10 +1672,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     if (!fileName) {
       return;
     }
+    let shouldFlushPending = false;
     set((state) => {
       const tab = state.tabs[tabId];
       if (!tab || tab.fileName === fileName) {
         return state;
+      }
+
+      if (!tab.fileName) {
+        shouldFlushPending = true;
       }
 
       const nextTabs = {
@@ -1639,6 +1704,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         fileToLeaf: nextFileToLeaf,
       } satisfies Pick<WorkspaceStore, 'tabs' | 'fileToLeaf'>;
     });
+
+    if (shouldFlushPending) {
+      flushPendingHistory(tabId, fileName);
+    }
   },
 
   undo: () => {
