@@ -70,6 +70,57 @@ describe('workspaceStore (multi-panel tabs)', () => {
     },
   ];
 
+  const mergeCandidates: Card[] = [
+    {
+      id: 'merge-001',
+      title: '統合候補1',
+      body: '本文A',
+      status: 'draft',
+      kind: 'paragraph',
+      hasLeftTrace: true,
+      hasRightTrace: false,
+      markdownPreviewEnabled: true,
+      updatedAt: '2025-11-02T00:00:00.000Z',
+      parent_id: null,
+      child_ids: [],
+      prev_id: null,
+      next_id: 'merge-002',
+      level: 0,
+    },
+    {
+      id: 'merge-002',
+      title: '統合候補2',
+      body: '本文B',
+      status: 'review',
+      kind: 'paragraph',
+      hasLeftTrace: false,
+      hasRightTrace: true,
+      markdownPreviewEnabled: true,
+      updatedAt: '2025-11-02T01:00:00.000Z',
+      parent_id: null,
+      child_ids: [],
+      prev_id: 'merge-001',
+      next_id: 'merge-003',
+      level: 0,
+    },
+    {
+      id: 'merge-003',
+      title: '統合候補3',
+      body: '本文C',
+      status: 'approved',
+      kind: 'paragraph',
+      hasLeftTrace: false,
+      hasRightTrace: false,
+      markdownPreviewEnabled: true,
+      updatedAt: '2025-11-02T02:00:00.000Z',
+      parent_id: null,
+      child_ids: [],
+      prev_id: 'merge-002',
+      next_id: null,
+      level: 0,
+    },
+  ];
+
   beforeEach(() => {
     resetWorkspaceStore();
     jest.useRealTimers();
@@ -720,3 +771,97 @@ describe('workspaceStore (multi-panel tabs)', () => {
     expect(useWorkspaceStore.getState().tabs[tabId]?.cards[0]?.hasRightTrace).toBe(false);
   });
 });
+
+  describe('mergeCards', () => {
+    it('merges contiguous sibling cards and removes originals', () => {
+      let tabId = '';
+      act(() => {
+        const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'merge.json', mergeCandidates);
+        expect(outcome.status).toBe('opened');
+        if (outcome.status !== 'denied') {
+          tabId = outcome.tabId;
+        }
+      });
+
+      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      act(() => {
+        result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-002'], {
+          title: '統合後タイトル',
+          body: '本文A\n本文B',
+          status: 'approved',
+          kind: 'paragraph',
+          cardId: 'MERGED-010',
+          removeOriginals: true,
+          inheritTraces: true,
+        });
+      });
+
+      expect(result).not.toBeNull();
+      const tab = useWorkspaceStore.getState().tabs[tabId];
+      expect(tab?.cards).toHaveLength(mergeCandidates.length - 1);
+      const newCard = tab?.cards.find((card) => card.id === result?.mergedCard.id);
+      expect(newCard?.title).toBe('統合後タイトル');
+      expect(newCard?.hasLeftTrace).toBe(true);
+      expect(newCard?.hasRightTrace).toBe(true);
+      expect(result?.removedCardIds).toEqual(['merge-001', 'merge-002']);
+    });
+
+    it('rejects non-contiguous selections', () => {
+      let tabId = '';
+      act(() => {
+        const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'merge.json', mergeCandidates);
+        expect(outcome.status).toBe('opened');
+        if (outcome.status !== 'denied') {
+          tabId = outcome.tabId;
+        }
+      });
+
+      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      act(() => {
+        result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-003'], {
+          title: 'invalid',
+          body: '',
+          status: 'draft',
+          kind: 'paragraph',
+          cardId: undefined,
+          removeOriginals: true,
+          inheritTraces: false,
+        });
+      });
+
+      expect(result).toBeNull();
+      const tab = useWorkspaceStore.getState().tabs[tabId];
+      expect(tab?.cards.map((card) => card.id)).toEqual(mergeCandidates.map((card) => card.id));
+    });
+
+    it('can retain originals when removeOriginals is false', () => {
+      let tabId = '';
+      act(() => {
+        const outcome = useWorkspaceStore.getState().openTab('leaf-A', 'merge.json', mergeCandidates);
+        expect(outcome.status).toBe('opened');
+        if (outcome.status !== 'denied') {
+          tabId = outcome.tabId;
+        }
+      });
+
+      let result: ReturnType<typeof useWorkspaceStore.getState()['mergeCards']> = null;
+      act(() => {
+        result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-002', 'merge-003'], {
+          title: '保持用',
+          body: '本文C',
+          status: 'review',
+          kind: 'paragraph',
+          cardId: undefined,
+          removeOriginals: false,
+          inheritTraces: false,
+        });
+      });
+
+      expect(result).not.toBeNull();
+      const tab = useWorkspaceStore.getState().tabs[tabId];
+      expect(tab?.cards).toHaveLength(mergeCandidates.length + 1);
+      expect(result?.removedCardIds).toHaveLength(0);
+      const merged = tab?.cards.find((card) => card.title === '保持用');
+      expect(merged).toBeDefined();
+    });
+  });

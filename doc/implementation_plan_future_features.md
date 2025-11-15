@@ -31,7 +31,7 @@
 3. 影響分析ヒートマップ（将来拡張として本計画では扱わない）  【Deprecated】
 4. ID自動付与と接頭語指定機能  【Completed】
 5. 未トレースカード数表示  【Completed】
-6. 右クリックコンテキストメニュー
+6. 右クリックコンテキストメニュー  【Completed】
 7. 検索機能の改善（別ダイアログ化）
 8. カード履歴管理機能
 9. カード出力機能
@@ -67,7 +67,7 @@
 └─ 9. カード出力 (依存: 4, 10)
 
 【UI改善層】← 比較的独立、基盤機能への軽微な依存
-├─ 6. 右クリックメニュー (独立度: 高)
+├─ 6. 右クリックメニュー (独立度: 高) 【Completed】
 ├─ 7. 検索機能改善 (依存: 4)
 └─ 12. Markdown Table (独立度: 高)【Completed】
 
@@ -923,7 +923,7 @@
 ### フェーズ4完了時の成果物
 
 **コード**:
-- [ ] `/src/renderer/components/CardMergeDialog.tsx`: カード統合ダイアログ
+- [x] `/src/renderer/components/CardMergeDialog.tsx`: カード統合ダイアログ
 - [ ] `/src/shared/project.ts`: プロジェクトファイル型定義
 - [ ] `/src/renderer/components/ProjectManagementDialog.tsx`: プロジェクト管理ダイアログ
 - [ ] `/src/main/project.ts`: プロジェクトファイル処理

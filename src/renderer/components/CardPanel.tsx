@@ -27,6 +27,8 @@ import { useVirtualizedCards } from '../hooks/useVirtualizedCards';
 import { countUntracedCards } from '../utils/cardUtils';
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { CardStatsDialog } from './CardStatsDialog';
+import { CardMergeDialog, type CardMergeDialogPayload } from './CardMergeDialog';
+import type { TraceabilityRelation } from '@/shared/traceability';
 
 const createKindFilterState = (): Record<CardKind, boolean> => {
   return CARD_KIND_VALUES.reduce<Record<CardKind, boolean>>((acc, kind) => {
@@ -41,6 +43,29 @@ const createKindFilterState = (): Record<CardKind, boolean> => {
  * @return 表示記号。
  */
 const connectorSymbol = (hasTrace: boolean): string => (hasTrace ? '●' : '○');
+
+interface MergeValidation {
+  canMerge: boolean;
+  reason?: string;
+  cards: Card[];
+}
+
+const replaceIdsInArray = (ids: string[], sourceSet: Set<string>, targetId: string): { updated: boolean; values: string[] } => {
+  let updated = false;
+  const values: string[] = [];
+  const seen = new Set<string>();
+  ids.forEach((id) => {
+    const nextId = sourceSet.has(id) ? targetId : id;
+    if (sourceSet.has(id)) {
+      updated = true;
+    }
+    if (!seen.has(nextId)) {
+      seen.add(nextId);
+      values.push(nextId);
+    }
+  });
+  return { updated, values };
+};
 
 /**
  * @brief ISO8601日時文字列をローカライズして表示する。
@@ -78,6 +103,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const [contextMenu, setContextMenu] = useState<{ card: Card; x: number; y: number } | null>(null);
   const [statsTargetCardId, setStatsTargetCardId] = useState<string | null>(null);
   const [toolbarInsertMode, setToolbarInsertMode] = useState<InsertPosition>('after');
+  const [isMergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [mergeDialogCards, setMergeDialogCards] = useState<Card[]>([]);
   const [previewIndicator, setPreviewIndicator] = useState<{ cardId: string | null; position: InsertPosition; highlightIds: string[] } | null>(null);
   const [filterText, setFilterText] = useState('');
   const [kindFilter, setKindFilter] = useState<Record<CardKind, boolean>>(() => createKindFilterState());
@@ -147,6 +174,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const copySelection = useWorkspaceStore((state) => state.copySelection);
   const pasteClipboard = useWorkspaceStore((state) => state.pasteClipboard);
+  const mergeCardsAction = useWorkspaceStore((state) => state.mergeCards);
   const clipboardData = useWorkspaceStore((state) => state.clipboard);
   const lastInsertPreview = useWorkspaceStore(
     useCallback((state) => state.lastInsertPreview, []),
@@ -222,6 +250,43 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const hasSelection = selectedCardIds.size > 0;
   const visualDropTarget = dropTarget ?? previewIndicator;
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
+  const mergeValidation = useMemo<MergeValidation>(() => {
+    if (selectedCardsList.length < 2) {
+      return { canMerge: false, reason: '2枚以上選択してください', cards: [] };
+    }
+    const baseParent = selectedCardsList[0].parent_id ?? null;
+    const baseLevel = selectedCardsList[0].level;
+    const indexMap = new Map<string, number>();
+    cards.forEach((card, index) => {
+      indexMap.set(card.id, index);
+    });
+
+    for (const card of selectedCardsList) {
+      if ((card.parent_id ?? null) !== baseParent) {
+        return { canMerge: false, reason: '同じ親カードの連続項目のみ統合できます', cards: [] };
+      }
+      if (card.level !== baseLevel) {
+        return { canMerge: false, reason: '同じ階層のカードのみ統合できます', cards: [] };
+      }
+      if (card.child_ids.length > 0) {
+        return { canMerge: false, reason: '子カードを持つ項目は統合できません', cards: [] };
+      }
+    }
+
+    let previousIndex: number | null = null;
+    for (const card of selectedCardsList) {
+      const currentIndex = indexMap.get(card.id);
+      if (currentIndex === undefined) {
+        return { canMerge: false, reason: '選択中のカードを特定できませんでした', cards: [] };
+      }
+      if (previousIndex !== null && currentIndex !== previousIndex + 1) {
+        return { canMerge: false, reason: '連続したカードのみ統合できます', cards: [] };
+      }
+      previousIndex = currentIndex;
+    }
+
+    return { canMerge: true, cards: selectedCardsList };
+  }, [cards, selectedCardsList]);
   const statsTargetCard = useMemo(() => {
     if (!statsTargetCardId) {
       return null;
@@ -294,6 +359,58 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     }
     return set.size > 0 ? set : null;
   }, [activeFileName, excludeSelfTrace, globalSelections, selectionSeeds, traceCacheSnapshot]);
+
+  const reassignTracesForMerge = useCallback(
+    async (fileName: string, sourceIds: string[], targetId: string) => {
+      if (!fileName || sourceIds.length === 0) {
+        return;
+      }
+      const traceState = useTraceStore.getState();
+      const sourceSet = new Set(sourceIds);
+      const affectedEntries = Object.values(traceState.cache).filter(
+        (entry) => entry.leftFile === fileName || entry.rightFile === fileName,
+      );
+      for (const entry of affectedEntries) {
+        const clonedRelations: TraceabilityRelation[] = entry.relations.map((relation) => ({
+          ...relation,
+          left_ids: [...relation.left_ids],
+          right_ids: [...relation.right_ids],
+        }));
+        let changed = false;
+        clonedRelations.forEach((relation) => {
+          if (entry.leftFile === fileName) {
+            const replaced = replaceIdsInArray(relation.left_ids, sourceSet, targetId);
+            if (replaced.updated) {
+              relation.left_ids = replaced.values;
+              changed = true;
+            }
+          }
+          if (entry.rightFile === fileName) {
+            const replaced = replaceIdsInArray(relation.right_ids, sourceSet, targetId);
+            if (replaced.updated) {
+              relation.right_ids = replaced.values;
+              changed = true;
+            }
+          }
+        });
+        if (!changed) {
+          continue;
+        }
+        try {
+          await traceState.saveRelationsForPair({
+            leftFile: entry.leftFile,
+            rightFile: entry.rightFile,
+            relations: clonedRelations,
+          });
+          onLog?.('INFO', `トレースを統合しました (${entry.leftFile} ↔ ${entry.rightFile})`);
+        } catch (error) {
+          console.error('[CardPanel] failed to merge trace relations', error);
+          onLog?.('WARN', 'トレース情報の更新に失敗しました。');
+        }
+      }
+    },
+    [onLog],
+  );
 
   const handlePanelTraceToggle = useCallback(() => {
     if (!activeFileName) {
@@ -853,6 +970,50 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     [copyPlainText, onLog],
   );
 
+  const handleMergeDialogCancel = useCallback(() => {
+    setMergeDialogOpen(false);
+    setMergeDialogCards([]);
+  }, []);
+
+  const handleOpenMergeDialog = useCallback(() => {
+    if (!mergeValidation.canMerge) {
+      if (mergeValidation.reason) {
+        onLog?.('WARN', mergeValidation.reason);
+      }
+      return;
+    }
+    setMergeDialogCards(mergeValidation.cards);
+    setMergeDialogOpen(true);
+    setContextMenu(null);
+  }, [mergeValidation, onLog]);
+
+  const handleMergeSubmit = useCallback(
+    async (payload: CardMergeDialogPayload) => {
+      if (!activeTabId || mergeDialogCards.length < 2) {
+        return;
+      }
+      const result = mergeCardsAction(leafId, activeTabId, mergeDialogCards.map((card) => card.id), {
+        title: payload.title,
+        body: payload.body,
+        status: payload.status,
+        kind: payload.kind,
+        cardId: payload.cardId,
+        removeOriginals: payload.removeOriginals,
+        inheritTraces: payload.inheritTraces,
+      });
+      if (!result) {
+        onLog?.('WARN', 'カード統合に失敗しました。');
+        return;
+      }
+      handleMergeDialogCancel();
+      onLog?.('INFO', `${mergeDialogCards.length}件のカードを統合しました。`);
+      if (payload.inheritTraces && payload.removeOriginals && activeFileName && result.removedCardIds.length > 0) {
+        await reassignTracesForMerge(activeFileName, result.removedCardIds, result.mergedCard.id);
+      }
+    },
+    [activeFileName, activeTabId, handleMergeDialogCancel, leafId, mergeCardsAction, mergeDialogCards, onLog, reassignTracesForMerge],
+  );
+
   const handleContextEdit = useCallback(
     (card: Card) => {
       if (!activeTabId) {
@@ -927,6 +1088,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         items: [
           { key: 'edit', label: '編集', icon: '✏️', onSelect: () => handleContextEdit(target) },
           { key: 'copy', label: 'コピー', icon: '📋', onSelect: handleCopySelected, disabled: !hasSelection },
+          { key: 'merge', label: '選択カードを統合', icon: '🧩', onSelect: handleOpenMergeDialog, disabled: !mergeValidation.canMerge },
           { key: 'delete', label: '削除', icon: '🗑️', onSelect: handleDeleteCards, disabled: !hasSelection, variant: 'danger' },
         ],
       },
@@ -959,7 +1121,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         ],
       },
     ];
-  }, [contextMenu, handleContextAction, handleContextEdit, handleCopyCardUuid, handleCopyCardsAsText, handleCopySelected, handleDeleteCards, handleOpenStatsDialog, handleContextPaste, hasClipboardItems, hasSelection]);
+  }, [contextMenu, handleContextAction, handleContextEdit, handleCopyCardUuid, handleCopyCardsAsText, handleCopySelected, handleDeleteCards, handleOpenMergeDialog, handleOpenStatsDialog, handleContextPaste, hasClipboardItems, hasSelection, mergeValidation]);
 
   /**
    * @brief ドラッグ開始時の処理。
@@ -1218,6 +1380,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           <button
             type="button"
             className="panel-toolbar__button"
+            onClick={handleOpenMergeDialog}
+            disabled={!activeTabId || !mergeValidation.canMerge}
+            aria-disabled={!activeTabId || !mergeValidation.canMerge}
+            title={mergeValidation.canMerge ? '選択カードを統合' : mergeValidation.reason ?? '統合できません'}
+          >
+            🧩
+          </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
             onClick={handleOpenBulkPrefixEdit}
             disabled={!activeTabId}
             aria-disabled={!activeTabId}
@@ -1448,6 +1620,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           leftTraceCount={leftTraceCounts[statsTargetCard.id] ?? 0}
           rightTraceCount={rightTraceCounts[statsTargetCard.id] ?? 0}
           onClose={() => setStatsTargetCardId(null)}
+        />
+      ) : null}
+
+      {isMergeDialogOpen ? (
+        <CardMergeDialog
+          cards={mergeDialogCards}
+          isOpen={isMergeDialogOpen}
+          onCancel={handleMergeDialogCancel}
+          onSubmit={handleMergeSubmit}
         />
       ) : null}
 

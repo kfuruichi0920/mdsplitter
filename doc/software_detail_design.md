@@ -335,3 +335,8 @@ Deprecated --> Draft : 再利用
   - `CardPanel.tsx` では `contextMenuSections` を `useMemo` で組み立て、コピー/貼り付け/追加/削除に既存ハンドラを再利用。`handleCopyCardsAsText` が `navigator.clipboard` + `execCommand` フォールバックで選択カードを整形 (`[cardId] タイトル\n本文` + `---` 区切り) し、`handleCopyCardUuid` が UUID をコピーする。履歴表示はフェーズ4待ちのため `disabled` 項目で予約済み。
   - カード統計は `src/renderer/components/CardStatsDialog.tsx` に切り出し、`CardStatsDialog` がカードID/UUID/種別/ステータス/作成日時/最終更新/左&右トレース件数/階層レベル/子カード数/文字数/単語数/行数を表示。`renderer/constants/cardPresentation.ts` にアイコン・ステータスラベル・種別ラベルを集約し、`renderer/utils/cardUtils.ts` の `calculateCardContentStatistics` を使ってプレーンテキスト統計を算出、`__tests__/cardUtils.test.ts` で単体テスト済み。
   - `styles.css` へ `.panel-context-menu__section-label`/`__icon`/`__shortcut` と統計ダイアログ (`.card-stats-dialog*`) を追加し、ライト/ダーク両テーマで視認性を確保した。
+- **P6-07 カード統合ダイアログ/ロジック (2025-11-15)**
+  - `src/renderer/components/CardMergeDialog.tsx` を追加し、選択カード一覧と統合後プロパティ（カードID/種別/ステータス/本文）を編集できるモーダルを実装。タイトルが空の間は決定ボタンを無効化し、送信中は `統合中…` と表示。オプションの「元のカードを削除」「トレース情報を引き継ぐ」を備え、同一階層かつ連続したカードのみが対象であることを UI メッセージで明示。
+  - `CardPanel.tsx` のツールバーとメニューに 🧩 ボタンを追加し、`mergeValidation` で親ID/level/child有無/連続性を検証。要件を満たさない場合は INFO/WARN ログを出力し、選択変更に応じて状態を更新する。統合後は `mergeDialogCards` のスナップショットを用いて `mergeCards` を呼び出し、ダイアログをクローズする。
+  - `workspaceStore.mergeCards` を実装し、Undo/Redo スタックへ統合前のカード配列を保存した上で新規カードを挿入。`removeOriginals` に応じて元カードを削除、`inheritTraces` に応じて `hasLeftTrace`/`hasRightTrace` を OR 結合し、`dirtyCardIds`/選択状態を更新する。子カードを持つ項目や非連続選択はストアで拒否し、単体テスト（`workspaceStore.test.ts`）で正常系/異常系/保持ケースを検証。
+  - トレース引き継ぎは `CardPanel` 内の `reassignTracesForMerge` で実装し、`useTraceStore` のキャッシュにロード済みのファイルペアだけを対象に relation の `left_ids`/`right_ids` を置換した後 `saveRelationsForPair` で永続化する。未ロードのトレースファイルについては現行仕様上検出できないため、ユーザーに必要に応じてペアを開いてから再統合する運用想定。

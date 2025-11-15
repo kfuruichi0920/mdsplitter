@@ -121,6 +121,21 @@ export type OpenTabResult =
  */
 export type InsertPosition = 'before' | 'after' | 'child';
 
+export interface MergeCardsOptions {
+  title: string;
+  body: string;
+  status: CardStatus;
+  kind: CardKind;
+  cardId?: string | null;
+  removeOriginals: boolean;
+  inheritTraces: boolean;
+}
+
+export interface MergeCardsResult {
+  mergedCard: Card;
+  removedCardIds: string[];
+}
+
 export interface WorkspaceStore {
   tabs: Record<string, PanelTabState>;
   leafs: Record<string, LeafWorkspaceState>;
@@ -156,6 +171,7 @@ export interface WorkspaceStore {
   hasClipboard: () => boolean; ///< クリップボードにカードがあるか
   renameTabFile: (tabId: string, fileName: string) => void; ///< タブに紐づくファイル名を変更
   setCardTraceFlags: (fileName: string, updates: Record<string, Partial<Pick<Card, 'hasLeftTrace' | 'hasRightTrace'>>>) => void; ///< トレースフラグを更新
+  mergeCards: (leafId: string, tabId: string, cardIds: string[], options: MergeCardsOptions) => MergeCardsResult | null; ///< カード統合
   undo: () => boolean; ///< Undo実行（成功時true）
   redo: () => boolean; ///< Redo実行（成功時true）
   canUndo: () => boolean; ///< Undo可能か判定
@@ -897,6 +913,132 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         },
       } satisfies Pick<WorkspaceStore, 'tabs'>;
     });
+  },
+
+  mergeCards: (leafId, tabId, cardIds, options) => {
+    let mergeResult: MergeCardsResult | null = null;
+
+    set((state) => {
+      const tab = state.tabs[tabId];
+      if (!tab || tab.leafId !== leafId) {
+        return state;
+      }
+
+      const uniqueIds = Array.from(new Set(cardIds)).filter(Boolean);
+      if (uniqueIds.length < 2) {
+        return state;
+      }
+
+      const selectionSet = new Set(uniqueIds);
+      const selectedEntries: { card: Card; index: number }[] = [];
+      tab.cards.forEach((card, index) => {
+        if (selectionSet.has(card.id)) {
+          selectedEntries.push({ card, index });
+        }
+      });
+
+      if (selectedEntries.length < 2) {
+        return state;
+      }
+
+      const baseParentId = selectedEntries[0].card.parent_id ?? null;
+      const baseLevel = selectedEntries[0].card.level;
+      const hasInvalidParent = selectedEntries.some((entry) => (entry.card.parent_id ?? null) !== baseParentId);
+      const hasInvalidLevel = selectedEntries.some((entry) => entry.card.level !== baseLevel);
+      const hasChildren = selectedEntries.some((entry) => entry.card.child_ids.length > 0);
+      const nonContiguous = selectedEntries.some((entry, idx) => idx > 0 && entry.index !== selectedEntries[idx - 1].index + 1);
+      if (hasInvalidParent || hasInvalidLevel || hasChildren || nonContiguous) {
+        return state;
+      }
+
+      const undoEntry: UndoRedoEntry = {
+        type: 'update',
+        tabId,
+        cards: [...tab.cards],
+        description: `${selectedEntries.length}件のカードを統合`,
+      } satisfies UndoRedoEntry;
+      const nextUndoStack = [...state.undoStack, undoEntry];
+      const trimmedUndoStack = nextUndoStack.length > 100 ? nextUndoStack.slice(-100) : nextUndoStack;
+
+      const removalSet = options.removeOriginals ? new Set(selectedEntries.map((entry) => entry.card.id)) : new Set<string>();
+      const removedCardIds = Array.from(removalSet);
+      const baseCards = removalSet.size > 0 ? tab.cards.filter((card) => !removalSet.has(card.id)) : [...tab.cards];
+      const firstIndex = selectedEntries[0].index;
+      const insertIndex = Math.min(firstIndex, baseCards.length);
+
+      const timestamp = new Date().toISOString();
+      let earliestCreatedAt: string | null = null;
+      selectedEntries.forEach((entry) => {
+        if (!entry.card.createdAt) {
+          return;
+        }
+        if (!earliestCreatedAt || entry.card.createdAt < earliestCreatedAt) {
+          earliestCreatedAt = entry.card.createdAt;
+        }
+      });
+
+      const mergedCard: Card = {
+        id: nanoid(),
+        cardId: options.cardId?.trim() ? options.cardId.trim() : undefined,
+        title: options.title.trim() || selectedEntries[0].card.title,
+        body: options.body,
+        status: options.status,
+        kind: options.kind,
+        hasLeftTrace: options.inheritTraces
+          ? selectedEntries.some((entry) => entry.card.hasLeftTrace)
+          : selectedEntries[0].card.hasLeftTrace,
+        hasRightTrace: options.inheritTraces
+          ? selectedEntries.some((entry) => entry.card.hasRightTrace)
+          : selectedEntries[0].card.hasRightTrace,
+        markdownPreviewEnabled: selectedEntries[0].card.markdownPreviewEnabled,
+        createdAt: earliestCreatedAt ?? timestamp,
+        updatedAt: timestamp,
+        parent_id: baseParentId,
+        child_ids: [],
+        prev_id: null,
+        next_id: null,
+        level: baseLevel,
+      } satisfies Card;
+
+      const nextCards = [
+        ...baseCards.slice(0, insertIndex),
+        mergedCard,
+        ...baseCards.slice(insertIndex),
+      ];
+      const rebuiltCards = rebuildSiblingLinks(nextCards);
+
+      const nextSelected = new Set<string>([mergedCard.id]);
+      const nextDirtyIds = new Set(tab.dirtyCardIds);
+      removedCardIds.forEach((id) => nextDirtyIds.delete(id));
+      nextDirtyIds.add(mergedCard.id);
+
+      mergeResult = {
+        mergedCard,
+        removedCardIds,
+      } satisfies MergeCardsResult;
+
+      return {
+        ...state,
+        tabs: {
+          ...state.tabs,
+          [tabId]: {
+            ...tab,
+            cards: rebuiltCards,
+            selectedCardIds: nextSelected,
+            dirtyCardIds: nextDirtyIds,
+            isDirty: true,
+          },
+        },
+        undoStack: trimmedUndoStack,
+        redoStack: [],
+      } satisfies Pick<WorkspaceStore, 'tabs' | 'undoStack' | 'redoStack'>;
+    });
+
+    if (mergeResult) {
+      emitCardLayoutChanged();
+    }
+
+    return mergeResult;
   },
 
   cycleCardStatus: (leafId, tabId, cardId) => {
