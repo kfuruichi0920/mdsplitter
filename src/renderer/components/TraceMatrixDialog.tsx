@@ -9,7 +9,7 @@ import { TraceMatrixCell } from '@/renderer/components/TraceMatrixCell';
 import { TraceMatrixHeader } from '@/renderer/components/TraceMatrixHeader';
 import { TraceMatrixToolbar } from '@/renderer/components/TraceMatrixToolbar';
 import { TraceMatrixFilterPanel } from '@/renderer/components/TraceMatrixFilterPanel';
-import { changeRelationKind, makeRelationKey, toggleTraceRelation, updateRelationMemo } from '@/renderer/utils/matrixRelations';
+import { changeRelationKind, makeRelationKey, toggleTraceRelation, updateRelationDirection, updateRelationMemo } from '@/renderer/utils/matrixRelations';
 import { exportMatrixToCSV, exportMatrixToExcel } from '@/renderer/utils/matrixExport';
 
 export const TraceMatrixDialog: React.FC = () => {
@@ -25,6 +25,7 @@ export const TraceMatrixDialog: React.FC = () => {
   const highlightedColumnCardIds = useMatrixStore((state) => state.highlightedColumnCardIds);
   const filter = useMatrixStore((state) => state.filter);
   const setRelations = useMatrixStore((state) => state.setRelations);
+  const setCards = useMatrixStore((state) => state.setCards);
   const setTraceMetadata = useMatrixStore((state) => state.setTraceMetadata);
   const setError = useMatrixStore((state) => state.setError);
   const setFilterQuery = useMatrixStore((state) => state.setFilterQuery);
@@ -33,6 +34,12 @@ export const TraceMatrixDialog: React.FC = () => {
   const resetFilter = useMatrixStore((state) => state.resetFilter);
   const setHighlightedRowCardIds = useMatrixStore((state) => state.setHighlightedRowCardIds);
   const setHighlightedColumnCardIds = useMatrixStore((state) => state.setHighlightedColumnCardIds);
+  const defaultRelationKind = useMatrixStore((state) => state.defaultRelationKind);
+  const defaultDirection = useMatrixStore((state) => state.defaultDirection);
+  const confirmMemoDeletion = useMatrixStore((state) => state.confirmMemoDeletion);
+  const setDefaultRelationKind = useMatrixStore((state) => state.setDefaultRelationKind);
+  const setDefaultDirection = useMatrixStore((state) => state.setDefaultDirection);
+  const setConfirmMemoDeletion = useMatrixStore((state) => state.setConfirmMemoDeletion);
 
   const relationLookup = useMemo(() => {
     const map = new Map<string, TraceabilityRelation>();
@@ -50,6 +57,13 @@ export const TraceMatrixDialog: React.FC = () => {
     const identifier = card.cardId ?? card.id;
     const title = card.title ? ` - ${card.title}` : '';
     return `${identifier}${title}`;
+  }, []);
+
+  const formatCardTooltip = useCallback((card: Card): string => {
+    const identifier = card.cardId ?? card.id;
+    const body = card.body?.trim() ?? '';
+    const snippet = body ? `${body.slice(0, 120)}${body.length > 120 ? '…' : ''}` : '---';
+    return `ID: ${identifier}\nステータス: ${card.status}\n本文: ${snippet}`;
   }, []);
 
   const filteredLeftCards = useMemo(() => {
@@ -106,6 +120,7 @@ export const TraceMatrixDialog: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [memoEditor, setMemoEditor] = useState<{
     relationId: string;
     leftLabel: string;
@@ -185,6 +200,39 @@ export const TraceMatrixDialog: React.FC = () => {
     [formatCardLabel],
   );
 
+  const handleRefresh = useCallback(async () => {
+    if (!leftFile || !rightFile) {
+      return;
+    }
+    const workspace = window.app?.workspace;
+    if (!workspace?.loadOutputFile || !workspace?.loadTraceFile) {
+      setError('ワークスペースAPIが利用できません');
+      return;
+    }
+    setIsRefreshing(true);
+    try {
+      const [leftSnapshot, rightSnapshot, traceResult] = await Promise.all([
+        workspace.loadOutputFile(leftFile),
+        workspace.loadOutputFile(rightFile),
+        workspace.loadTraceFile(leftFile, rightFile),
+      ]);
+      setCards('left', leftSnapshot?.cards ?? []);
+      setCards('right', rightSnapshot?.cards ?? []);
+      if (traceResult) {
+        setTraceMetadata(traceResult.fileName, traceResult.payload.header ?? null);
+        setRelations(traceResult.payload.relations);
+      } else {
+        setTraceMetadata(null, null);
+        setRelations([]);
+      }
+    } catch (error) {
+      console.error('[TraceMatrixDialog] failed to refresh matrix data', error);
+      setError(error instanceof Error ? error.message : '更新に失敗しました');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [leftFile, rightFile, setCards, setError, setRelations, setTraceMetadata]);
+
   const handleMemoDialogSave = useCallback(
     (value: string) => {
       if (!memoEditor) {
@@ -200,16 +248,45 @@ export const TraceMatrixDialog: React.FC = () => {
     setMemoEditor(null);
   }, []);
 
+  const handleDirectionChange = useCallback(
+    (relationId: string, direction: TraceabilityRelation['directed']) => {
+      const previous = useMatrixStore.getState().relations;
+      const next = updateRelationDirection(previous, relationId, direction);
+      if (next === previous) {
+        return;
+      }
+      setRelations(next);
+      void persistRelations(next, previous);
+    },
+    [persistRelations, setRelations],
+  );
+
   const handleToggle = useCallback(
     (leftCardId: string, rightCardId: string) => {
       const previous = useMatrixStore.getState().relations;
-      const { next } = toggleTraceRelation(previous, leftCardId, rightCardId);
+      const relation = relationLookup.get(makeRelationKey(leftCardId, rightCardId));
+      if (
+        relation &&
+        relation.memo &&
+        confirmMemoDeletion &&
+        relation.left_ids.length === 1 &&
+        relation.right_ids.length === 1
+      ) {
+        const confirmed = window.confirm('このトレースにはメモが設定されています。削除するとメモも失われます。続行しますか?');
+        if (!confirmed) {
+          return;
+        }
+      }
+      const { next } = toggleTraceRelation(previous, leftCardId, rightCardId, {
+        defaultKind: defaultRelationKind,
+        defaultDirection,
+      });
       setRelations(next);
       void persistRelations(next, previous);
       broadcastSelection(leftFile, [leftCardId], 'row');
       broadcastSelection(rightFile, [rightCardId], 'column');
     },
-    [setRelations, persistRelations, broadcastSelection, leftFile, rightFile],
+    [broadcastSelection, confirmMemoDeletion, defaultDirection, defaultRelationKind, leftFile, relationLookup, persistRelations, rightFile, setRelations],
   );
 
   const handleChangeKind = useCallback(
@@ -244,6 +321,21 @@ export const TraceMatrixDialog: React.FC = () => {
         })),
       },
       {
+        key: 'direction',
+        title: '方向',
+        items: DIRECTION_OPTIONS.map((direction) => ({
+          key: direction,
+          label: describeDirected(direction),
+          onSelect: () => {
+            if (currentRelation) {
+              handleDirectionChange(currentRelation.id, direction);
+            }
+          },
+          disabled: !currentRelation,
+          closeOnSelect: true,
+        })),
+      },
+      {
         key: 'memo',
         title: 'メモ',
         items: [
@@ -273,7 +365,7 @@ export const TraceMatrixDialog: React.FC = () => {
         ],
       },
     ];
-  }, [applyMemoUpdate, contextMenu, handleChangeKind, leftCards, openMemoEditor, relationLookup, rightCards]);
+  }, [applyMemoUpdate, contextMenu, handleChangeKind, handleDirectionChange, leftCards, openMemoEditor, relationLookup, rightCards]);
 
   const handleExport = useCallback(
     async (format: 'csv' | 'excel') => {
@@ -338,10 +430,19 @@ export const TraceMatrixDialog: React.FC = () => {
         totalTraces={stats.totalTraces}
         untracedLeftCount={stats.untracedLeftCount}
         untracedRightCount={stats.untracedRightCount}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
         onExportCSV={() => handleExport('csv')}
         onExportExcel={() => handleExport('excel')}
+        defaultRelationKind={defaultRelationKind}
+        defaultDirection={defaultDirection}
+        onChangeDefaultRelationKind={setDefaultRelationKind}
+        onChangeDefaultDirection={setDefaultDirection}
+        confirmMemoDeletion={confirmMemoDeletion}
+        onChangeConfirmMemoDeletion={setConfirmMemoDeletion}
       />
       {isSaving ? <p className="trace-matrix-status">保存中…</p> : null}
+      {isRefreshing ? <p className="trace-matrix-status">更新中…</p> : null}
       {exporting ? <p className="trace-matrix-status">エクスポート中…</p> : null}
       {exportMessage ? <p className="trace-matrix-status">{exportMessage}</p> : null}
       <div className="trace-matrix-content">
@@ -353,7 +454,7 @@ export const TraceMatrixDialog: React.FC = () => {
                   <th className="trace-matrix-table__corner" />
                   {filteredRightCards.map((card) => (
                     <th key={card.id} className="trace-matrix-table__column-header">
-                      <button type="button" onClick={() => handleColumnHeaderClick(card)}>
+                      <button type="button" onClick={() => handleColumnHeaderClick(card)} title={formatCardTooltip(card)}>
                         <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
                         <span className="trace-matrix-grid__title">{card.title}</span>
                       </button>
@@ -365,7 +466,7 @@ export const TraceMatrixDialog: React.FC = () => {
                 {filteredLeftCards.map((leftCard) => (
                   <tr key={leftCard.id}>
                     <th className="trace-matrix-table__row-header" scope="row">
-                      <button type="button" onClick={() => handleRowHeaderClick(leftCard)}>
+                      <button type="button" onClick={() => handleRowHeaderClick(leftCard)} title={formatCardTooltip(leftCard)}>
                         <span className="trace-matrix-grid__card-id">{leftCard.cardId ?? leftCard.id}</span>
                         <span className="trace-matrix-grid__title">{leftCard.title}</span>
                       </button>
@@ -377,6 +478,7 @@ export const TraceMatrixDialog: React.FC = () => {
                           <TraceMatrixCell
                             hasTrace={Boolean(relation)}
                             traceKind={relation?.type}
+                            direction={relation?.directed}
                             memo={relation?.memo}
                             isRowHighlighted={rowHighlightSet.has(leftCard.id)}
                             isColumnHighlighted={columnHighlightSet.has(rightCard.id)}
@@ -482,3 +584,16 @@ const TraceMemoDialog: React.FC<TraceMemoDialogProps> = ({ leftLabel, rightLabel
 };
 
 TraceMatrixDialog.displayName = 'TraceMatrixDialog';
+
+const DIRECTION_OPTIONS: TraceabilityRelation['directed'][] = ['left_to_right', 'right_to_left', 'bidirectional'];
+
+const describeDirected = (value: TraceabilityRelation['directed']): string => {
+  switch (value) {
+    case 'right_to_left':
+      return '列 → 行';
+    case 'bidirectional':
+      return '双方向';
+    default:
+      return '行 → 列';
+  }
+};

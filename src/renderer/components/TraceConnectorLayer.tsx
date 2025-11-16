@@ -53,6 +53,7 @@ interface ConnectorPathEntry {
   path: string;
   className: string;
   relationKind: TraceRelationKind;
+  direction: TraceabilityLink['direction'];
   memo?: string;
   sourceLabel: string;
   targetLabel: string;
@@ -62,6 +63,7 @@ interface ConnectorTooltipState {
   id: string;
   label: string;
   relation: TraceRelationKind;
+  direction: TraceabilityLink['direction'];
   memo?: string;
   x: number;
   y: number;
@@ -76,6 +78,17 @@ const directionSwap = (direction: 'forward' | 'backward' | 'bidirectional'): 'fo
   if (direction === 'forward') return 'backward';
   if (direction === 'backward') return 'forward';
   return 'bidirectional';
+};
+
+const describeFlowDirection = (direction: 'forward' | 'backward' | 'bidirectional'): string => {
+  switch (direction) {
+    case 'backward':
+      return '列 → 行';
+    case 'bidirectional':
+      return '双方向';
+    default:
+      return '行 → 列';
+  }
 };
 
 /**
@@ -480,6 +493,7 @@ export const TraceConnectorLayer = ({
         path,
         className,
         relationKind: link.relation,
+        direction: link.direction,
         memo: link.memo,
         sourceLabel: `${source.fileName}:${source.cardId}`,
         targetLabel: `${target.fileName}:${target.cardId}`,
@@ -499,6 +513,7 @@ export const TraceConnectorLayer = ({
         id: entry.id,
         label: `${entry.sourceLabel} → ${entry.targetLabel}`,
         relation: entry.relationKind,
+        direction: entry.direction,
         memo: entry.memo,
         x: event.clientX - containerRect.left + 12,
         y: event.clientY - containerRect.top + 12,
@@ -612,6 +627,7 @@ export const TraceConnectorLayer = ({
               key={connector.id}
               className={className}
               d={connector.path}
+              pointerEvents="visibleStroke"
               onMouseEnter={(event) => handleConnectorMouseEnter(connector, event)}
               onMouseMove={(event) => handleConnectorMouseMove(connector, event)}
               onMouseLeave={handleConnectorMouseLeave}
@@ -623,7 +639,7 @@ export const TraceConnectorLayer = ({
       {tooltip ? (
         <div className="trace-connector-tooltip" style={{ top: tooltip.y, left: tooltip.x }}>
           <p className="trace-connector-tooltip__label">{tooltip.label}</p>
-          <p className="trace-connector-tooltip__meta">種別: {tooltip.relation}</p>
+          <p className="trace-connector-tooltip__meta">種別: {tooltip.relation} / 方向: {describeFlowDirection(tooltip.direction)}</p>
           <p className={['trace-connector-tooltip__memo', tooltip.memo ? '' : 'trace-connector-tooltip__memo--empty'].join(' ').trim()}>
             {tooltip.memo ?? 'メモは未設定です'}
           </p>

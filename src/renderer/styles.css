@@ -1147,7 +1147,6 @@
     stroke: var(--trace-color-trace, rgba(96, 165, 250, 0.7));
     stroke-width: 2;
     transition: stroke 0.2s ease;
-    pointer-events: stroke;
     cursor: pointer;
   }
 
@@ -1595,15 +1594,31 @@
   }
 
   .trace-matrix-toolbar {
-    @apply flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800;
   }
 
   .trace-matrix-toolbar__stats {
-    @apply flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300;
+    @apply flex flex-wrap gap-4 text-slate-600 dark:text-slate-300;
   }
 
   .trace-matrix-toolbar__actions {
-    @apply flex gap-3;
+    @apply flex flex-wrap gap-2;
+  }
+
+  .trace-matrix-toolbar__settings {
+    @apply flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300;
+  }
+
+  .trace-matrix-toolbar__settings label {
+    @apply flex items-center gap-2;
+  }
+
+  .trace-matrix-toolbar__settings select {
+    @apply rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100;
+  }
+
+  .trace-matrix-toolbar__checkbox {
+    @apply inline-flex items-center gap-2 text-sm;
   }
 
   .trace-matrix-grid {

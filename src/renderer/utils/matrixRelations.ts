@@ -16,10 +16,16 @@ export const buildRelationLookup = (relations: TraceabilityRelation[]): Map<stri
   return map;
 };
 
+interface ToggleOptions {
+  defaultKind?: TraceRelationKind;
+  defaultDirection?: TraceabilityRelation['directed'];
+}
+
 export const toggleTraceRelation = (
   relations: TraceabilityRelation[],
   leftId: string,
   rightId: string,
+  options?: ToggleOptions,
 ): { next: TraceabilityRelation[]; isActive: boolean } => {
   const lookup = buildRelationLookup(relations);
   const key = makeRelationKey(leftId, rightId);
@@ -29,8 +35,8 @@ export const toggleTraceRelation = (
       id: nanoid(),
       left_ids: [leftId],
       right_ids: [rightId],
-      type: 'trace',
-      directed: 'left_to_right',
+      type: options?.defaultKind ?? 'trace',
+      directed: options?.defaultDirection ?? 'left_to_right',
     };
     return { next: [...relations, relation], isActive: true };
   }
@@ -80,3 +86,9 @@ export const updateRelationMemo = (
     const nextMemo = memo.trim();
     return nextMemo.length > 0 ? { ...relation, memo: nextMemo } : { ...relation, memo: undefined };
   });
+
+export const updateRelationDirection = (
+  relations: TraceabilityRelation[],
+  relationId: string,
+  direction: TraceabilityRelation['directed'],
+): TraceabilityRelation[] => relations.map((relation) => (relation.id === relationId ? { ...relation, directed: direction } : relation));

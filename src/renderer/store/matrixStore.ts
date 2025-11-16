@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import type { Card, CardStatus } from '@/shared/workspace';
-import type { TraceabilityRelation, TraceabilityHeader } from '@/shared/traceability';
+import type { TraceabilityRelation, TraceabilityHeader, TraceRelationKind } from '@/shared/traceability';
 import type { MatrixInitPayload, TraceChangeEvent } from '@/shared/matrixProtocol';
 
 const computeStats = (
@@ -70,6 +70,9 @@ export interface MatrixState {
   isLoading: boolean;
   error: string | null;
   filter: MatrixFilter;
+  defaultRelationKind: TraceRelationKind;
+  defaultDirection: TraceabilityRelation['directed'];
+  confirmMemoDeletion: boolean;
   initializeFromPayload: (payload: MatrixInitPayload) => void;
   setTraceMetadata: (fileName: string | null, header: TraceabilityHeader | null) => void;
   setCards: (side: 'left' | 'right', cards: Card[]) => void;
@@ -83,6 +86,9 @@ export interface MatrixState {
   toggleFilterStatus: (status: CardStatus) => void;
   setTraceFocus: (side: 'row' | 'column', cardId: string | null) => void;
   resetFilter: () => void;
+  setDefaultRelationKind: (kind: TraceRelationKind) => void;
+  setDefaultDirection: (direction: TraceabilityRelation['directed']) => void;
+  setConfirmMemoDeletion: (value: boolean) => void;
   reset: () => void;
 }
 
@@ -103,6 +109,9 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   isLoading: false,
   error: null,
   filter: initialFilter,
+  defaultRelationKind: 'trace',
+  defaultDirection: 'left_to_right',
+  confirmMemoDeletion: true,
   initializeFromPayload: (payload) =>
     set(() => ({
       windowId: payload.windowId,
@@ -160,6 +169,9 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       },
     })),
   resetFilter: () => set(() => ({ filter: initialFilter })),
+  setDefaultRelationKind: (kind) => set(() => ({ defaultRelationKind: kind })),
+  setDefaultDirection: (direction) => set(() => ({ defaultDirection: direction })),
+  setConfirmMemoDeletion: (value) => set(() => ({ confirmMemoDeletion: value })),
   reset: () =>
     set(() => ({
       windowId: null,
@@ -176,5 +188,8 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       isLoading: false,
       error: null,
       filter: initialFilter,
+      defaultRelationKind: 'trace',
+      defaultDirection: 'left_to_right',
+      confirmMemoDeletion: true,
     })),
 }));

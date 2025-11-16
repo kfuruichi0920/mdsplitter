@@ -1,10 +1,11 @@
 import React from 'react';
 
-import type { TraceRelationKind } from '@/shared/traceability';
+import type { TraceRelationKind, TraceabilityRelation } from '@/shared/traceability';
 
 interface TraceMatrixCellProps {
   hasTrace: boolean;
   traceKind?: TraceRelationKind;
+  direction?: TraceabilityRelation['directed'];
   memo?: string;
   isRowHighlighted: boolean;
   isColumnHighlighted: boolean;
@@ -15,6 +16,7 @@ interface TraceMatrixCellProps {
 export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
   hasTrace,
   traceKind,
+  direction,
   memo,
   isRowHighlighted,
   isColumnHighlighted,
@@ -36,6 +38,7 @@ export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
   const tooltipParts = [] as string[];
   if (hasTrace) {
     tooltipParts.push(`トレース: ${traceKind ?? 'trace'}`);
+    tooltipParts.push(`方向: ${formatDirection(direction)}`);
   } else {
     tooltipParts.push('トレースなし');
   }
@@ -61,3 +64,14 @@ export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
 };
 
 TraceMatrixCell.displayName = 'TraceMatrixCell';
+
+const formatDirection = (value?: TraceabilityRelation['directed']): string => {
+  switch (value) {
+    case 'right_to_left':
+      return '列→行';
+    case 'bidirectional':
+      return '双方向';
+    default:
+      return '行→列';
+  }
+};
