@@ -421,6 +421,15 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     return merged.size > 0 ? merged : traceHighlightIds;
   }, [traceHighlightIds, matrixSelectionIds]);
 
+  const openMatrixDialog = useCallback(() => {
+    const defaultLeft = activeFileName ?? availableFiles[0] ?? '';
+    const alternative = availableFiles.find((file) => file !== defaultLeft) ?? '';
+    setMatrixLeftFile(defaultLeft);
+    setMatrixRightFile(alternative);
+    setMatrixDialogError(availableFiles.length >= 2 ? null : '2つのファイルを開いてください');
+    setMatrixDialogOpen(true);
+  }, [activeFileName, availableFiles]);
+
   const handleMatrixDialogSubmit = useCallback(async () => {
     if (!window.app?.matrix) {
       setMatrixDialogError('matrix API が利用できません');
@@ -1463,6 +1472,20 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             aria-label="トレース表示切替"
           >
             ⛓️
+          </button>
+        </div>
+        <div className="panel-toolbar__separator" aria-hidden="true" />
+        <div className="panel-toolbar__group">
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={openMatrixDialog}
+            disabled={availableFiles.length < 2}
+            aria-disabled={availableFiles.length < 2}
+            title="トレースマトリクスを開く"
+            aria-label="トレースマトリクスを開く"
+          >
+            🗺️
           </button>
         </div>
         <div className="panel-toolbar__separator" aria-hidden="true" />
