@@ -29,6 +29,7 @@ import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { CardStatsDialog } from './CardStatsDialog';
 import { CardMergeDialog, type CardMergeDialogPayload } from './CardMergeDialog';
 import { CardHistoryDialog } from './CardHistoryDialog';
+import { MatrixLaunchDialog } from './MatrixLaunchDialog';
 import type { TraceabilityRelation } from '@/shared/traceability';
 
 const createKindFilterState = (): Record<CardKind, boolean> => {
@@ -350,6 +351,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     return seeds;
   }, [globalSelections]);
 
+  const availableFiles = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(tabsSnapshot).forEach((tab) => {
+      if (tab?.fileName) {
+        set.add(tab.fileName);
+      }
+    });
+    return Array.from(set).sort();
+  }, [tabsSnapshot]);
+
   const traceHighlightIds = useMemo(() => {
     if (!activeFileName || selectionSeeds.length === 0) {
       return null;
@@ -369,6 +380,10 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   }, [activeFileName, excludeSelfTrace, globalSelections, selectionSeeds, traceCacheSnapshot]);
 
   const [matrixSelectionIds, setMatrixSelectionIds] = useState<Set<string>>(new Set());
+  const [isMatrixDialogOpen, setMatrixDialogOpen] = useState(false);
+  const [matrixLeftFile, setMatrixLeftFile] = useState('');
+  const [matrixRightFile, setMatrixRightFile] = useState('');
+  const [matrixDialogError, setMatrixDialogError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!window.app?.matrix) {
@@ -405,6 +420,46 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     matrixSelectionIds.forEach((id) => merged.add(id));
     return merged.size > 0 ? merged : traceHighlightIds;
   }, [traceHighlightIds, matrixSelectionIds]);
+
+  const openMatrixDialog = useCallback(() => {
+    const defaultLeft = activeFileName ?? availableFiles[0] ?? '';
+    const alternative = availableFiles.find((file) => file !== defaultLeft) ?? '';
+    setMatrixLeftFile(defaultLeft);
+    setMatrixRightFile(alternative);
+    setMatrixDialogError(availableFiles.length >= 2 ? null : '2つのファイルを開いてください');
+    setMatrixDialogOpen(true);
+  }, [activeFileName, availableFiles]);
+
+  const handleMatrixDialogSubmit = useCallback(async () => {
+    if (!window.app?.matrix) {
+      setMatrixDialogError('matrix API が利用できません');
+      return;
+    }
+    if (!matrixLeftFile || !matrixRightFile) {
+      setMatrixDialogError('左右ファイルを選択してください');
+      return;
+    }
+    if (matrixLeftFile === matrixRightFile) {
+      setMatrixDialogError('左右には異なるファイルを選択してください');
+      return;
+    }
+    try {
+      await window.app.matrix.open({ leftFile: matrixLeftFile, rightFile: matrixRightFile });
+      onLog?.('INFO', `トレースマトリクスを開きました: ${matrixLeftFile} ⇔ ${matrixRightFile}`);
+      setMatrixDialogOpen(false);
+    } catch (error) {
+      console.error('[CardPanel] failed to open matrix window', error);
+      setMatrixDialogError('マトリクスウィンドウを開けませんでした');
+    }
+  }, [matrixLeftFile, matrixRightFile, onLog]);
+
+  const handleMatrixSwap = useCallback(() => {
+    setMatrixDialogError(null);
+    setMatrixLeftFile((prevLeft) => {
+      setMatrixRightFile(prevLeft);
+      return matrixRightFile;
+    });
+  }, [matrixRightFile]);
 
   const reassignTracesForMerge = useCallback(
     async (fileName: string, sourceIds: string[], targetId: string) => {
@@ -1507,6 +1562,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             ⛓️
           </button>
+          <button
+            type="button"
+            className="panel-toolbar__button"
+            onClick={openMatrixDialog}
+            disabled={availableFiles.length < 2}
+            aria-disabled={availableFiles.length < 2}
+            title="トレースマトリクスを開く"
+            aria-label="トレースマトリクスを開く"
+          >
+            🗺️
+          </button>
         </div>
         <div className="panel-toolbar__group">
           <button
@@ -1700,6 +1766,19 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           onSubmit={handleMergeSubmit}
         />
       ) : null}
+
+      <MatrixLaunchDialog
+        isOpen={isMatrixDialogOpen}
+        files={availableFiles}
+        leftFile={matrixLeftFile}
+        rightFile={matrixRightFile}
+        error={matrixDialogError}
+        onChangeLeft={setMatrixLeftFile}
+        onChangeRight={setMatrixRightFile}
+        onSwap={handleMatrixSwap}
+        onSubmit={handleMatrixDialogSubmit}
+        onClose={() => setMatrixDialogOpen(false)}
+      />
 
       {/* カードID接頭語一括編集ダイアログ */}
       {isBulkPrefixEditOpen ? (

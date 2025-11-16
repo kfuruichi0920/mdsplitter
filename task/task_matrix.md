@@ -70,12 +70,12 @@
 
 ## 9. Phase2実装ログ（2025-11-15）
 - `src/renderer/MatrixApp.tsx` を追加し、`index.html#matrix` で起動したウィンドウでは `App` の代わりにマトリクス専用UIをレンダリングするよう分岐。`useMatrixIPC` の購読で初期データロード・エラー表示を制御。
-- `TraceMatrixDialog/Header/Toolbar/Cell` を実装（`src/renderer/components/*`）。TanStack Table/ react-window はネットワーク制限で導入できなかったため、CSS Grid ベースの簡易仮想グリッドで代替し、セルクリック/右クリック操作・ステータス表示・統計バーを組み込んだ。
+- `TraceMatrixDialog/Header/Toolbar/Cell` を実装（`src/renderer/components/*`）。TanStack Table + react-window を用いた `FixedSizeGrid` 仮想グリッドへ移行し、ヘッダ/行ヘッダは粘着表示、セルはクリック/右クリック操作・ステータス表示・統計バーを備える。
 - `matrixStore` にトレースファイル名・ヘッダ・統計の管理APIを追加し、`useMatrixIPC` が `window.app.workspace.loadTraceFile` から取得したメタデータを保持。`window.app.matrix.broadcastTraceChange`/`window.app.workspace.saveTraceFile` を呼び出す `TraceMatrixDialog` の操作と接続。
 - `src/renderer/utils/matrixRelations.ts` とJestテスト（`matrixRelations.test.ts`）でセル単位のトグル/種別変更ロジックを共通化し、Phase2要求のセル操作振る舞いを保証。
 - `src/renderer/styles.css` にマトリクスUI用スタイルを追加し、提供されたimage.pngの配色レイアウトをベースにヘッダ/ツールバー/セル色分けを再現。
 
 ## 10. Phase3-5実装ログ（2025-11-15）
 - Phase3: `matrixStore` にフィルタ状態（カードID/タイトル検索、ステータス、行/列トレース注目）と行列ハイライトセットを導入し、`TraceMatrixFilterPanel.tsx` と `TraceMatrixDialog.tsx` に検索UI・CSSを追加。カードパネルから `window.app.matrix.broadcastCardSelection` を発火してマトリクスに選択カードを送信し、マトリクス側は `useMatrixIPC` で受信して行/列を強調表示する。
-- Phase4: `matrixExport.ts` でCSV文字列生成を実装し、`matrix:export` IPC（`src/main/main.ts`／`preload.ts`／`global.d.ts`）経由で `_out` ディレクトリへ保存するフローを構築。Excel出力は `xlsx@0.18.5` のインストールが継続して `EAI_AGAIN` となるため未対応だが、CSVボタンから即時保存できる。
-- Phase5: `CardPanel.tsx` で選択セットを `broadcastCardSelection` へ送信し、マトリクスからの選択イベントを購読してカード一覧側にもハイライトを反映。マトリクスのセル操作は既存の `broadcastTraceChange` でカード一覧のトレースキャッシュを更新し、双方向のリアルタイム連動が成立した。
+- Phase4: `matrixExport.ts` でCSV/Excel出力を実装し、`matrix:export` IPC（`src/main/main.ts`／`preload.ts`／`global.d.ts`）経由で `_out` への保存を実現。Excelは `xlsx` ベースでBase64をメインプロセスに送り込み、ToolbarからCSV/Excelの2ボタンを提供。
+- Phase5: `CardPanel.tsx` で選択セットを `broadcastCardSelection` へ送信し、マトリクスからの選択イベントも購読してカード一覧側にハイライトを反映。マトリクスのセル操作完了時は既存の `broadcastTraceChange` でカード一覧のトレースキャッシュが同期され、双方向のリアルタイム連動が成立した。

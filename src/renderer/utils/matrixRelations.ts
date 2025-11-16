@@ -2,14 +2,14 @@ import { nanoid } from 'nanoid';
 
 import type { TraceabilityRelation, TraceRelationKind } from '@/shared/traceability';
 
-const makeKey = (leftId: string, rightId: string): string => `${leftId}::${rightId}`;
+export const makeRelationKey = (leftId: string, rightId: string): string => `${leftId}::${rightId}`;
 
 export const buildRelationLookup = (relations: TraceabilityRelation[]): Map<string, TraceabilityRelation> => {
   const map = new Map<string, TraceabilityRelation>();
   relations.forEach((relation) => {
     relation.left_ids.forEach((leftId) => {
       relation.right_ids.forEach((rightId) => {
-        map.set(makeKey(leftId, rightId), relation);
+        map.set(makeRelationKey(leftId, rightId), relation);
       });
     });
   });
@@ -22,7 +22,7 @@ export const toggleTraceRelation = (
   rightId: string,
 ): { next: TraceabilityRelation[]; isActive: boolean } => {
   const lookup = buildRelationLookup(relations);
-  const key = makeKey(leftId, rightId);
+  const key = makeRelationKey(leftId, rightId);
   const existing = lookup.get(key);
   if (!existing) {
     const relation: TraceabilityRelation = {
@@ -59,7 +59,7 @@ export const changeRelationKind = (
   kind: TraceRelationKind,
 ): TraceabilityRelation[] => {
   const lookup = buildRelationLookup(relations);
-  const key = makeKey(leftId, rightId);
+  const key = makeRelationKey(leftId, rightId);
   const existing = lookup.get(key);
   if (!existing) {
     return relations;

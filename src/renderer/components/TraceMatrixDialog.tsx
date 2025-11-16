@@ -1,21 +1,26 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { FixedSizeGrid, type GridChildComponentProps } from 'react-window';
 
 import { TRACE_RELATION_KINDS, type TraceabilityRelation } from '@/shared/traceability';
+import type { Card } from '@/shared/workspace';
 import { useMatrixStore } from '@/renderer/store/matrixStore';
 import { ContextMenu, type ContextMenuSection } from '@/renderer/components/ContextMenu';
 import { TraceMatrixCell } from '@/renderer/components/TraceMatrixCell';
 import { TraceMatrixHeader } from '@/renderer/components/TraceMatrixHeader';
 import { TraceMatrixToolbar } from '@/renderer/components/TraceMatrixToolbar';
 import { TraceMatrixFilterPanel } from '@/renderer/components/TraceMatrixFilterPanel';
-import { buildRelationLookup, changeRelationKind, toggleTraceRelation } from '@/renderer/utils/matrixRelations';
-import { exportMatrixToCSV } from '@/renderer/utils/matrixExport';
+import { useMatrixGrid } from '@/renderer/hooks/useMatrixGrid';
+import { changeRelationKind, makeRelationKey, toggleTraceRelation } from '@/renderer/utils/matrixRelations';
+import { exportMatrixToCSV, exportMatrixToExcel } from '@/renderer/utils/matrixExport';
 
-const makeCellKey = (leftId: string, rightId: string) => `${leftId}::${rightId}`;
+const ROW_HEADER_WIDTH = 200;
+const COLUMN_WIDTH = 140;
+const ROW_HEIGHT = 48;
 
 export const TraceMatrixDialog: React.FC = () => {
   const leftCards = useMatrixStore((state) => state.leftCards);
   const rightCards = useMatrixStore((state) => state.rightCards);
-  const relations = useMatrixStore((state) => state.relations);
   const stats = useMatrixStore((state) => state.stats);
   const leftFile = useMatrixStore((state) => state.leftFile);
   const rightFile = useMatrixStore((state) => state.rightFile);
@@ -32,51 +37,9 @@ export const TraceMatrixDialog: React.FC = () => {
   const setTraceFocus = useMatrixStore((state) => state.setTraceFocus);
   const resetFilter = useMatrixStore((state) => state.resetFilter);
 
-  const relationLookup = useMemo(() => buildRelationLookup(relations), [relations]);
+  const { filteredLeftCards, filteredRightCards, relationLookup, headerColumns } = useMatrixGrid();
   const rowHighlightSet = useMemo(() => new Set(highlightedRowCardIds), [highlightedRowCardIds]);
   const columnHighlightSet = useMemo(() => new Set(highlightedColumnCardIds), [highlightedColumnCardIds]);
-
-  const filteredLeftCards = useMemo(() => {
-    return leftCards.filter((card) => {
-      if (filter.cardIdQuery && !(card.cardId ?? card.id).toLowerCase().includes(filter.cardIdQuery.toLowerCase())) {
-        return false;
-      }
-      if (filter.titleQuery && !(card.title ?? '').toLowerCase().includes(filter.titleQuery.toLowerCase())) {
-        return false;
-      }
-      if (!filter.status[card.status]) {
-        return false;
-      }
-      if (filter.columnTraceFocus) {
-        const key = makeCellKey(card.id, filter.columnTraceFocus);
-        if (!relationLookup.has(key)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [leftCards, filter, relationLookup]);
-
-  const filteredRightCards = useMemo(() => {
-    return rightCards.filter((card) => {
-      if (filter.cardIdQuery && !(card.cardId ?? card.id).toLowerCase().includes(filter.cardIdQuery.toLowerCase())) {
-        return false;
-      }
-      if (filter.titleQuery && !(card.title ?? '').toLowerCase().includes(filter.titleQuery.toLowerCase())) {
-        return false;
-      }
-      if (!filter.status[card.status]) {
-        return false;
-      }
-      if (filter.rowTraceFocus) {
-        const key = makeCellKey(filter.rowTraceFocus, card.id);
-        if (!relationLookup.has(key)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [rightCards, filter, relationLookup]);
 
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -87,6 +50,30 @@ export const TraceMatrixDialog: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [scrollState, setScrollState] = useState({ left: 0, top: 0 });
+  const gridBodyRef = useRef<HTMLDivElement>(null);
+  const [gridSize, setGridSize] = useState({ width: 640, height: 480 });
+
+  useEffect(() => {
+    const measure = () => {
+      const node = gridBodyRef.current;
+      if (!node) {
+        return;
+      }
+      setGridSize({ width: node.clientWidth, height: node.clientHeight });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  useEffect(() => {
+    const node = gridBodyRef.current;
+    if (!node) {
+      return;
+    }
+    setGridSize({ width: node.clientWidth, height: node.clientHeight });
+  }, [filteredLeftCards.length, filteredRightCards.length]);
 
   const persistRelations = useCallback(
     async (nextRelations: TraceabilityRelation[], previousRelations: TraceabilityRelation[]) => {
@@ -124,38 +111,33 @@ export const TraceMatrixDialog: React.FC = () => {
 
   const handleToggle = useCallback(
     (leftCardId: string, rightCardId: string) => {
-      const previous = relations;
-      const { next } = toggleTraceRelation(relations, leftCardId, rightCardId);
+      const previous = useMatrixStore.getState().relations;
+      const { next } = toggleTraceRelation(previous, leftCardId, rightCardId);
       setRelations(next);
       void persistRelations(next, previous);
       broadcastSelection(leftFile, [leftCardId]);
       broadcastSelection(rightFile, [rightCardId]);
     },
-    [relations, setRelations, persistRelations, broadcastSelection, leftFile, rightFile],
+    [setRelations, persistRelations, broadcastSelection, leftFile, rightFile],
   );
 
   const handleChangeKind = useCallback(
     (leftCardId: string, rightCardId: string, kind: (typeof TRACE_RELATION_KINDS)[number]) => {
-      const previous = relations;
-      const next = changeRelationKind(relations, leftCardId, rightCardId, kind);
+      const previous = useMatrixStore.getState().relations;
+      const next = changeRelationKind(previous, leftCardId, rightCardId, kind);
       setRelations(next);
       void persistRelations(next, previous);
       broadcastSelection(leftFile, [leftCardId]);
       broadcastSelection(rightFile, [rightCardId]);
     },
-    [relations, setRelations, persistRelations, broadcastSelection, leftFile, rightFile],
-  );
-
-  const gridTemplateColumns = useMemo(
-    () => `200px repeat(${filteredRightCards.length}, minmax(120px, 1fr))`,
-    [filteredRightCards.length],
+    [setRelations, persistRelations, broadcastSelection, leftFile, rightFile],
   );
 
   const menuSections: ContextMenuSection[] = useMemo(() => {
     if (!contextMenu) {
       return [];
     }
-    const currentRelation = relationLookup.get(makeCellKey(contextMenu.leftCardId, contextMenu.rightCardId));
+    const currentRelation = relationLookup.get(makeRelationKey(contextMenu.leftCardId, contextMenu.rightCardId));
     return [
       {
         key: 'type',
@@ -171,34 +153,74 @@ export const TraceMatrixDialog: React.FC = () => {
     ];
   }, [contextMenu, relationLookup, handleChangeKind]);
 
-  const handleExport = useCallback(async () => {
-    if (!leftFile || !rightFile) {
-      return;
-    }
-    try {
-      setExporting(true);
-      setExportMessage(null);
-      const csv = exportMatrixToCSV(leftCards, rightCards, relations);
-      const suggestion = `${leftFile.replace(/\.md$/i, '')}_${rightFile.replace(/\.md$/i, '')}.csv`;
+  const handleExport = useCallback(
+    async (format: 'csv' | 'excel') => {
+      if (!leftFile || !rightFile) {
+        setExportMessage('ファイル選択が必要です。');
+        return;
+      }
       const dialogApi = window.app?.dialogs?.promptSaveFile;
       if (!dialogApi) {
         setExportMessage('保存ダイアログAPIが利用できません。');
         return;
       }
-      const result = await dialogApi({ defaultFileName: suggestion });
-      if (!result || result.canceled || !result.fileName) {
-        setExportMessage('エクスポートをキャンセルしました。');
-        return;
+      try {
+        setExporting(true);
+        setExportMessage(null);
+        const defaultBase = `${leftFile.replace(/\.md$/i, '')}_${rightFile.replace(/\.md$/i, '')}`;
+        const suggestedName = format === 'csv' ? `${defaultBase}.csv` : `${defaultBase}.xlsx`;
+        const result = await dialogApi({ defaultFileName: suggestedName });
+        if (!result || result.canceled || !result.fileName) {
+          setExportMessage('エクスポートをキャンセルしました。');
+          return;
+        }
+        const normalized = format === 'csv'
+          ? result.fileName.endsWith('.csv') ? result.fileName : `${result.fileName}.csv`
+          : result.fileName.endsWith('.xlsx') ? result.fileName : `${result.fileName}.xlsx`;
+        if (format === 'csv') {
+          const csv = exportMatrixToCSV(leftCards, rightCards, useMatrixStore.getState().relations);
+          await window.app.matrix.export({ fileName: normalized, content: csv, format: 'csv', encoding: 'utf8' });
+          setExportMessage(`${normalized} にCSVを保存しました。`);
+        } else {
+          const base64 = exportMatrixToExcel(leftCards, rightCards, useMatrixStore.getState().relations);
+          await window.app.matrix.export({ fileName: normalized, content: base64, format: 'excel', encoding: 'base64' });
+          setExportMessage(`${normalized} にExcelを保存しました。`);
+        }
+      } catch (error) {
+        console.error('[TraceMatrixDialog] export failed', error);
+        setExportMessage('エクスポートに失敗しました。');
+      } finally {
+        setExporting(false);
       }
-      await window.app.matrix.export({ fileName: result.fileName, content: csv, format: 'csv' });
-      setExportMessage(`${result.fileName} にCSVを保存しました。`);
-    } catch (error) {
-      console.error('[TraceMatrixDialog] export failed', error);
-      setExportMessage('エクスポートに失敗しました。');
-    } finally {
-      setExporting(false);
-    }
-  }, [leftCards, rightCards, relations, leftFile, rightFile]);
+    },
+    [leftCards, rightCards, leftFile, rightFile],
+  );
+
+  const cellRenderer = useCallback(
+    ({ columnIndex, rowIndex, style }: GridChildComponentProps) => {
+      const leftCard = filteredLeftCards[rowIndex];
+      const rightCard = filteredRightCards[columnIndex];
+      if (!leftCard || !rightCard) {
+        return null;
+      }
+      const relation = relationLookup.get(makeRelationKey(leftCard.id, rightCard.id));
+      return (
+        <div style={style} className="trace-matrix-grid__cell-wrapper">
+          <TraceMatrixCell
+            hasTrace={Boolean(relation)}
+            traceKind={relation?.type}
+            isRowHighlighted={rowHighlightSet.has(leftCard.id)}
+            isColumnHighlighted={columnHighlightSet.has(rightCard.id)}
+            onToggle={() => handleToggle(leftCard.id, rightCard.id)}
+            onContextMenu={(event) => {
+              setContextMenu({ x: event.clientX, y: event.clientY, leftCardId: leftCard.id, rightCardId: rightCard.id });
+            }}
+          />
+        </div>
+      );
+    },
+    [filteredLeftCards, filteredRightCards, relationLookup, rowHighlightSet, columnHighlightSet, handleToggle],
+  );
 
   return (
     <div className="trace-matrix-dialog">
@@ -212,45 +234,68 @@ export const TraceMatrixDialog: React.FC = () => {
         totalTraces={stats.totalTraces}
         untracedLeftCount={stats.untracedLeftCount}
         untracedRightCount={stats.untracedRightCount}
-        onExport={handleExport}
+        onExportCSV={() => handleExport('csv')}
+        onExportExcel={() => handleExport('excel')}
       />
       {isSaving ? <p className="trace-matrix-status">保存中…</p> : null}
       {exporting ? <p className="trace-matrix-status">エクスポート中…</p> : null}
       {exportMessage ? <p className="trace-matrix-status">{exportMessage}</p> : null}
       <div className="trace-matrix-content">
-        <div className="trace-matrix-grid" aria-live="polite">
-          <div className="trace-matrix-grid__inner" style={{ gridTemplateColumns }}>
-            <div className="trace-matrix-grid__corner">&nbsp;</div>
-            {filteredRightCards.map((card) => (
-              <div key={card.id} className="trace-matrix-grid__column-header">
-                <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
-                <span className="trace-matrix-grid__title">{card.title}</span>
-              </div>
-            ))}
-            {filteredLeftCards.map((leftCard) => (
-              <React.Fragment key={leftCard.id}>
-                <div className="trace-matrix-grid__row-header">
-                  <span className="trace-matrix-grid__card-id">{leftCard.cardId ?? leftCard.id}</span>
-                  <span className="trace-matrix-grid__title">{leftCard.title}</span>
-                </div>
-                {filteredRightCards.map((rightCard) => {
-                  const relation = relationLookup.get(makeCellKey(leftCard.id, rightCard.id));
+        <div className="trace-matrix-grid">
+          <div className="trace-matrix-grid__column-header-row">
+            <div className="trace-matrix-grid__corner" style={{ width: ROW_HEADER_WIDTH }}>&nbsp;</div>
+            <div
+              className="trace-matrix-grid__column-headers"
+              style={{
+                transform: `translateX(-${scrollState.left}px)`,
+                width: headerColumns.length * COLUMN_WIDTH,
+              }}
+            >
+              {headerColumns.map((header) => {
+                const card = header.column.columnDef.meta?.card as Card | undefined;
+                if (!card) {
                   return (
-                    <TraceMatrixCell
-                      key={`${leftCard.id}:${rightCard.id}`}
-                      hasTrace={Boolean(relation)}
-                      traceKind={relation?.type}
-                      isRowHighlighted={rowHighlightSet.has(leftCard.id)}
-                      isColumnHighlighted={columnHighlightSet.has(rightCard.id)}
-                      onToggle={() => handleToggle(leftCard.id, rightCard.id)}
-                      onContextMenu={(event) => {
-                        setContextMenu({ x: event.clientX, y: event.clientY, leftCardId: leftCard.id, rightCardId: rightCard.id });
-                      }}
-                    />
+                    <div key={header.id} className="trace-matrix-grid__column-header" style={{ width: COLUMN_WIDTH }} />
                   );
-                })}
-              </React.Fragment>
-            ))}
+                }
+                return (
+                  <div key={header.id} className="trace-matrix-grid__column-header" style={{ width: COLUMN_WIDTH }}>
+                    <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
+                    <span className="trace-matrix-grid__title">{card.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="trace-matrix-grid__body">
+            <div
+              className="trace-matrix-grid__row-headers"
+              style={{ width: ROW_HEADER_WIDTH, transform: `translateY(-${scrollState.top}px)` }}
+            >
+              {filteredLeftCards.map((card) => (
+                <div key={card.id} className="trace-matrix-grid__row-header" style={{ height: ROW_HEIGHT }}>
+                  <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
+                  <span className="trace-matrix-grid__title">{card.title}</span>
+                </div>
+              ))}
+            </div>
+            <div className="trace-matrix-grid__cells" ref={gridBodyRef}>
+              {filteredLeftCards.length > 0 && filteredRightCards.length > 0 ? (
+                <FixedSizeGrid
+                  columnCount={filteredRightCards.length}
+                  columnWidth={COLUMN_WIDTH}
+                  height={Math.max(100, gridSize.height)}
+                  rowCount={filteredLeftCards.length}
+                  rowHeight={ROW_HEIGHT}
+                  width={Math.max(100, gridSize.width)}
+                  onScroll={({ scrollLeft, scrollTop }) => setScrollState({ left: scrollLeft, top: scrollTop })}
+                >
+                  {cellRenderer}
+                </FixedSizeGrid>
+              ) : (
+                <div className="trace-matrix-status px-2">表示するセルがありません。</div>
+              )}
+            </div>
           </div>
         </div>
         <TraceMatrixFilterPanel

@@ -41,6 +41,7 @@ export interface MatrixExportRequest {
   fileName: string;
   content: string;
   format: MatrixExportFormat;
+  encoding: 'utf8' | 'base64';
 }
 
 export interface MatrixExportResult {

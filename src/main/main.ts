@@ -282,17 +282,15 @@ ipcMain.on('matrix:card-selection', (event, payload: CardSelectionChangeEvent) =
 });
 
 ipcMain.handle('matrix:export', async (_event, payload: MatrixExportRequest): Promise<MatrixExportResult> => {
-  if (!payload || typeof payload.fileName !== 'string' || typeof payload.content !== 'string') {
+  if (!payload || typeof payload.fileName !== 'string' || typeof payload.content !== 'string' || typeof payload.encoding !== 'string') {
     throw new Error('matrix:export payload is invalid');
-  }
-  if (payload.format !== 'csv') {
-    throw new Error('Excelエクスポートは未対応です（依存関係未導入）。');
   }
   const paths = getWorkspacePaths();
   const safeName = payload.fileName.trim().length > 0 ? payload.fileName.trim() : 'trace-matrix.csv';
   const resolved = path.join(paths.outputDir, safeName);
-  await fs.writeFile(resolved, payload.content, 'utf8');
-  logMessage('info', `トレースマトリクスCSVを保存しました: ${resolved}`);
+  const buffer = payload.encoding === 'base64' ? Buffer.from(payload.content, 'base64') : Buffer.from(payload.content, 'utf8');
+  await fs.writeFile(resolved, buffer);
+  logMessage('info', `トレースマトリクスを保存しました (${payload.format}): ${resolved}`);
   return { savedPath: resolved } satisfies MatrixExportResult;
 });
 

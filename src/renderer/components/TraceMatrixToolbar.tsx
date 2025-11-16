@@ -2,14 +2,16 @@ interface TraceMatrixToolbarProps {
   totalTraces: number;
   untracedLeftCount: number;
   untracedRightCount: number;
-  onExport?: () => void;
+  onExportCSV?: () => void;
+  onExportExcel?: () => void;
 }
 
 export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
   totalTraces,
   untracedLeftCount,
   untracedRightCount,
-  onExport,
+  onExportCSV,
+  onExportExcel,
 }) => (
   <div className="trace-matrix-toolbar">
     <div className="trace-matrix-toolbar__stats">
@@ -18,8 +20,11 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
       <span>未トレース（列）: {untracedRightCount}</span>
     </div>
     <div className="trace-matrix-toolbar__actions">
-      <button type="button" className="btn-primary" onClick={onExport} disabled={!onExport}>
+      <button type="button" className="btn-secondary" onClick={onExportCSV} disabled={!onExportCSV}>
         CSVエクスポート
+      </button>
+      <button type="button" className="btn-primary" onClick={onExportExcel} disabled={!onExportExcel}>
+        Excelエクスポート
       </button>
     </div>
   </div>

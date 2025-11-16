@@ -16,7 +16,7 @@ import {
   type WorkspaceStore,
 } from './workspaceStore';
 
-type MergeCardsReturn = ReturnType<WorkspaceStore['mergeCards']>;
+type MergeCardsReturn = NonNullable<ReturnType<WorkspaceStore['mergeCards']>>;
 
 const baseCards: Card[] = [
     {
@@ -786,7 +786,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: MergeCardsReturn = null;
+      let result: MergeCardsReturn | null = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-002'], {
           title: '統合後タイトル',
@@ -819,7 +819,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: MergeCardsReturn = null;
+      let result: MergeCardsReturn | null = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-001', 'merge-003'], {
           title: 'invalid',
@@ -847,7 +847,7 @@ describe('workspaceStore (multi-panel tabs)', () => {
         }
       });
 
-      let result: MergeCardsReturn = null;
+      let result: MergeCardsReturn | null = null;
       act(() => {
         result = useWorkspaceStore.getState().mergeCards('leaf-A', tabId, ['merge-002', 'merge-003'], {
           title: '保持用',
