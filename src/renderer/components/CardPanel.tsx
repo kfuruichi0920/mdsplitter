@@ -255,7 +255,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const highlightedIds = useMemo(() => new Set(previewIndicator?.highlightIds ?? []), [previewIndicator]);
   const mergeValidation = useMemo<MergeValidation>(() => {
     if (selectedCardsList.length < 2) {
-      return { canMerge: false, reason: '2枚以上選択してください', cards: [] };
+      return { canMerge: false, reason: '選択カードを結合:2枚以上選択してください', cards: [] };
     }
     const baseParent = selectedCardsList[0].parent_id ?? null;
     const baseLevel = selectedCardsList[0].level;
@@ -420,15 +420,6 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
     matrixSelectionIds.forEach((id) => merged.add(id));
     return merged.size > 0 ? merged : traceHighlightIds;
   }, [traceHighlightIds, matrixSelectionIds]);
-
-  const openMatrixDialog = useCallback(() => {
-    const defaultLeft = activeFileName ?? availableFiles[0] ?? '';
-    const alternative = availableFiles.find((file) => file !== defaultLeft) ?? '';
-    setMatrixLeftFile(defaultLeft);
-    setMatrixRightFile(alternative);
-    setMatrixDialogError(availableFiles.length >= 2 ? null : '2つのファイルを開いてください');
-    setMatrixDialogOpen(true);
-  }, [activeFileName, availableFiles]);
 
   const handleMatrixDialogSubmit = useCallback(async () => {
     if (!window.app?.matrix) {
@@ -1402,6 +1393,23 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
         <div className="tab-bar__spacer" />
         <button
           type="button"
+          className="tab-bar__tab"
+          onClick={(event) => {
+            event.stopPropagation();
+            const defaultLeft = activeFileName ?? availableFiles[0] ?? '';
+            const alternative = availableFiles.find((file) => file !== defaultLeft) ?? '';
+            setMatrixLeftFile(defaultLeft);
+            setMatrixRightFile(alternative);
+            setMatrixDialogOpen(true);
+          }}
+          disabled={availableFiles.length < 2}
+          aria-label="トレースマトリクスを開く"
+          title="トレースマトリクスを開く"
+        >
+          🗺️
+        </button>
+        <button
+          type="button"
           className="tab-bar__close"
           onClick={(event) => {
             event.stopPropagation();
@@ -1416,7 +1424,17 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 
       {/* パネルツールバー: 各種操作ボタン・フィルタ・メタ情報 */}
       <div className="panel-toolbar">
+        {/* 表示操作グループ */}
         <div className="panel-toolbar__group">
+          <button
+            type="button"
+            className={`panel-toolbar__button${cardDisplayMode === 'compact' ? ' panel-toolbar__button--active' : ''}`}
+            onClick={handleToggleDisplayMode}
+            title={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
+            aria-label={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
+          >
+            ☰
+          </button>
           <button
             type="button"
             className="panel-toolbar__button"
@@ -1435,7 +1453,20 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             ⏫
           </button>
+          <button
+            type="button"
+            className={`panel-toolbar__button${isFileTraceVisible ? ' panel-toolbar__button--active' : ''}`}
+            onClick={handlePanelTraceToggle}
+            disabled={!activeFileName}
+            aria-disabled={!activeFileName}
+            title="トレース表示切替"
+            aria-label="トレース表示切替"
+          >
+            ⛓️
+          </button>
         </div>
+        <div className="panel-toolbar__separator" aria-hidden="true" />
+        {/* カード操作グループ */}
         <div className="panel-toolbar__group">
           <button
             type="button"
@@ -1486,7 +1517,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             onClick={handlePasteIntoSelection}
             disabled={!activeTabId || !hasClipboardItems}
             aria-disabled={!activeTabId || !hasClipboardItems}
-            title="クリップボードを貼り付け (Ctrl+V)"
+            title="コピーしたカードを貼り付け (Ctrl+V)"
           >
             📥
           </button>
@@ -1500,6 +1531,9 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
           >
             🧩
           </button>
+        </div>
+        <div className="panel-toolbar__separator" aria-hidden="true" />
+        <div className="panel-toolbar__group">
           <button
             type="button"
             className="panel-toolbar__button"
@@ -1511,6 +1545,8 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
             🏷️
           </button>
         </div>
+        <div className="panel-toolbar__separator" aria-hidden="true" />
+        {/* フィルタグループ */}
         <div className="panel-toolbar__group">
           <input
             className={`panel-toolbar__input${filterText ? ' panel-toolbar__input--active' : ''}`}
@@ -1552,39 +1588,6 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            className={`panel-toolbar__button${isFileTraceVisible ? ' panel-toolbar__button--active' : ''}`}
-            onClick={handlePanelTraceToggle}
-            disabled={!activeFileName}
-            aria-disabled={!activeFileName}
-            title="トレース表示切替"
-            aria-label="トレース表示切替"
-          >
-            ⛓️
-          </button>
-          <button
-            type="button"
-            className="panel-toolbar__button"
-            onClick={openMatrixDialog}
-            disabled={availableFiles.length < 2}
-            aria-disabled={availableFiles.length < 2}
-            title="トレースマトリクスを開く"
-            aria-label="トレースマトリクスを開く"
-          >
-            🗺️
-          </button>
-        </div>
-        <div className="panel-toolbar__group">
-          <button
-            type="button"
-            className={`panel-toolbar__button${cardDisplayMode === 'compact' ? ' panel-toolbar__button--active' : ''}`}
-            onClick={handleToggleDisplayMode}
-            title={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
-            aria-label={cardDisplayMode === 'detailed' ? 'コンパクト表示に切替' : '詳細表示に切替'}
-          >
-            ☰
-          </button>
         </div>
         <div className="panel-toolbar__spacer" />
         <div className="panel-toolbar__meta">
