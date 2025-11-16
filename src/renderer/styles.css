@@ -616,7 +616,7 @@
   }
 
   .settings-field--inline {
-    @apply flex-row items-center justify-between;
+    @apply flex-row items-center justify-between gap-3;
   }
 
   .settings-field__label {

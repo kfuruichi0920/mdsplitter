@@ -1145,6 +1145,31 @@ export const App = () => {
   }, [theme]);
 
   useEffect(() => {
+    const handler = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 1 : -1;
+      setAppSettings((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const nextFontSize = Math.min(24, Math.max(10, prev.theme.fontSize + delta));
+        const next = {
+          ...prev,
+          theme: { ...prev.theme, fontSize: nextFontSize },
+        } satisfies AppSettings;
+        applyThemeFromSettings(next.theme, next.theme.mode, setThemeStore);
+        void window.app?.settings?.update?.(next);
+        return next;
+      });
+    };
+    window.addEventListener('wheel', handler, { passive: false });
+    return () => window.removeEventListener('wheel', handler);
+  }, [setAppSettings, setThemeStore]);
+
+  useEffect(() => {
     //! カードファイル一覧と出力ファイル一覧を初期化
     const loadFileList = async () => {
       if (!window.app?.workspace?.listCardFiles || !window.app?.workspace?.listOutputFiles) {

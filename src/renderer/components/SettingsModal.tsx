@@ -139,13 +139,13 @@ export const SettingsModal = ({
     });
   };
 
-  const renderThemeSection = () => {
-    if (!settings) {
-      return null;
-    }
-    return (
-      <div className="settings-modal__section">
-        <h3>テーマ</h3>
+const renderThemeSection = () => {
+  if (!settings) {
+    return null;
+  }
+  return (
+    <div className="settings-modal__section">
+      <h3>テーマ</h3>
         <div className="settings-field">
           <label className="settings-field__label">モード</label>
           <div className="settings-radio-group" role="radiogroup" aria-label="テーマモード">
@@ -181,6 +181,61 @@ export const SettingsModal = ({
           {validationErrors['theme.splitterWidth'] ? (
             <div className="settings-field__error">{validationErrors['theme.splitterWidth']}</div>
           ) : null}
+        </div>
+
+        <div className="settings-field settings-field--inline">
+          <label className="settings-field__label" htmlFor="font-size">フォントサイズ (px)</label>
+          <input
+            id="font-size"
+            type="number"
+            min={10}
+            max={24}
+            value={numberInput(settings.theme.fontSize, 14)}
+            onChange={(event) => {
+              const fontSize = Number(event.target.value) || 14;
+              onChange({
+                ...settings,
+                theme: { ...settings.theme, fontSize },
+              });
+              onPreviewTheme(settings.theme.mode, { ...settings.theme, fontSize });
+            }}
+          />
+        </div>
+
+        <div className="settings-field">
+          <label className="settings-field__label" htmlFor="font-family">フォントファミリー</label>
+          <input
+            id="font-family"
+            type="text"
+            value={settings.theme.fontFamily}
+            onChange={(event) => {
+              const fontFamily = event.target.value;
+              onChange({
+                ...settings,
+                theme: { ...settings.theme, fontFamily },
+              });
+              onPreviewTheme(settings.theme.mode, { ...settings.theme, fontFamily });
+            }}
+            placeholder="例: 'Inter, Segoe UI, sans-serif'"
+          />
+        </div>
+
+        <div className="settings-field settings-field--inline">
+          <label className="settings-field__checkbox">
+            <input
+              type="checkbox"
+              checked={settings.theme.compact}
+              onChange={(event) => {
+                const compact = event.target.checked;
+                onChange({
+                  ...settings,
+                  theme: { ...settings.theme, compact },
+                });
+                onPreviewTheme(settings.theme.mode, { ...settings.theme, compact });
+              }}
+            />
+            <span>コンパクト表示（余白を詰める）</span>
+          </label>
         </div>
       </div>
     );
