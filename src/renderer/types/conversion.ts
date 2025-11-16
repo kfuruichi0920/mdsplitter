@@ -40,4 +40,6 @@ export interface ConversionModalDisplayState {
   cardIdStartNumber: number;                ///< 開始番号（デフォルト: 1）
   cardIdDigits: number;                     ///< 桁数（ゼロパディング、デフォルト: 3）
   cardIdAssignmentRule: CardIdAssignmentRule; ///< 付与ルール
+  // タイトル設定
+  maxTitleLength: number;                   ///< タイトル最大文字数（0-80、デフォルト: 20）
 }

@@ -1,5 +1,5 @@
 import type { Card } from '../../store/workspaceStore';
-import { calculateCardContentStatistics } from '../cardUtils';
+import { calculateCardContentStatistics, truncateCardTitle, DEFAULT_MAX_TITLE_LENGTH } from '../cardUtils';
 
 describe('calculateCardContentStatistics', () => {
   it('タイトルと本文の合計文字列を対象に統計を算出する', () => {
@@ -28,5 +28,42 @@ describe('calculateCardContentStatistics', () => {
     };
     const stats = calculateCardContentStatistics(card);
     expect(stats.wordCount).toBe(3);
+  });
+});
+
+describe('truncateCardTitle', () => {
+  it('最大文字数以下のタイトルはそのまま返す', () => {
+    const shortTitle = '短いタイトル';
+    expect(truncateCardTitle(shortTitle, 20)).toBe(shortTitle);
+    expect(truncateCardTitle(shortTitle)).toBe(shortTitle);
+  });
+
+  it('最大文字数を超えるタイトルは切り捨てて末尾に…を付ける', () => {
+    const longTitle = 'これは非常に長いタイトルでありカードタイトルの最大文字数を超えることを期待しています';
+    const truncated = truncateCardTitle(longTitle, 20);
+    expect(truncated.length).toBe(20);
+    expect(truncated).toMatch(/…$/);
+    // 20文字のうち、末尾1文字が…なので、元の文字列の最初の19文字 + …
+    expect(truncated.substring(0, 19)).toBe(longTitle.substring(0, 19));
+  });
+
+  it('デフォルトの最大文字数（20文字）を使用する', () => {
+    const longTitle = 'A'.repeat(100);
+    const truncated = truncateCardTitle(longTitle);
+    expect(truncated.length).toBe(DEFAULT_MAX_TITLE_LENGTH);
+    expect(truncated.length).toBe(20);
+    expect(truncated).toMatch(/…$/);
+  });
+
+  it('カスタムの最大文字数を適用する', () => {
+    const title = '1234567890abcdefghij';
+    const truncated = truncateCardTitle(title, 10);
+    expect(truncated.length).toBe(10);
+    expect(truncated).toBe('123456789…');
+  });
+
+  it('ちょうど最大文字数のタイトルはそのまま返す', () => {
+    const exactTitle = 'A'.repeat(20);
+    expect(truncateCardTitle(exactTitle, 20)).toBe(exactTitle);
   });
 });

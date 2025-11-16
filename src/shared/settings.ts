@@ -34,6 +34,7 @@ export interface InputSettings {
 export interface ConverterSettings {
   strategy: ConverterStrategy;
   timeoutMs: number | null;
+  maxTitleLength: number; ///< カードタイトルの最大文字数
 }
 
 export interface LlmSettings {
@@ -148,7 +149,8 @@ export const defaultSettings: AppSettings = {
   },
   converter: {
     strategy: 'rule',
-    timeoutMs: 60000
+    timeoutMs: 60000,
+    maxTitleLength: 20
   },
   llm: {
     provider: 'none',

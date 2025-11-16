@@ -34,4 +34,39 @@ describe('convertWithRuleEngine', () => {
     expect(bullet?.parent_id).toBe(childHeading?.id);
     expect(bullet?.level).toBe(2);
   });
+
+  it('truncates long titles according to maxTitleLength setting', () => {
+    const longTitleDoc: NormalizedDocument = {
+      fileName: 'long.md',
+      baseName: 'long',
+      extension: '.md',
+      isMarkdown: true,
+      content: `# これは非常に長いタイトルでありカードタイトルの最大文字数を超えることを期待しています\n\n段落の内容も非常に長い文章であってカードタイトルとして保持する場合は最大文字数で切り捨てられることを期待します。\n`,
+    };
+
+    // デフォルト（20文字）でテスト
+    const cardsDefault = convertWithRuleEngine(longTitleDoc, {
+      now: new Date('2025-11-09T00:00:00Z'),
+    });
+    const headingCard = cardsDefault.find((card) => card.kind === 'heading');
+    const paragraphCard = cardsDefault.find((card) => card.kind === 'paragraph');
+
+    expect(headingCard?.title.length).toBeLessThanOrEqual(20);
+    expect(headingCard?.title).toMatch(/…$/); // 末尾に…が付く
+    expect(paragraphCard?.title.length).toBeLessThanOrEqual(20);
+    expect(paragraphCard?.title).toMatch(/…$/);
+
+    // カスタム値（40文字）でテスト
+    const cardsCustom = convertWithRuleEngine(longTitleDoc, {
+      now: new Date('2025-11-09T00:00:00Z'),
+      maxTitleLength: 40,
+    });
+    const headingCardCustom = cardsCustom.find((card) => card.kind === 'heading');
+    const paragraphCardCustom = cardsCustom.find((card) => card.kind === 'paragraph');
+
+    expect(headingCardCustom?.title.length).toBeLessThanOrEqual(40);
+    expect(headingCardCustom?.title).toMatch(/…$/);
+    expect(paragraphCardCustom?.title.length).toBeLessThanOrEqual(40);
+    expect(paragraphCardCustom?.title).toMatch(/…$/);
+  });
 });

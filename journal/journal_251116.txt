@@ -1,0 +1,219 @@
+# 作業記録 2025-11-16
+
+## 作業内容（更新版）
+カードタイトルの最大文字数制限機能を実装し、変換ダイアログでUI設定を追加
+
+## 実装した仕様
+### 第1フェーズ（完了）
+- タイトルとして保持する文字列は最大N文字とする。N文字を超えた部分は切り捨て。
+- N文字は設定可能とする。Nの初期値は40文字とする。
+
+### 第2フェーズ（完了）
+- カード変換ダイアログに「4. タイトル設定」セクションを追加
+- タイトル最大文字数をUI上で設定可能に（0-80文字の範囲）
+- 初期値を20文字に変更
+
+## 変更ファイル
+
+### 1. 設定ファイル
+**ファイル:** src/shared/settings.ts
+
+**変更内容:**
+- `ConverterSettings`インターフェースに`maxTitleLength: number`を追加（37行目）
+- `defaultSettings`の`converter`に`maxTitleLength: 40`を設定（153行目）
+
+**根拠:**
+- カードタイトルの最大文字数を設定可能にするため、変換設定に新しいプロパティを追加
+- 初期値は仕様の通り40文字に設定
+
+### 2. 変換オプション型定義
+**ファイル:** src/shared/conversion/types.ts
+
+**変更内容:**
+- `ConversionOptions`インターフェースに`maxTitleLength?: number`を追加（14行目）
+
+**根拠:**
+- ruleEngineに最大文字数を渡すため、変換オプションに追加
+
+### 3. ルールエンジン
+**ファイル:** src/shared/conversion/ruleEngine.ts
+
+**変更内容:**
+- `MAX_TITLE_LENGTH`定数（ハードコード48文字）を削除
+- `summarizeTitle`関数に`maxLength`パラメータを追加（24行目）
+- `buildCards`関数内で`options?.maxTitleLength ?? 40`を取得（133行目）
+- 見出しカード、段落カード両方に対して最大文字数制限を適用（158-159行目）
+  - 見出しカード: sanitizeText後に長さチェック
+  - 段落カード: summarizeTitle関数内で長さチェック
+- コメントを追加（10-23行目）
+
+**根拠:**
+- 現状は見出しカードには制限なし、段落カードのみ48文字で切り捨てていたが、仕様では全カードに適用
+- 設定値を受け取れるように変更し、デフォルト値を40文字に統一
+
+### 4. 変換実行部分
+**ファイル:** src/renderer/App.tsx
+
+**変更内容:**
+- `convertDocument`呼び出し時に`maxTitleLength: appSettings?.converter.maxTitleLength ?? 40`を追加（1747行目）
+- インポート検証時にタイトル長チェックを追加（635-639行目）
+  - 最大文字数を超えるタイトルはエラーメッセージを表示
+
+**根拠:**
+- 変換時に設定から最大文字数を取得してruleEngineに渡す
+- インポート時の検証で、設定値を超えるタイトルを持つカードを検出
+
+### 5. ストア
+**ファイル:** src/renderer/store/workspaceStore.ts
+
+**変更内容:**
+- `updateCard`関数内でタイトル変更時に最大文字数で切り捨て処理を追加（964-972行目）
+- 現在はハードコード40文字（TODO: 設定から取得）
+
+**根拠:**
+- ユーザーが手動でタイトルを編集する際も、最大文字数を超えないように制限
+- updateCard時に自動的に切り捨てることで、UI側の制限を回避しても整合性を保つ
+
+### 6. ユーティリティ関数
+**ファイル:** src/renderer/utils/cardUtils.ts
+
+**変更内容:**
+- `DEFAULT_MAX_TITLE_LENGTH = 40`定数を追加（17行目）
+- `truncateCardTitle`関数を追加（28-39行目）
+  - タイトルを指定された最大文字数で切り捨てる
+  - 最大文字数を超える場合は末尾に…を付与
+
+**根拠:**
+- 共通のタイトル切り捨てロジックを提供
+- 将来的に複数箇所で使用できるようユーティリティ化
+
+### 7. テスト
+**ファイル:** src/shared/conversion/__tests__/ruleEngine.test.ts
+
+**変更内容:**
+- タイトル長制限のテストケースを追加（38-72行目）
+  - デフォルト値（40文字）での切り捨てテスト
+  - カスタム値（20文字）での切り捨てテスト
+  - 見出しカード、段落カード両方のテスト
+
+**ファイル:** src/renderer/utils/__tests__/cardUtils.test.ts
+
+**変更内容:**
+- `truncateCardTitle`関数のテストスイートを追加（34-67行目）
+  - 最大文字数以下のタイトルはそのまま返す
+  - 最大文字数を超えるタイトルは切り捨てて末尾に…を付ける
+  - デフォルト値とカスタム値のテスト
+  - ちょうど最大文字数のタイトルのテスト
+
+**根拠:**
+- 新機能の動作を保証するためのテストを追加
+
+## 決定事項
+
+### 1. タイトル切り捨て方法
+- 最大文字数を超える場合、`(maxLength - 1)`文字目まで取得し、末尾に`…`（三点リーダー、1文字）を付与
+- 例: 40文字制限の場合、39文字 + `…` = 40文字
+
+### 2. 適用範囲
+- **変換時（ruleEngine）:** すべてのカード種別（見出し、段落、箇条書き）に適用
+- **ユーザー編集時（updateCard）:** タイトル変更時に自動的に切り捨て
+- **インポート時（App.tsx）:** 検証でエラーを表示
+
+### 3. 設定の初期値
+- 40文字（仕様の通り）
+- 従来のハードコード値48文字から40文字に変更
+
+### 4. 設定の配置場所
+- `AppSettings.converter.maxTitleLength`
+- 変換設定の一部として管理
+
+### 5. TODO事項
+- workspaceStore.tsのupdateCard関数で、現在ハードコードされている最大文字数（40）を設定から取得するように変更
+  - これには、workspaceStoreから設定にアクセスする仕組みが必要
+  - または、updateCardのパラメータとして渡す方法を検討
+
+## テスト結果
+- `ruleEngine.test.ts`: 全テスト通過（3件）
+- `cardUtils.test.ts`: 全テスト通過（8件）
+- 型チェック: App.tsxとworkspaceStore.tsで今回の変更に関する型エラーなし
+  - workspaceStore.test.tsのエラーは既存のもの（今回の変更とは無関係）
+
+## 影響範囲分析結果
+
+### 現状の問題点（修正前）
+1. 見出しカード: タイトル長の制限なし
+2. 段落/箇条書きカード: 48文字で自動切り捨て（ハードコード）
+3. ユーザー編集時: UI上で長さ制限なし
+4. 設定: タイトル長の設定項目が存在しない
+
+### 修正後の動作（第2フェーズ後）
+1. すべてのカード種別で最大文字数制限を適用（デフォルト20文字）
+2. 変換ダイアログで最大文字数を変更可能（0-80文字の範囲）
+3. 変換時、編集時、インポート時すべてで制限を適用
+
+## 追加変更（第2フェーズ）
+
+### 8. 変換モーダル型定義
+**ファイル:** src/renderer/types/conversion.ts
+
+**変更内容:**
+- `ConversionModalDisplayState`に`maxTitleLength: number`を追加（44行目）
+
+**根拠:**
+- 変換ダイアログの状態にタイトル最大文字数を保持するため
+
+### 9. 変換モーダルコンポーネント
+**ファイル:** src/renderer/components/ConversionModal.tsx
+
+**変更内容:**
+- `ConversionModalProps`に`onMaxTitleLengthChange`コールバックを追加（32行目）
+- コンポーネントのpropsに`onMaxTitleLengthChange`を追加（69行目）
+- 「4. タイトル設定」セクションを追加（283-303行目）
+  - タイトル最大文字数の入力フィールド（type="number", min="0", max="80"）
+  - ヘルプテキスト表示
+
+**根拠:**
+- ユーザーが変換時にタイトル最大文字数を設定できるようにするため
+- 0-80文字の範囲で設定可能（仕様通り）
+
+### 10. App.tsx（変換モーダル関連）
+**ファイル:** src/renderer/App.tsx
+
+**変更内容:**
+- `buildConversionState`にデフォルト値`maxTitleLength: 20`を追加（409行目）
+- `handleMaxTitleLengthChange`ハンドラーを追加（1584-1588行目）
+  - 0-80の範囲で値をクランプ
+- `ConversionModal`に`onMaxTitleLengthChange`プロップを渡す（2836行目）
+- `convertDocument`呼び出し時に`conversionState.maxTitleLength`を使用（1755行目）
+
+**根拠:**
+- 変換モーダルの状態管理とイベント処理
+- 変換時にユーザーが設定した値を使用
+
+### デフォルト値の変更（全ファイル）
+- settings.ts: 40文字 → 20文字（153行目）
+- cardUtils.ts: 40文字 → 20文字（17行目）
+- ruleEngine.ts: 40文字 → 20文字（133行目）
+- workspaceStore.ts: 40文字 → 20文字（967行目）
+- App.tsx: 40文字 → 20文字（637行目）
+
+## コミット対象ファイル
+- src/shared/settings.ts
+- src/shared/conversion/types.ts
+- src/shared/conversion/ruleEngine.ts
+- src/renderer/App.tsx
+- src/renderer/store/workspaceStore.ts
+- src/renderer/utils/cardUtils.ts
+- src/shared/conversion/__tests__/ruleEngine.test.ts
+- src/renderer/utils/__tests__/cardUtils.test.ts
+- **src/renderer/types/conversion.ts** ← 追加
+- **src/renderer/components/ConversionModal.tsx** ← 追加
+- **src/shared/conversion/__tests__/__snapshots__/ruleEngine.test.ts.snap** ← 追加（スナップショット更新）
+
+## 備考
+- CardPanel.tsxのinput要素へのmaxLength属性追加は見送り
+  - 理由: 設定値をCardPanelに渡す仕組みが大きな変更になるため
+  - 代替案: workspaceStore.updateCardで自動的に切り捨てることで対応
+- UI側での入力制限は補助的なものとし、主要な制限はバックエンド（ruleEngine、updateCard）で行う設計
+- **変換ダイアログで設定した値は変換実行ごとに適用され、settings.jsonの値は参照しない**
+  - settings.jsonの値は将来的な拡張用として残しているが、現状は使用していない

@@ -29,6 +29,7 @@ interface ConversionModalProps {
   onCardIdStartNumberChange: (startNumber: number) => void;
   onCardIdDigitsChange: (digits: number) => void;
   onCardIdAssignmentRuleChange: (rule: CardIdAssignmentRule) => void;
+  onMaxTitleLengthChange: (length: number) => void;
 }
 
 /**
@@ -65,6 +66,7 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
   onCardIdStartNumberChange,
   onCardIdDigitsChange,
   onCardIdAssignmentRuleChange,
+  onMaxTitleLengthChange,
 }) => {
   if (!state.isOpen) {
     return null;
@@ -276,6 +278,28 @@ export const ConversionModal: React.FC<ConversionModalProps> = ({
                   {state.cardIdPrefix}-{String(state.cardIdStartNumber + 2).padStart(state.cardIdDigits, '0')}, ...
                 </div>
               )}
+            </div>
+          </section>
+
+          <section className="conversion-modal__section">
+            <div className="conversion-modal__section-header">
+              <h3>4. タイトル設定</h3>
+            </div>
+            <div className="conversion-modal__title-settings">
+              <div className="conversion-modal__field">
+                <label htmlFor="max-title-length">タイトル最大文字数</label>
+                <input
+                  id="max-title-length"
+                  type="number"
+                  value={state.maxTitleLength}
+                  onChange={(e) => onMaxTitleLengthChange(Number(e.target.value))}
+                  min="0"
+                  max="80"
+                />
+                <p className="conversion-modal__field-help">
+                  カードタイトルの最大文字数を指定します（0-80文字、推奨: 20-40文字）
+                </p>
+              </div>
             </div>
           </section>
         </div>

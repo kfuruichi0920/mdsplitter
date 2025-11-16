@@ -11,6 +11,7 @@ export interface NormalizedDocument {
 
 export interface ConversionOptions {
   now?: Date;
+  maxTitleLength?: number; ///< カードタイトルの最大文字数
 }
 
 export interface ConversionResult {

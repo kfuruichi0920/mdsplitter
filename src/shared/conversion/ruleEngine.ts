@@ -7,19 +7,29 @@ interface ParsedSegment {
   level: number;
 }
 
-const MAX_TITLE_LENGTH = 48;
-
+/**
+ * @brief テキストをサニタイズ（タブ等を空白に変換、前後の空白を削除）
+ * @param text サニタイズ対象のテキスト
+ * @return サニタイズ後のテキスト
+ */
 const sanitizeText = (text: string): string => text.replace(/[\t\f\v]+/g, ' ').trim();
 
-const summarizeTitle = (text: string, fallback: string): string => {
+/**
+ * @brief タイトルを指定された最大文字数で切り捨てる
+ * @param text 元のテキスト
+ * @param fallback テキストが空の場合のフォールバック
+ * @param maxLength 最大文字数
+ * @return 切り捨て後のタイトル（最大文字数を超える場合は末尾に…を付与）
+ */
+const summarizeTitle = (text: string, fallback: string, maxLength: number): string => {
   const sanitized = sanitizeText(text);
   if (!sanitized) {
     return fallback;
   }
-  if (sanitized.length <= MAX_TITLE_LENGTH) {
+  if (sanitized.length <= maxLength) {
     return sanitized;
   }
-  return `${sanitized.slice(0, MAX_TITLE_LENGTH - 1)}…`;
+  return `${sanitized.slice(0, maxLength - 1)}…`;
 };
 
 const headingPattern = /^(?<hashes>#{1,6})\s+(?<title>.+)$/;
@@ -120,6 +130,7 @@ const createCardId = (index: number): string => `card-${String(index).padStart(4
 
 const buildCards = (document: NormalizedDocument, segments: ParsedSegment[], options?: ConversionOptions): Card[] => {
   const timestamp = (options?.now ?? new Date()).toISOString();
+  const maxTitleLength = options?.maxTitleLength ?? 20; // デフォルト20文字
   const cards: Card[] = [];
   const cardMap = new Map<string, Card>();
   const childMap = new Map<string | null, string[]>();
@@ -143,7 +154,9 @@ const buildCards = (document: NormalizedDocument, segments: ParsedSegment[], opt
 
     const body = segment.text.trim();
     const defaultTitle = segment.kind === 'heading' ? `見出し ${cards.length + 1}` : `セクション ${cards.length + 1}`;
-    const title = segment.kind === 'heading' ? sanitizeText(segment.text) || defaultTitle : summarizeTitle(body, defaultTitle);
+    // すべてのカード種別で最大文字数制限を適用
+    const rawTitle = segment.kind === 'heading' ? sanitizeText(segment.text) || defaultTitle : summarizeTitle(body, defaultTitle, maxTitleLength);
+    const title = rawTitle.length > maxTitleLength ? `${rawTitle.slice(0, maxTitleLength - 1)}…` : rawTitle;
 
     const card: Card = {
       id,

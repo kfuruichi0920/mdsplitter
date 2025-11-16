@@ -961,7 +961,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           return card;
         }
         const nextUpdatedAt = patch.updatedAt ?? new Date().toISOString();
-        const nextCard = { ...card, ...patch, updatedAt: nextUpdatedAt } satisfies Card;
+        // タイトルが変更される場合、最大文字数で切り捨てる
+        let processedPatch = patch;
+        if (patch.title !== undefined) {
+          const maxTitleLength = 20; // TODO: 設定から取得
+          const truncatedTitle = patch.title.length > maxTitleLength
+            ? `${patch.title.slice(0, maxTitleLength - 1)}…`
+            : patch.title;
+          processedPatch = { ...patch, title: truncatedTitle };
+        }
+        const nextCard = { ...card, ...processedPatch, updatedAt: nextUpdatedAt } satisfies Card;
         beforeSnapshot = card;
         afterSnapshot = nextCard;
         return nextCard;

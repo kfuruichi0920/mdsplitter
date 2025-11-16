@@ -405,6 +405,8 @@ const buildConversionState = (strategy: ConverterStrategy): ConversionModalDispl
   cardIdStartNumber: 1,
   cardIdDigits: 3,
   cardIdAssignmentRule: 'all', // デフォルトを'all'に変更（すべてのカードにIDを付与）
+  // タイトル設定のデフォルト値
+  maxTitleLength: 20, // デフォルト20文字
 });
 
 /**
@@ -629,6 +631,12 @@ export const App = () => {
 
         if (typeof card.title !== 'string' || card.title.trim() === '') {
           invalidMessages.push(`${cardId}: タイトルが空です`);
+          return;
+        }
+
+        const maxTitleLength = appSettings?.converter.maxTitleLength ?? 20;
+        if (card.title.length > maxTitleLength) {
+          invalidMessages.push(`${cardId}: タイトルが長すぎます (最大${maxTitleLength}文字、現在${card.title.length}文字)`);
           return;
         }
 
@@ -1573,6 +1581,12 @@ export const App = () => {
     setConversionState((prev) => ({ ...prev, cardIdAssignmentRule: rule }));
   }, []);
 
+  const handleMaxTitleLengthChange = useCallback((length: number) => {
+    // 0-80の範囲で制限
+    const clampedLength = Math.max(0, Math.min(80, length));
+    setConversionState((prev) => ({ ...prev, maxTitleLength: clampedLength }));
+  }, []);
+
   const handleConversionCancel = useCallback(() => {
     if (conversionState.converting) {
       setConversionState((prev) => ({ ...prev, cancelRequested: true, error: null }));
@@ -1737,6 +1751,8 @@ export const App = () => {
           digits: conversionState.cardIdDigits,
           assignmentRule: conversionState.cardIdAssignmentRule,
         },
+        // タイトル最大文字数を変換モーダルの設定から取得して渡す
+        maxTitleLength: conversionState.maxTitleLength,
       });
 
       updateConversionProgress(80, 'カードファイルを保存しています…');
@@ -2823,6 +2839,7 @@ export const App = () => {
         onCardIdStartNumberChange={handleCardIdStartNumberChange}
         onCardIdDigitsChange={handleCardIdDigitsChange}
         onCardIdAssignmentRuleChange={handleCardIdAssignmentRuleChange}
+        onMaxTitleLengthChange={handleMaxTitleLengthChange}
       />
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">

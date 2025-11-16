@@ -12,6 +12,11 @@
 import type { Card } from '../store/workspaceStore';
 
 /**
+ * @brief カードタイトルのデフォルト最大文字数。
+ */
+export const DEFAULT_MAX_TITLE_LENGTH = 20;
+
+/**
  * @brief カード本文の統計情報。
  */
 export interface CardContentStatistics {
@@ -19,6 +24,19 @@ export interface CardContentStatistics {
   wordCount: number;
   lineCount: number;
 }
+
+/**
+ * @brief カードタイトルを最大文字数で切り捨てる。
+ * @param title 元のタイトル
+ * @param maxLength 最大文字数（デフォルト: 40）
+ * @return 切り捨て後のタイトル（最大文字数を超える場合は末尾に…を付与）
+ */
+export const truncateCardTitle = (title: string, maxLength: number = DEFAULT_MAX_TITLE_LENGTH): string => {
+  if (title.length <= maxLength) {
+    return title;
+  }
+  return `${title.slice(0, maxLength - 1)}…`;
+};
 
 /**
  * @brief 未トレースカード数を計算する。
