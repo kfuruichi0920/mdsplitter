@@ -1732,4 +1732,49 @@
   .matrix-launcher__footer {
     @apply mt-4 flex justify-end gap-2;
   }
+
+  .trace-matrix-grid {
+    @apply flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .trace-matrix-grid__scroll {
+    @apply h-full w-full overflow-auto;
+    max-height: 60vh;
+  }
+
+  .trace-matrix-table {
+    @apply min-w-full border-collapse border-spacing-0;
+    table-layout: fixed;
+  }
+
+  .trace-matrix-table th,
+  .trace-matrix-table td {
+    @apply border border-slate-200 align-top dark:border-slate-700;
+  }
+
+  .trace-matrix-table__corner {
+    @apply w-48 bg-slate-100 dark:bg-slate-800;
+  }
+
+  .trace-matrix-table__column-header {
+    @apply bg-slate-100 text-left text-xs dark:bg-slate-800;
+  }
+
+  .trace-matrix-table__column-header button,
+  .trace-matrix-table__row-header button {
+    @apply flex w-full flex-col gap-0.5 px-2 py-2 text-left;
+  }
+
+  .trace-matrix-table__row-header {
+    @apply bg-slate-100 text-xs dark:bg-slate-800;
+  }
+
+  .trace-matrix-table__cell {
+    @apply p-0 align-middle;
+    height: 52px;
+  }
+
+  .trace-matrix-table__cell button {
+    @apply flex h-full w-full items-center justify-center border-0 bg-transparent p-0;
+  }
 }

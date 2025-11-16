@@ -456,8 +456,9 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
   const handleMatrixSwap = useCallback(() => {
     setMatrixDialogError(null);
     setMatrixLeftFile((prevLeft) => {
+      const nextLeft = matrixRightFile;
       setMatrixRightFile(prevLeft);
-      return matrixRightFile;
+      return nextLeft;
     });
   }, [matrixRightFile]);
 
