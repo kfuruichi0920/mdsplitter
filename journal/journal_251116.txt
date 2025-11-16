@@ -217,3 +217,93 @@
 - UI側での入力制限は補助的なものとし、主要な制限はバックエンド（ruleEngine、updateCard）で行う設計
 - **変換ダイアログで設定した値は変換実行ごとに適用され、settings.jsonの値は参照しない**
   - settings.jsonの値は将来的な拡張用として残しているが、現状は使用していない
+
+---
+
+# 作業記録 - 2025-11-16（第2回）
+
+## 作業内容
+コメントガイドライン（spec/comment_guildline.md）に従い、ソースコードにDoxygenスタイルのコメントを追加。
+
+## 対象ファイル
+以下の7つのファイルにDoxygenコメントを追加：
+
+1. **src/shared/conversion/pipeline.ts**
+   - ファイルヘッダーコメント追加
+   - ドキュメント→カード変換パイプラインの詳細説明
+   - 根拠: spec/comment_guildline.md:12-43
+
+2. **src/shared/conversion/ruleEngine.ts**
+   - ファイルヘッダーコメント追加
+   - 型定義（ParsedSegment）にコメント追加
+   - 主要関数（flushParagraph、parseMarkdownDocument、parsePlainTextDocument、buildCards、convertWithRuleEngine）にコメント追加
+   - 正規表現パターン定数にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43, 103-133
+
+3. **src/shared/conversion/llmAdapter.ts**
+   - ファイルヘッダーコメント追加
+   - 型定義（LlmConversionUsage、LlmConversionRequest、LlmConversionResponse、LlmAdapter）にコメント追加
+   - StubLlmAdapterクラスとconvertメソッドにコメント追加
+   - エクスポート関数（setLlmAdapter、getLlmAdapter、resetLlmAdapter）にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43, 47-99
+
+4. **src/shared/conversion/types.ts**
+   - ファイルヘッダーコメント追加
+   - 型定義（NormalizedDocument、ConversionOptions、ConversionResult、ConversionStrategy、ConversionProgressEvent）にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43
+
+5. **src/main/history.ts**
+   - ファイルヘッダーコメント追加
+   - 補助関数（sanitizeToken、deriveHistoryFilePath、repairLegacyCardVersion、repairLegacyHistory）にコメント追加
+   - エクスポート関数（loadCardHistory、appendCardHistoryVersion、deleteCardHistoryFile）にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43, 103-133
+
+6. **src/main/matrixWindowManager.ts**
+   - ファイルヘッダーコメント追加
+   - 型定義（MatrixWindowContext）にコメント追加
+   - 補助関数（resolveMatrixRendererPath、resolvePreloadPath）にコメント追加
+   - MatrixWindowManagerクラスとメソッド（createMatrixWindow、closeMatrixWindow、openFromRequest、broadcastTraceChange、broadcastCardSelection、getWindowIdByWebContentsId）にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43, 47-99, 103-133
+
+7. **src/shared/traceability.ts**
+   - ファイルヘッダーコメントを充実化
+   - 定数（TRACE_RELATION_KINDS、TRACEABILITY_FILE_SCHEMA_VERSION）の説明を詳細化
+   - 型定義（TraceRelationKind、TraceDirection、TraceabilityLink、TraceabilityHeader、TraceabilityRelation、TraceabilityFile、TraceFileSaveRequest、TraceFileSaveResult、LoadedTraceabilityFile）の説明を詳細化
+   - 関数（normalizeDirection、invertDirection、isTraceabilityHeader、isTraceabilityRelation、isTraceabilityFile、relationToLinks、relationsToLinks、getTraceabilityStubs）にコメント追加
+   - スタブ定数（TRACEABILITY_STUBS）にコメント追加
+   - 根拠: spec/comment_guildline.md:12-43, 103-133
+
+## 決定事項
+1. **コメントスタイル**: Doxygenスタイルを採用
+   - ファイルヘッダー: @file, @brief, @details, @author, @date, @version, @copyright, @see
+   - 型定義: @brief, @detailsで説明、メンバーには ///< で末尾コメント
+   - 関数: @brief, @details, @param, @return, @throws で説明
+   - 計算量・例外・境界条件・スレッド安全性を明記
+   - 根拠: spec/comment_guildline.md:6-8
+
+2. **言語**: コメントは日本語で記述
+   - 根拠: spec/comment_guildline.md:3
+
+3. **コメント対象の優先順位**:
+   - テストファイル以外の主要ソースファイル（src/main/*.ts、src/shared/**/*.ts、src/renderer/store/*.ts、src/renderer/components/*.tsx）を優先
+   - 既にコメントが充実しているファイル（src/main/main.ts、src/main/workspace.ts、src/main/logger.ts、src/main/documentLoader.ts、src/renderer/store/splitStore.ts等）は対象外
+   - 根拠: AGENT.md:28（コードコメント、テストコメントを書くこと）
+
+4. **@todoタグの使用**:
+   - 未確定事項は@todoで明示
+   - llmAdapter.tsに「実際のLLM API統合（OpenAI、Anthropic等）」を@todoで記述
+   - 根拠: spec/comment_guildline.md:4, 6
+
+## コミット対象ファイル
+- src/shared/conversion/pipeline.ts
+- src/shared/conversion/ruleEngine.ts
+- src/shared/conversion/llmAdapter.ts
+- src/shared/conversion/types.ts
+- src/main/history.ts
+- src/main/matrixWindowManager.ts
+- src/shared/traceability.ts
+
+## 備考
+- 作業前の状態: 一部のファイル（main.ts、workspace.ts、logger.ts、documentLoader.ts、splitStore.ts）には既にDoxygenコメントが充実していた
+- 今回の作業で、変換処理・履歴管理・マトリクスウィンドウ管理・トレーサビリティ関連のコアモジュールにコメントを追加完了
+- 詳細設計情報（doc/software_detail_design.md）の更新は、AGENT.md:14に従い作業終了時に実施予定

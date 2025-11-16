@@ -1,10 +1,32 @@
+/**
+ * @file ruleEngine.ts
+ * @brief ルールベースのドキュメント→カード変換エンジン。
+ * @details
+ * Markdown/プレーンテキストを正規表現パターンで解析し、階層構造を持つカード配列に変換。
+ * 見出し・箇条書き・段落を識別し、親子・前後関係を構築。計算量O(N)（N: 行数）。
+ * 例:
+ * @code
+ * const cards = convertWithRuleEngine(doc, { maxTitleLength: 30 });
+ * @endcode
+ * @author K.Furuichi
+ * @date 2025-11-16
+ * @version 0.2
+ * @copyright MIT
+ * @see pipeline.ts
+ */
+
 import type { Card } from '@/shared/workspace';
 import type { ConversionOptions, NormalizedDocument } from './types';
 
+/**
+ * @brief 解析済みセグメント。
+ * @details
+ * 見出し・段落・箇条書きの種別とテキスト・階層レベルを保持。
+ */
 interface ParsedSegment {
-  kind: 'heading' | 'paragraph' | 'bullet';
-  text: string;
-  level: number;
+  kind: 'heading' | 'paragraph' | 'bullet'; ///< セグメント種別。
+  text: string; ///< セグメント本文。
+  level: number; ///< 階層レベル（0が最上位）。
 }
 
 /**
@@ -32,11 +54,20 @@ const summarizeTitle = (text: string, fallback: string, maxLength: number): stri
   return `${sanitized.slice(0, maxLength - 1)}…`;
 };
 
-const headingPattern = /^(?<hashes>#{1,6})\s+(?<title>.+)$/;
-const markdownBulletPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?<body>.+)$/;
-const numberedHeadingPattern = /^(?<seq>\d+(?:\.\d+)*[.)]?)\s+(?<title>.+)$/;
-const plainBulletPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?<body>.+)$/;
+const headingPattern = /^(?<hashes>#{1,6})\s+(?<title>.+)$/; ///< Markdown見出しパターン（#が1～6個）。
+const markdownBulletPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?<body>.+)$/; ///< Markdown箇条書きパターン。
+const numberedHeadingPattern = /^(?<seq>\d+(?:\.\d+)*[.)]?)\s+(?<title>.+)$/; ///< プレーンテキスト番号付き見出しパターン。
+const plainBulletPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?<body>.+)$/; ///< プレーンテキスト箇条書きパターン。
 
+/**
+ * @brief 段落バッファをフラッシュしてセグメント配列に追加。
+ * @details
+ * バッファが空でなければ、結合して段落セグメントを生成。計算量O(M)（M: バッファ行数）。
+ * @param paragraphs 段落バッファ（破壊的にクリアされる）。
+ * @param segments セグメント配列（追加先）。
+ * @param parentLevel 親見出しレベル。
+ * @note バッファは破壊的にクリアされる（副作用）。
+ */
 const flushParagraph = (
   paragraphs: string[],
   segments: ParsedSegment[],
@@ -54,6 +85,13 @@ const flushParagraph = (
   paragraphs.length = 0;
 };
 
+/**
+ * @brief Markdownドキュメントを解析してセグメント配列を生成。
+ * @details
+ * 見出し（#）、箇条書き、段落を識別。計算量O(N)（N: 行数）。
+ * @param content Markdownテキスト。
+ * @return 解析済みセグメント配列。
+ */
 const parseMarkdownDocument = (content: string): ParsedSegment[] => {
   const segments: ParsedSegment[] = [];
   const lines = content.split(/\n/);
@@ -89,6 +127,13 @@ const parseMarkdownDocument = (content: string): ParsedSegment[] => {
   return segments;
 };
 
+/**
+ * @brief プレーンテキストドキュメントを解析してセグメント配列を生成。
+ * @details
+ * 番号付き見出し（1.、1.1など）、箇条書き、段落を識別。計算量O(N)（N: 行数）。
+ * @param content プレーンテキスト。
+ * @return 解析済みセグメント配列。
+ */
 const parsePlainTextDocument = (content: string): ParsedSegment[] => {
   const segments: ParsedSegment[] = [];
   const lines = content.split(/\n/);
@@ -126,8 +171,22 @@ const parsePlainTextDocument = (content: string): ParsedSegment[] => {
   return segments;
 };
 
+/**
+ * @brief カードIDを生成（ゼロパディング4桁）。
+ * @param index インデックス（1起算）。
+ * @return カードID（例: card-0001）。
+ */
 const createCardId = (index: number): string => `card-${String(index).padStart(4, '0')}`;
 
+/**
+ * @brief セグメント配列からカード配列を構築。
+ * @details
+ * 階層スタックで親子関係を追跡し、prev_id/next_id/child_idsを設定。計算量O(N)（N: セグメント数）。
+ * @param document 元ドキュメント情報。
+ * @param segments 解析済みセグメント配列。
+ * @param options 変換オプション（タイトル最大長等）。
+ * @return カード配列。
+ */
 const buildCards = (document: NormalizedDocument, segments: ParsedSegment[], options?: ConversionOptions): Card[] => {
   const timestamp = (options?.now ?? new Date()).toISOString();
   const maxTitleLength = options?.maxTitleLength ?? 20; // デフォルト20文字
@@ -204,6 +263,14 @@ const buildCards = (document: NormalizedDocument, segments: ParsedSegment[], opt
   return cards;
 };
 
+/**
+ * @brief ルールベース変換のエントリーポイント。
+ * @details
+ * Markdown/プレーンテキストを判定し、適切なパーサーでカード配列を生成。計算量O(N)。
+ * @param document 正規化済みドキュメント。
+ * @param options 変換オプション（タイトル最大長等）。
+ * @return カード配列。
+ */
 export const convertWithRuleEngine = (
   document: NormalizedDocument,
   options?: ConversionOptions,
