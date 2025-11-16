@@ -472,6 +472,10 @@
     @apply flex-1 min-h-0 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden bg-slate-50 p-3 dark:bg-slate-950;
   }
 
+  .app-shell[data-compact='true'] .panel-cards {
+    @apply gap-1.5 p-2;
+  }
+
   .panel-cards__empty {
     @apply rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400;
   }
@@ -828,6 +832,10 @@
     @apply flex-row items-center gap-2 py-1.5;
   }
 
+  .app-shell[data-compact='true'] .card--compact {
+    @apply gap-1 py-1;
+  }
+
   .card--compact .card__header {
     @apply contents;
   }
@@ -839,6 +847,10 @@
 
   .card__header {
     @apply flex items-center gap-2 text-xs font-semibold;
+  }
+
+  .app-shell[data-compact='true'] .card__header {
+    @apply gap-1 text-[11px];
   }
 
   .card__connector-button {
@@ -1638,6 +1650,10 @@
     @apply flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-800;
   }
 
+  .app-shell[data-compact='true'] .trace-matrix-grid {
+    @apply text-[12px];
+  }
+
   .trace-matrix-grid__column-header-row {
     @apply flex border-b border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800;
   }
@@ -1845,6 +1861,18 @@
     width: var(--matrix-row-header-width);
     min-width: var(--matrix-row-header-width);
     max-width: var(--matrix-row-header-width);
+  }
+
+  .app-shell[data-compact='true'] .trace-matrix-table__row-header,
+  .app-shell[data-compact='true'] .trace-matrix-table__column-header,
+  .app-shell[data-compact='true'] .trace-matrix-table__column-count,
+  .app-shell[data-compact='true'] .trace-matrix-table__row-count,
+  .app-shell[data-compact='true'] .trace-matrix-table__cell button {
+    @apply py-1 px-1 leading-tight;
+  }
+
+  .app-shell[data-compact='true'] .trace-matrix-table__cell {
+    height: 44px;
   }
 
   .trace-matrix-table__row-title--zero button {
