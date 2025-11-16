@@ -23,12 +23,13 @@
  * @copyright MIT
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useConnectorLayoutStore, type CardAnchorEntry } from '../store/connectorLayoutStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { shallow } from 'zustand/shallow';
 import { useTraceStore, type TraceSeed, toTraceNodeKey, splitTraceNodeKey } from '../store/traceStore';
 import { useTracePreferenceStore, makeCardKey, type TraceConnectorSide } from '../store/tracePreferenceStore';
-import type { TraceabilityLink } from '@/shared/traceability';
+import type { TraceRelationKind, TraceabilityLink } from '@/shared/traceability';
 
 /**
  * @brief TraceConnectorLayerが利用するプロパティ型。
@@ -51,6 +52,19 @@ interface ConnectorPathEntry {
   id: string;
   path: string;
   className: string;
+  relationKind: TraceRelationKind;
+  memo?: string;
+  sourceLabel: string;
+  targetLabel: string;
+}
+
+interface ConnectorTooltipState {
+  id: string;
+  label: string;
+  relation: TraceRelationKind;
+  memo?: string;
+  x: number;
+  y: number;
 }
 
 /**
@@ -162,6 +176,8 @@ export const TraceConnectorLayer = ({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastMeasureTimeRef = useRef<number>(0);
+  const [hoveredConnector, setHoveredConnector] = useState<ConnectorTooltipState | null>(null);
+  const [selectedConnector, setSelectedConnector] = useState<ConnectorTooltipState | null>(null);
 
   // 測定処理をuseCallbackでメモ化
   const measure = useCallback(() => {
@@ -459,10 +475,94 @@ export const TraceConnectorLayer = ({
         .filter(Boolean)
         .join(' ');
 
-      acc.push({ id: link.id, path, className });
+      acc.push({
+        id: link.id,
+        path,
+        className,
+        relationKind: link.relation,
+        memo: link.memo,
+        sourceLabel: `${source.fileName}:${source.cardId}`,
+        targetLabel: `${target.fileName}:${target.cardId}`,
+      });
       return acc;
     }, []);
   }, [cards, containerRect, direction, filteredLinks, highlightedNodeKeys, leftLeafIds, rightLeafIds, showOffscreenConnectors]);
+
+  const tooltip = hoveredConnector ?? selectedConnector;
+
+  const toTooltipState = useCallback(
+    (entry: ConnectorPathEntry, event: ReactMouseEvent<SVGPathElement>): ConnectorTooltipState | null => {
+      if (!containerRect) {
+        return null;
+      }
+      return {
+        id: entry.id,
+        label: `${entry.sourceLabel} → ${entry.targetLabel}`,
+        relation: entry.relationKind,
+        memo: entry.memo,
+        x: event.clientX - containerRect.left + 12,
+        y: event.clientY - containerRect.top + 12,
+      } satisfies ConnectorTooltipState;
+    },
+    [containerRect],
+  );
+
+  const handleConnectorMouseEnter = useCallback(
+    (entry: ConnectorPathEntry, event: ReactMouseEvent<SVGPathElement>) => {
+      const next = toTooltipState(entry, event);
+      if (next) {
+        setHoveredConnector(next);
+      }
+    },
+    [toTooltipState],
+  );
+
+  const handleConnectorMouseMove = useCallback(
+    (entry: ConnectorPathEntry, event: ReactMouseEvent<SVGPathElement>) => {
+      if (!hoveredConnector || hoveredConnector.id !== entry.id) {
+        return;
+      }
+      const next = toTooltipState(entry, event);
+      if (next) {
+        setHoveredConnector(next);
+      }
+    },
+    [hoveredConnector, toTooltipState],
+  );
+
+  const handleConnectorMouseLeave = useCallback(() => {
+    setHoveredConnector(null);
+  }, []);
+
+  const handleConnectorClick = useCallback(
+    (entry: ConnectorPathEntry, event: ReactMouseEvent<SVGPathElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedConnector((prev) => {
+        if (prev?.id === entry.id) {
+          return null;
+        }
+        return toTooltipState(entry, event) ?? null;
+      });
+    },
+    [toTooltipState],
+  );
+
+  useEffect(() => {
+    if (!selectedConnector) {
+      return;
+    }
+    if (!connectorPaths.some((connector) => connector.id === selectedConnector.id)) {
+      setSelectedConnector(null);
+    }
+  }, [connectorPaths, selectedConnector]);
+
+  useEffect(() => {
+    if (!containerRect) {
+      setHoveredConnector(null);
+      setSelectedConnector(null);
+    }
+  }, [containerRect]);
 
   if (direction !== 'vertical' || !isTraceVisible) {
     return null;
@@ -497,8 +597,38 @@ export const TraceConnectorLayer = ({
             <path d="M 0 0 L 6 3 L 0 6 z" fill="#60a5fa" />
           </marker>
         </defs>
-        {connectorPaths.map((connector) => <path key={connector.id} className={connector.className} d={connector.path} />)}
+        {connectorPaths.map((connector) => {
+          const isHovered = hoveredConnector?.id === connector.id;
+          const isSelected = selectedConnector?.id === connector.id;
+          const className = [
+            connector.className,
+            isHovered ? 'trace-connector-path--hover' : '',
+            isSelected ? 'trace-connector-path--selected' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          return (
+            <path
+              key={connector.id}
+              className={className}
+              d={connector.path}
+              onMouseEnter={(event) => handleConnectorMouseEnter(connector, event)}
+              onMouseMove={(event) => handleConnectorMouseMove(connector, event)}
+              onMouseLeave={handleConnectorMouseLeave}
+              onClick={(event) => handleConnectorClick(connector, event)}
+            />
+          );
+        })}
       </svg>
+      {tooltip ? (
+        <div className="trace-connector-tooltip" style={{ top: tooltip.y, left: tooltip.x }}>
+          <p className="trace-connector-tooltip__label">{tooltip.label}</p>
+          <p className="trace-connector-tooltip__meta">種別: {tooltip.relation}</p>
+          <p className={['trace-connector-tooltip__memo', tooltip.memo ? '' : 'trace-connector-tooltip__memo--empty'].join(' ').trim()}>
+            {tooltip.memo ?? 'メモは未設定です'}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 };

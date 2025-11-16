@@ -1139,6 +1139,7 @@
 
   .trace-connector-layer__svg {
     @apply h-full w-full;
+    pointer-events: none;
   }
 
   .trace-connector-path {
@@ -1146,6 +1147,8 @@
     stroke: var(--trace-color-trace, rgba(96, 165, 250, 0.7));
     stroke-width: 2;
     transition: stroke 0.2s ease;
+    pointer-events: stroke;
+    cursor: pointer;
   }
 
   .trace-connector-path--placeholder {
@@ -1188,6 +1191,17 @@
     filter: drop-shadow(0 0 4px var(--trace-highlight-color, rgba(147, 197, 253, 0.4)));
   }
 
+  .trace-connector-path--hover {
+    stroke-width: 3;
+    filter: drop-shadow(0 0 6px rgba(147, 197, 253, 0.7));
+  }
+
+  .trace-connector-path--selected {
+    stroke-width: 3.6;
+    stroke: var(--trace-selected-color, #34d399);
+    filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.6));
+  }
+
   .trace-connector-path--dir-forward {
     marker-end: url(#trace-connector-arrow);
   }
@@ -1199,6 +1213,27 @@
   .trace-connector-path--dir-bidirectional {
     marker-start: url(#trace-connector-arrow);
     marker-end: url(#trace-connector-arrow);
+  }
+
+  .trace-connector-tooltip {
+    @apply absolute max-w-xs rounded bg-slate-900/90 px-3 py-2 text-xs text-white shadow-lg;
+    pointer-events: none;
+  }
+
+  .trace-connector-tooltip__label {
+    @apply font-semibold;
+  }
+
+  .trace-connector-tooltip__meta {
+    @apply text-slate-300;
+  }
+
+  .trace-connector-tooltip__memo {
+    @apply mt-1 whitespace-pre-wrap;
+  }
+
+  .trace-connector-tooltip__memo--empty {
+    @apply italic text-slate-400;
   }
 
   /* ConversionModal カードID設定フィールド */
@@ -1775,6 +1810,60 @@
   }
 
   .trace-matrix-table__cell button {
-    @apply flex h-full w-full items-center justify-center border-0 bg-transparent p-0;
+    @apply relative flex h-full w-full items-center justify-center border-0 bg-transparent p-0;
+  }
+
+  .trace-matrix-cell--has-memo::after {
+    content: '✎';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 0.65rem;
+    color: var(--matrix-memo-indicator, #10b981);
+    pointer-events: none;
+  }
+
+  .trace-memo-dialog {
+    @apply fixed inset-0 z-50 flex items-center justify-center;
+  }
+
+  .trace-memo-dialog__backdrop {
+    @apply absolute inset-0 bg-slate-900/50 backdrop-blur-sm;
+  }
+
+  .trace-memo-dialog__body {
+    @apply relative z-10 flex w-full max-w-xl flex-col gap-4 rounded-lg bg-white p-6 shadow-2xl dark:bg-slate-900;
+  }
+
+  .trace-memo-dialog__header {
+    @apply flex items-start gap-4 text-sm font-semibold text-slate-700 dark:text-slate-200;
+  }
+
+  .trace-memo-dialog__label {
+    @apply text-xs uppercase tracking-wide text-slate-400;
+  }
+
+  .trace-memo-dialog__value {
+    @apply text-sm text-slate-900 dark:text-slate-100;
+  }
+
+  .trace-memo-dialog__arrow {
+    @apply text-lg text-slate-400;
+  }
+
+  .trace-memo-dialog__close {
+    @apply ml-auto rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  .trace-memo-dialog__field {
+    @apply flex flex-col gap-2 text-sm text-slate-700 dark:text-slate-200;
+  }
+
+  .trace-memo-dialog__field textarea {
+    @apply min-h-[120px] w-full rounded border border-slate-300 p-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .trace-memo-dialog__footer {
+    @apply flex items-center justify-end gap-3;
   }
 }

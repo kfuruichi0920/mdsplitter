@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { TRACE_RELATION_KINDS, type TraceabilityRelation } from '@/shared/traceability';
 import type { Card } from '@/shared/workspace';
@@ -9,7 +9,7 @@ import { TraceMatrixCell } from '@/renderer/components/TraceMatrixCell';
 import { TraceMatrixHeader } from '@/renderer/components/TraceMatrixHeader';
 import { TraceMatrixToolbar } from '@/renderer/components/TraceMatrixToolbar';
 import { TraceMatrixFilterPanel } from '@/renderer/components/TraceMatrixFilterPanel';
-import { changeRelationKind, makeRelationKey, toggleTraceRelation } from '@/renderer/utils/matrixRelations';
+import { changeRelationKind, makeRelationKey, toggleTraceRelation, updateRelationMemo } from '@/renderer/utils/matrixRelations';
 import { exportMatrixToCSV, exportMatrixToExcel } from '@/renderer/utils/matrixExport';
 
 export const TraceMatrixDialog: React.FC = () => {
@@ -45,6 +45,12 @@ export const TraceMatrixDialog: React.FC = () => {
     });
     return map;
   }, [relations]);
+
+  const formatCardLabel = useCallback((card: Card): string => {
+    const identifier = card.cardId ?? card.id;
+    const title = card.title ? ` - ${card.title}` : '';
+    return `${identifier}${title}`;
+  }, []);
 
   const filteredLeftCards = useMemo(() => {
     return leftCards.filter((card) => {
@@ -100,6 +106,12 @@ export const TraceMatrixDialog: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [memoEditor, setMemoEditor] = useState<{
+    relationId: string;
+    leftLabel: string;
+    rightLabel: string;
+    initialMemo: string;
+  } | null>(null);
 
   const persistRelations = useCallback(
     async (nextRelations: TraceabilityRelation[], previousRelations: TraceabilityRelation[]) => {
@@ -143,6 +155,51 @@ export const TraceMatrixDialog: React.FC = () => {
     }
   }, [setHighlightedRowCardIds, setHighlightedColumnCardIds]);
 
+  const applyMemoUpdate = useCallback(
+    (relationId: string, memoValue: string) => {
+      const previous = useMatrixStore.getState().relations;
+      const target = previous.find((relation) => relation.id === relationId);
+      const normalized = memoValue.trim();
+      if (!target) {
+        return;
+      }
+      if ((target.memo ?? '') === normalized) {
+        return;
+      }
+      const next = updateRelationMemo(previous, relationId, memoValue);
+      setRelations(next);
+      void persistRelations(next, previous);
+    },
+    [persistRelations, setRelations],
+  );
+
+  const openMemoEditor = useCallback(
+    (relation: TraceabilityRelation, leftCard: Card, rightCard: Card) => {
+      setMemoEditor({
+        relationId: relation.id,
+        leftLabel: formatCardLabel(leftCard),
+        rightLabel: formatCardLabel(rightCard),
+        initialMemo: relation.memo ?? '',
+      });
+    },
+    [formatCardLabel],
+  );
+
+  const handleMemoDialogSave = useCallback(
+    (value: string) => {
+      if (!memoEditor) {
+        return;
+      }
+      applyMemoUpdate(memoEditor.relationId, value);
+      setMemoEditor(null);
+    },
+    [applyMemoUpdate, memoEditor],
+  );
+
+  const handleMemoDialogClose = useCallback(() => {
+    setMemoEditor(null);
+  }, []);
+
   const handleToggle = useCallback(
     (leftCardId: string, rightCardId: string) => {
       const previous = useMatrixStore.getState().relations;
@@ -172,6 +229,8 @@ export const TraceMatrixDialog: React.FC = () => {
       return [];
     }
     const currentRelation = relationLookup.get(makeRelationKey(contextMenu.leftCardId, contextMenu.rightCardId));
+    const leftCard = leftCards.find((card) => card.id === contextMenu.leftCardId);
+    const rightCard = rightCards.find((card) => card.id === contextMenu.rightCardId);
     return [
       {
         key: 'type',
@@ -184,8 +243,37 @@ export const TraceMatrixDialog: React.FC = () => {
           closeOnSelect: true,
         })),
       },
+      {
+        key: 'memo',
+        title: 'メモ',
+        items: [
+          {
+            key: 'edit-memo',
+            label: currentRelation?.memo ? 'メモを編集' : 'メモを追加',
+            disabled: !currentRelation || !leftCard || !rightCard,
+            onSelect: () => {
+              if (!currentRelation || !leftCard || !rightCard) {
+                return;
+              }
+              openMemoEditor(currentRelation, leftCard, rightCard);
+            },
+          },
+          {
+            key: 'clear-memo',
+            label: 'メモをクリア',
+            variant: 'danger',
+            disabled: !currentRelation || !currentRelation.memo,
+            onSelect: () => {
+              if (!currentRelation) {
+                return;
+              }
+              applyMemoUpdate(currentRelation.id, '');
+            },
+          },
+        ],
+      },
     ];
-  }, [contextMenu, relationLookup, handleChangeKind]);
+  }, [applyMemoUpdate, contextMenu, handleChangeKind, leftCards, openMemoEditor, relationLookup, rightCards]);
 
   const handleExport = useCallback(
     async (format: 'csv' | 'excel') => {
@@ -289,6 +377,7 @@ export const TraceMatrixDialog: React.FC = () => {
                           <TraceMatrixCell
                             hasTrace={Boolean(relation)}
                             traceKind={relation?.type}
+                            memo={relation?.memo}
                             isRowHighlighted={rowHighlightSet.has(leftCard.id)}
                             isColumnHighlighted={columnHighlightSet.has(rightCard.id)}
                             onToggle={() => handleToggle(leftCard.id, rightCard.id)}
@@ -322,6 +411,72 @@ export const TraceMatrixDialog: React.FC = () => {
       {contextMenu ? (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} sections={menuSections} onClose={() => setContextMenu(null)} />
       ) : null}
+      {memoEditor ? (
+        <TraceMemoDialog
+          leftLabel={memoEditor.leftLabel}
+          rightLabel={memoEditor.rightLabel}
+          initialValue={memoEditor.initialMemo}
+          onSave={handleMemoDialogSave}
+          onClose={handleMemoDialogClose}
+        />
+      ) : null}
+    </div>
+  );
+};
+
+interface TraceMemoDialogProps {
+  leftLabel: string;
+  rightLabel: string;
+  initialValue: string;
+  onSave: (value: string) => void;
+  onClose: () => void;
+}
+
+const TraceMemoDialog: React.FC<TraceMemoDialogProps> = ({ leftLabel, rightLabel, initialValue, onSave, onClose }) => {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSave(value);
+  };
+
+  return (
+    <div className="trace-memo-dialog" role="dialog" aria-modal="true" aria-label="トレースメモ編集">
+      <div className="trace-memo-dialog__backdrop" onClick={onClose} />
+      <form className="trace-memo-dialog__body" onSubmit={handleSubmit}>
+        <header className="trace-memo-dialog__header">
+          <div>
+            <p className="trace-memo-dialog__label">左</p>
+            <p className="trace-memo-dialog__value">{leftLabel}</p>
+          </div>
+          <span className="trace-memo-dialog__arrow">⇔</span>
+          <div>
+            <p className="trace-memo-dialog__label">右</p>
+            <p className="trace-memo-dialog__value">{rightLabel}</p>
+          </div>
+          <button type="button" className="trace-memo-dialog__close" onClick={onClose} aria-label="閉じる">
+            ✕
+          </button>
+        </header>
+        <div className="trace-memo-dialog__content">
+          <label className="trace-memo-dialog__field">
+            <span>メモ</span>
+            <textarea value={value} onChange={(event) => setValue(event.target.value)} rows={5} placeholder="コネクタに関する補足を入力" />
+          </label>
+        </div>
+        <footer className="trace-memo-dialog__footer">
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            キャンセル
+          </button>
+          <button type="submit" className="btn-primary">
+            保存
+          </button>
+        </footer>
+      </form>
     </div>
   );
 };

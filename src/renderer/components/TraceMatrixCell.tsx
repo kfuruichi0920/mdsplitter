@@ -5,6 +5,7 @@ import type { TraceRelationKind } from '@/shared/traceability';
 interface TraceMatrixCellProps {
   hasTrace: boolean;
   traceKind?: TraceRelationKind;
+  memo?: string;
   isRowHighlighted: boolean;
   isColumnHighlighted: boolean;
   onToggle: () => void;
@@ -14,20 +15,34 @@ interface TraceMatrixCellProps {
 export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
   hasTrace,
   traceKind,
+  memo,
   isRowHighlighted,
   isColumnHighlighted,
   onToggle,
   onContextMenu,
 }) => {
+  const hasMemo = Boolean(memo?.trim());
   const classes = [
     'trace-matrix-cell',
     hasTrace ? 'trace-matrix-cell--active' : '',
     traceKind ? `trace-matrix-cell--kind-${traceKind}` : '',
     isRowHighlighted ? 'trace-matrix-cell--row-highlight' : '',
     isColumnHighlighted ? 'trace-matrix-cell--column-highlight' : '',
+    hasMemo ? 'trace-matrix-cell--has-memo' : '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const tooltipParts = [] as string[];
+  if (hasTrace) {
+    tooltipParts.push(`トレース: ${traceKind ?? 'trace'}`);
+  } else {
+    tooltipParts.push('トレースなし');
+  }
+  if (hasMemo) {
+    tooltipParts.push(`メモ: ${memo}`);
+  }
+  const title = tooltipParts.join('\n');
 
   return (
     <button
@@ -38,8 +53,8 @@ export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
         event.preventDefault();
         onContextMenu(event);
       }}
-      title={hasTrace ? `トレース: ${traceKind ?? 'trace'}` : 'トレースなし'}
-    >
+      title={title}
+      >
       {hasTrace ? '●' : ''}
     </button>
   );

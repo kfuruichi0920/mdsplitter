@@ -31,6 +31,7 @@ export interface TraceabilityLink {
   targetCardId: string; ///< 右側カードID。
   relation: TraceRelationKind; ///< 関係種別。
   direction: TraceDirection; ///< 方向性。
+  memo?: string; ///< 関連付けられたメモ（任意）
 }
 
 /**
@@ -136,7 +137,8 @@ export const isTraceabilityRelation = (value: unknown): value is TraceabilityRel
     Array.isArray(candidate.left_ids) &&
     Array.isArray(candidate.right_ids) &&
     typeof candidate.type === 'string' &&
-    typeof candidate.directed === 'string'
+    typeof candidate.directed === 'string' &&
+    (candidate.memo === undefined || typeof candidate.memo === 'string')
   );
 };
 
@@ -185,6 +187,7 @@ export const relationToLinks = (
         targetCardId: rightId,
         relation: relation.type,
         direction,
+        memo: relation.memo,
       });
     });
   });

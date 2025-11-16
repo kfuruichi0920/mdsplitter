@@ -68,3 +68,15 @@ export const changeRelationKind = (
     relation.id === existing.id ? { ...relation, type: kind } : relation,
   );
 };
+
+export const updateRelationMemo = (
+  relations: TraceabilityRelation[],
+  relationId: string,
+  memo: string,
+): TraceabilityRelation[] => relations.map((relation) => {
+    if (relation.id !== relationId) {
+      return relation;
+    }
+    const nextMemo = memo.trim();
+    return nextMemo.length > 0 ? { ...relation, memo: nextMemo } : { ...relation, memo: undefined };
+  });
