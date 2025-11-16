@@ -1,7 +1,7 @@
 # mdsplitter 詳細設計
 
-最終更新日: 2025-11-15  
-対象リポジトリ: `mdsplitter_copy_codex`
+最終更新日: 2025-11-16
+対象リポジトリ: `mdsplitter`
 
 ## 1. システム概要
 - 目的: 自然言語ドキュメントをカード単位に構造化し、階層・トレーサビリティを含む編集を可能にする Electron/React/TypeScript 製デスクトップアプリ。
@@ -51,11 +51,35 @@
 | `src/main/workspace.ts` | ワークスペースディレクトリ生成と設定ファイル管理。 | `_input/_out/_logs` 作成とサンプルファイル配置、設定既定値を提供。 | ⚠️ |
 | `src/main.ts` | レンダラエントリ移行後の互換プレースホルダ。 | 旧インポート経路維持のみを目的とした空モジュール。 | ⚠️ |
 | `src/renderer/main.tsx` | React エントリポイント。`App` を `#root` にマウント。 | Vite ビルド対象。 | ⚠️ |
-| `src/renderer/store/workspaceStore.ts` | 分割パネルごとのタブ/カードを管理する Zustand ストア。 | パネル⇔タブ⇔カードのマッピング、ファイル排他 (同一ファイルの多重オープン禁止)、カード更新/移動/追加/削除と Undo/Redo スタック、保存フラグ更新を実装。 | ⚠️ |
-| `src/renderer/store/uiStore.ts` | テーマ設定ストア。ライト/ダークモードのトグルを提供。 | Tailwind ダークモード制御に利用。 | ⚠️ |
-| `src/renderer/store/notificationStore.ts` | 共通通知(トースト)の状態管理。 | レベル別のメッセージ表示と自動消去を担当。 | ⚠️ |
+| `src/renderer/store/workspaceStore.ts` | 分割パネルごとのタブ/カードを管理する Zustand ストア。 | パネル⇔タブ⇔カードのマッピング、ファイル排他 (同一ファイルの多重オープン禁止)、カード更新/移動/追加/削除と Undo/Redo スタック、保存フラグ更新を実装。 | ✅ |
+| `src/renderer/store/uiStore.ts` | テーマ設定ストア。ライト/ダークモードのトグルを提供。 | Tailwind ダークモード制御に利用。 | ✅ |
+| `src/renderer/store/notificationStore.ts` | 共通通知(トースト)の状態管理。 | レベル別のメッセージ表示と自動消去を担当。 | ✅ |
+| `src/renderer/store/matrixStore.ts` | トレースマトリクス専用ストア。 | 左右カードファイル、relation データ、フィルタ状態、統計情報、UI設定を保持。マトリクスウィンドウとメインウィンドウ間のデータ同期を管理。 | ✅ |
+| `src/renderer/store/historyStore.ts` | カード履歴管理ストア。 | カード履歴のロード・キャッシュ・追記を管理。`window.app.history` API を通じてメインプロセスと連携。 | ✅ |
+| `src/renderer/store/traceStore.ts` | トレーサビリティデータストア。 | トレースファイルの読み込み・保存、relation の追加/削除、カード件数集計を管理。 | ✅ |
+| `src/renderer/store/splitStore.ts` | 分割パネル構造ストア。 | 再帰的グリッド構造（VSCode 風の分割）を管理。分割操作、リサイズ、アクティブパネル追跡を実装。 | ✅ |
+| `src/renderer/store/panelEngagementStore.ts` | パネル選択状態ストア。 | アクティブ/準アクティブ/非アクティブの3段階パネル状態を管理。Ctrl+クリック時の複数パネル選択に対応。 | ✅ |
+| `src/renderer/store/tracePreferenceStore.ts` | トレースコネクタ表示設定ストア。 | 可視トグル、種別フィルタ、還流許可、個別カードミュートを管理。 | ✅ |
+| `src/renderer/store/connectorLayoutStore.ts` | コネクタレイアウト情報ストア。 | カード要素の位置情報と可視状態を保持。ResizeObserver/MutationObserver を通じて DOM 位置をトラッキング。 | ✅ |
 | `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | コンパクトモードでの余白調整とテーマ切替を保持。 | ⚠️ |
 | `src/renderer/components/ConversionModal.tsx` | 📂 ボタンから起動するカード変換モーダル。入力ファイル情報、サイズ警告同意チェック、固定ルール/LLM ストラテジ選択、変換実行ボタンを提供。 | Zustand 経由で `ConversionModalDisplayState` を受け取りレンダリング。 | ✅ |
+| `src/renderer/components/SettingsModal.tsx` | 設定ダイアログコンポーネント。 | テーマ/入出力/ログ/ワークスペースの各セクションを左右2ペインで表示。`Ctrl+,` で呼び出し。 | ✅ |
+| `src/renderer/components/NotificationCenter.tsx` | トースト通知コンポーネント。 | 成功/警告/エラーなど共通フィードバックを画面右上に表示。 | ✅ |
+| `src/renderer/components/SplitContainer.tsx` | 分割パネルコンテナコンポーネント。 | 再帰的グリッド構造を描画し、タブバーとカードパネルを配置。 | ✅ |
+| `src/renderer/components/CardPanel.tsx` | カードパネルコンポーネント。 | タブバー、ツールバー、カード一覧、フィルタ機能を提供。 | ✅ |
+| `src/renderer/components/TraceConnectorLayer.tsx` | トレースコネクタ描画レイヤ。 | 隣接する左右パネル間のコネクタを SVG で描画。種別フィルタ/選択フォーカス/可視トグルに対応。 | ✅ |
+| `src/renderer/components/ContextMenu.tsx` | 右クリックメニューコンポーネント。 | カード右クリック時のコンテキストメニューを表示。編集・コピー・削除・挿入・貼り付け・情報系の操作を提供。 | ✅ |
+| `src/renderer/components/CardStatsDialog.tsx` | カード統計ダイアログ。 | カードID/UUID/種別/ステータス/作成日時/最終更新/トレース件数/階層レベル/子カード数/文字数/単語数/行数を表示。 | ✅ |
+| `src/renderer/components/CardMergeDialog.tsx` | カード統合ダイアログ。 | 選択カード一覧と統合後プロパティを編集するモーダル。元カード削除とトレース引き継ぎのオプション付き。 | ✅ |
+| `src/renderer/components/CardHistoryDialog.tsx` | カード履歴ダイアログ。 | カード編集履歴の表示と復元機能を提供。バージョン間の差分表示も可能。 | ✅ |
+| `src/renderer/components/CardDiffViewer.tsx` | カード差分表示コンポーネント。 | カード履歴のバージョン間差分を視覚的に表示。 | ✅ |
+| `src/renderer/MatrixApp.tsx` | トレースマトリクスアプリケーションのルートコンポーネント。 | 別ウィンドウで起動するマトリクス編集専用アプリケーション。`TraceMatrixDialog` をレンダリング。 | ✅ |
+| `src/renderer/components/TraceMatrixDialog.tsx` | トレースマトリクスメインコンポーネント。 | 左右カードファイルのマトリクス表示、セル編集、フィルタリング、統計表示を統合。 | ✅ |
+| `src/renderer/components/TraceMatrixToolbar.tsx` | マトリクスツールバー。 | エクスポート、フィルタリセット、デフォルト設定などの操作を提供。 | ✅ |
+| `src/renderer/components/TraceMatrixHeader.tsx` | マトリクスヘッダー。 | ファイル情報、統計情報、設定アイコンを表示。 | ✅ |
+| `src/renderer/components/TraceMatrixFilterPanel.tsx` | マトリクスフィルタパネル。 | カードID、タイトル、ステータスによるフィルタリング機能を提供。 | ✅ |
+| `src/renderer/components/TraceMatrixCell.tsx` | マトリクスセルコンポーネント。 | 個別のマトリクスセルを描画。relation の有無、種別、方向性を視覚的に表示し、クリックで編集可能。 | ✅ |
+| `src/renderer/components/MatrixLaunchDialog.tsx` | マトリクス起動ダイアログ。 | メインウィンドウからマトリクスウィンドウを開くための左右ファイル選択ダイアログ。 | ✅ |
 | `src/renderer/styles.css` | Tailwind 基礎スタイルと `@apply` によるコンポーネントスタイル。ライト/ダークテーマに対応。 | 文字サイズ・余白を小さくしたコンパクトデザインを適用。 | ⚠️ |
 | `src/renderer/types/conversion.ts` | 変換モーダル用の状態/入力ファイルサマリ型定義。 | `ConversionModalDisplayState`/`ConversionSourceSummary` を集中管理。 | ✅ |
 | `src/vite-env.d.ts` | Vite クライアント型補完の参照ディレクティブ。 | 実装コードは含まず型補助のみ提供。 | ✅ |
@@ -93,9 +117,12 @@
 | UC-04 | カード変換（LLM） | LLM アダプタで分割し監査情報と共に保存。 | ユーザ、LLM アダプタ | JSON 保存、監査ログ出力。 | ⚠️ (LLM スタブ/アダプタ抽象のみ実装) |
 | UC-05 | カード編集 | カード CRUD、ステータス操作、Undo/Redo。 | ユーザ、カード編集 UI | ストアとファイル整合、未保存状態表示。 | ⛔ |
 | UC-06 | トレーサビリティ管理 | カード間リンク追加/削除と可視化。 | ユーザ、トレーサ管理モジュール | `trace_*.json` 更新、ビュー反映。 | ⛔ |
-| UC-07 | 検索・フィルタ | 種別/ステータス/テキストで絞り込み。 | ユーザ、検索モジュール | 条件一致カード表示と親展開。 | ⛔ |
-| UC-08 | 設定変更と即時反映 | `settings.json` や UI からの設定変更を即時反映。 | ユーザ、設定モジュール | バリデーション通過と変更反映ログ。 | ⚠️ |
-| UC-09 | ログ監査 | 操作ログ収集とローテーション。 | ユーザ、ログモジュール | ログが閾値管理され監査要件満足。 | ⛔ |
+| UC-07 | 検索・フィルタ | 種別/ステータス/テキストで絞り込み。 | ユーザ、検索モジュール | 条件一致カード表示と親展開。 | ✅ |
+| UC-08 | 設定変更と即時反映 | `settings.json` や UI からの設定変更を即時反映。 | ユーザ、設定モジュール | バリデーション通過と変更反映ログ。 | ✅ |
+| UC-09 | ログ監査 | 操作ログ収集とローテーション。 | ユーザ、ログモジュール | ログが閾値管理され監査要件満足。 | ✅ |
+| UC-10 | トレースマトリクス表示・編集 | 2つのカードファイル間のトレース関係をマトリクス形式で表示・編集。 | ユーザ、マトリクスモジュール | 別ウィンドウでマトリクス表示、セル編集、フィルタリング、統計表示、CSV/Excel エクスポート。 | ✅ |
+| UC-11 | カード履歴管理 | カード編集履歴の記録・表示・復元。 | ユーザ、履歴モジュール | 編集履歴の自動記録、履歴表示、特定バージョンへの復元、差分表示。 | ✅ |
+| UC-12 | カード統合 | 同一階層の連続カードを1つのカードに統合。 | ユーザ、カード編集モジュール | 選択カードの統合、元カード削除オプション、トレース引き継ぎオプション。 | ✅ |
 
 ## 4. 処理フロー (PlantUML)
 以下のダイアグラムは要求仕様ベースの将来設計であり、現行コードには対応処理が存在しない。
@@ -167,12 +194,15 @@ Deprecated --> Draft : 再利用
 ### 5.1 本番依存
 | ライブラリ | 用途 | 主な利用箇所 | 実装状況 |
 | --- | --- | --- | --- |
-| `react` | UI コンポーネントフレームワーク | `src/renderer/App.tsx`、`src/components/Hello.tsx`。 | ⚠️ |
-| `react-dom` | React レンダラー | `src/renderer/main.tsx` で `App` をマウント。 | ⚠️ |
-| `zustand` | グローバル状態管理（Zustand） | `src/renderer/store/workspaceStore.ts`、`src/renderer/App.tsx`。 | ⚠️ |
-| `tailwindcss` | ユーティリティファースト CSS フレームワーク | `src/renderer/styles.css`、`tailwind.config.js`。 | ⚠️ |
-| `postcss` | Tailwind ビルドチェーン | `postcss.config.js`。 | ⚠️ |
-| `autoprefixer` | CSS プレフィックス自動付与 | `postcss.config.js`。 | ⚠️ |
+| `react` | UI コンポーネントフレームワーク | `src/renderer/App.tsx`、`src/components/Hello.tsx`。 | ✅ |
+| `react-dom` | React レンダラー | `src/renderer/main.tsx` で `App` をマウント。 | ✅ |
+| `zustand` | グローバル状態管理（Zustand） | `src/renderer/store/workspaceStore.ts`、`src/renderer/App.tsx` 等の各種ストア。 | ✅ |
+| `tailwindcss` | ユーティリティファースト CSS フレームワーク | `src/renderer/styles.css`、`tailwind.config.js`。 | ✅ |
+| `postcss` | Tailwind ビルドチェーン | `postcss.config.js`。 | ✅ |
+| `autoprefixer` | CSS プレフィックス自動付与 | `postcss.config.js`。 | ✅ |
+| `@tanstack/react-table` | テーブル/マトリクス表示 | `src/renderer/components/TraceMatrixDialog.tsx` でトレースマトリクスの行列表示に利用。 | ✅ |
+| `react-window` | 仮想化リスト | `src/renderer/hooks/useVirtualizedCards.ts` で大量カード表示の最適化に利用。 | ✅ |
+| `xlsx` | Excel ファイル出力 | `src/renderer/utils/matrixExport.ts` でトレースマトリクスの Excel エクスポートに利用。 | ✅ |
 
 ### 5.2 開発・テスト依存
 | カテゴリ | ライブラリ | 用途 | 実装状況 |
@@ -217,7 +247,69 @@ Deprecated --> Draft : 再利用
 - I/O: `src/main/main.ts:82-133` が `workspace:save` / `workspace:load` IPC を提供し、`src/main/workspace.ts:19-168` で JSON を読み書きする。
 - レンダラー: `src/renderer/App.tsx:146-466` が初回マウント時に `workspace.load` を呼び出してストアへハイドレートし、保存完了後も `Ctrl+S` で同ファイルを更新する。
 
-## 6. 実装進捗と今後の観点
+## 6. トレースマトリクス機能実装サマリ
+
+### 6.1 機能概要
+2つのカードファイル間のトレーサビリティ関係を、マトリクス（行列）形式で表示・編集する機能。メインウィンドウから独立した専用ウィンドウで動作し、大量のカード間トレースを効率的に管理できる。
+
+### 6.2 アーキテクチャ
+- **マルチウィンドウ構成**: メインウィンドウとマトリクスウィンドウが IPC 経由で通信し、トレース変更をリアルタイムに同期。
+- **専用ストア**: `matrixStore` がマトリクスウィンドウの状態を管理。フィルタ、統計、UI 設定を保持。
+- **IPC プロトコル**: `src/shared/matrixProtocol.ts` で定義された `MatrixInitPayload`、`TraceChangeEvent` を使用。
+- **ウィンドウマネージャ**: `src/main/matrixWindowManager.ts` がマトリクスウィンドウの生成・破棄・通信を管理。
+
+### 6.3 主要コンポーネント
+- **MatrixApp.tsx**: マトリクスウィンドウのルートコンポーネント。`useMatrixIPC` で IPC イベントをリッスン。
+- **TraceMatrixDialog.tsx**: マトリクス本体。左右カードの行列表示、セル編集、右クリックメニュー、統計表示を統合。
+- **TraceMatrixCell.tsx**: 個別セルコンポーネント。relation の有無、種別、方向性を視覚化し、クリックで編集可能。
+- **TraceMatrixToolbar.tsx**: エクスポート、フィルタリセット、デフォルト設定を提供。
+- **TraceMatrixFilterPanel.tsx**: カードID、タイトル、ステータスによるフィルタリング。
+
+### 6.4 主要機能
+- **マトリクス表示**: 左カードを行、右カードを列として relation をセルに表示。
+- **セル編集**: セルクリックで relation の追加/削除、右クリックメニューで種別・方向性・メモの編集。
+- **フィルタリング**: カードID、タイトル、ステータスで行列をフィルタ。特定カードとのトレース有無でフォーカス。
+- **統計表示**: 総トレース数、未トレースカード数を左右別に表示。
+- **エクスポート**: CSV/Excel 形式でマトリクスをエクスポート。メモ含有オプション付き。
+- **リアルタイム同期**: マトリクスでの編集がメインウィンドウのコネクタ表示に即反映。
+
+### 6.5 データフロー
+1. メインウィンドウで左右パネルを開き、マトリクス起動ダイアログから対象ファイルを選択。
+2. `matrixWindowManager` が新規ウィンドウを生成し、`MatrixInitPayload` で初期データを送信。
+3. マトリクスウィンドウは `matrixStore` に状態を保存し、UI を描画。
+4. セル編集時、`useTraceStore.saveRelationsForPair` でトレースファイルを更新し、`TraceChangeEvent` をメインウィンドウへブロードキャスト。
+5. メインウィンドウは `TraceConnectorLayer` を再描画し、コネクタ表示を更新。
+
+## 7. カード履歴管理機能実装サマリ
+
+### 7.1 機能概要
+カード編集操作（作成、更新、削除、復元）を自動的に履歴として記録し、ユーザーが任意の時点のバージョンに復元できる機能。履歴は `_out/.history/` 配下に JSON ファイルとして永続化される。
+
+### 7.2 データモデル
+- **CardHistory**: カード単位の履歴。`versions` 配列にバージョン情報を保持。
+- **CardHistoryVersion**: 個別バージョン。`operation` (create/update/delete/restore)、`timestamp`、`card` スナップショット、`diff` (before/after) を含む。
+- **履歴ファイル**: `_out/.history/{fileName}/{cardId}.json` として保存。
+
+### 7.3 主要コンポーネント・モジュール
+- **historyStore.ts**: 履歴のロード・キャッシュ・追記を管理。`window.app.history.load`/`append` を通じてメインプロセスと連携。
+- **src/main/history.ts**: 履歴ファイルの読み書き、ディレクトリ生成を担当。
+- **CardHistoryDialog.tsx**: 履歴一覧表示、バージョン選択、復元ボタンを提供。
+- **CardDiffViewer.tsx**: バージョン間差分を視覚的に表示。
+
+### 7.4 主要機能
+- **自動記録**: カード作成・更新・削除時に `workspaceStore` から自動的に履歴を記録。
+- **履歴表示**: カード右クリックメニューまたはショートカットから履歴ダイアログを開き、バージョン一覧を表示。
+- **差分表示**: 任意の2バージョン間の差分を `CardDiffViewer` で確認。
+- **復元**: 選択したバージョンにカードを復元。復元操作自体も履歴に記録され、`restoredFromVersionId` で元バージョンを追跡。
+
+### 7.5 運用フロー
+1. カード編集時、`workspaceStore.updateCard` が呼ばれると、`historyStore.appendVersion` が自動起動。
+2. メインプロセスの `history.append` がカードスナップショットと差分を計算し、履歴ファイルに追記。
+3. 履歴ダイアログで特定バージョンを選択し「復元」ボタンをクリック。
+4. `workspaceStore.restoreCardFromHistory` が該当バージョンのカードデータを現在のカードに適用。
+5. 復元操作自体が新しい履歴バージョンとして記録され、復元チェーンを追跡可能。
+
+## 8. 実装進捗と今後の観点
 - フェーズ P1-03: UI 設計書に沿ったレイアウト骨格（メニュー/ツールバー/サイドバー/カードパネル/ログ/ステータスバー）をプレースホルダで構築し、サイドバー幅とログエリア高さのドラッグリサイズを実装済み。次工程ではグローバルストア連携と実データ描画を進める。
 - フェーズ P1-04: Zustand ストアを導入し、カードダミーデータの表示とステータス更新アクションを UI へ接続。ストアの単体テストおよび App コンポーネントの振る舞いテストを追加済み。次フェーズでは実データソースへの接続やストア分割を検討する。
 - フェーズ P1-05: Tailwind CSS を導入し、`App` 全体を `@apply` ベースのユーティリティスタイルに刷新。テーマ設定ストアを新設し、ライト/ダークモード切替が UI 全域に反映される基盤とテストを整備。以降は実データ/コンポーネント化時に Tailwind の抽象化を進める。
@@ -238,9 +330,12 @@ Deprecated --> Draft : 再利用
 - フェーズ P2-21a: ドラッグ中の挿入位置を可視化するため、`CardPanel.tsx:900-980` で `card__drop-indicator` にラベル付き要素を追加し、兄弟挿入時に「ここに挿入（前/後）」を表示。子挿入時は `.card__drop-child-overlay` を描画し、「子として追加」バッジと枠線で階層変更を明示。対応するスタイルを `src/renderer/styles.css:300-330,472-520` に追加し、カード要素を `position: relative` に変更してオーバーレイをサポートした。
 - フェーズ P2-21b: 保存フローをカードファイル単位に刷新。`workspaceStore` へ `renameTabFile` を追加し、`App.tsx:800-930` の `saveActiveTab` で `window.app.workspace.saveCardFile`（新規IPC）を通じて `_out/` 配下へ JSON を出力。`main/workspace.ts:330-370` に `saveCardFileSnapshot` を実装し、`workspace:saveCardFile` ハンドラを `main.ts:120-150`、`preload.ts:30-80`、`global.d.ts:20-40` に追加。ツールバーへ「📝 別名保存」ボタンを配置し、`Ctrl+Shift+S` ショートカットでリネーム保存、保存後は `renameTabFile` でタブのファイル名/タイトルを更新する。
 - P1-05 追加対応: 文字サイズと余白を見直し、全 UI をコンパクト表示（text-sm 基準、ツールバー/ステータスバー高さ縮小、ログエリア 112px）へ調整。
+- **フェーズ P7 (トレースマトリクス機能)**: 2つのカードファイル間のトレース関係をマトリクス形式で表示・編集する機能を実装。独立したマトリクスウィンドウで動作し、CSV/Excel エクスポート、フィルタリング、統計表示、リアルタイム同期を提供。`@tanstack/react-table` と `xlsx` ライブラリを追加。メインウィンドウとマトリクスウィンドウ間で IPC 通信を確立し、トレース変更をブロードキャスト。
+- **フェーズ P8 (カード履歴管理機能)**: カード編集履歴の自動記録、表示、復元機能を実装。`_out/.history/` 配下に履歴ファイルを保存し、バージョン間差分表示と復元機能を提供。右クリックメニューから履歴ダイアログを開き、任意のバージョンに復元可能。
+- **フェーズ P9 (カード統合・統計機能)**: 同一階層の連続カードを統合する機能と、カード統計情報ダイアログを実装。統合時に元カード削除とトレース引き継ぎのオプションを提供。統計ダイアログではカードID、種別、ステータス、トレース件数、文字数などの詳細情報を表示。
 - `npm run dev` は GUI 対応 OS 上で実行してウィンドウ起動を確認する。WSL2 では `electron` が GUI を持たず、メインプロセス API (`ipcMain`) が未定義となるためテスト/ビルドのみ実施し、GUI 検証は Windows/macOS/Linux ホストで行う。
-- ファイル I/O、カード変換、トレーサ管理などのコア機能はすべて未実装。仕様は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照し詳細設計へ落とし込む。
-- テスト基盤は Jest/Playwright の設定が存在するが、網羅的なテストケースは未作成。機能実装に伴いユニット・統合・E2E テストを拡充する。
+- コア機能の多くは実装済み。未実装機能は `spec/SW要求仕様書.md` 章 2〜7、`spec/UI設計書.md` を参照。
+- テスト基盤は Jest/Playwright で整備済み。主要コンポーネントとストアにユニットテストを追加済み。E2E テストは Smoke テストのみで、今後拡充予定。
 - ドキュメント更新は仕様変更と連動させる必要があり、本ファイルも実装進捗に合わせてステータスを更新すること。
 
 
