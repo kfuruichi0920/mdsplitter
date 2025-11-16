@@ -2931,6 +2931,8 @@ export const App = () => {
           >
             📋
           </button>
+        </div>
+        <div className="toolbar-group">
           <button
             type="button"
             className="toolbar-button"
@@ -2965,6 +2967,75 @@ export const App = () => {
             aria-label="名前を付けて保存"
           >
             📝
+          </button>
+        </div>
+        <div className="toolbar-group">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('horizontal')}
+            title="上下分割"
+            aria-label="上下分割"
+          >
+            ⇅
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => handleSplit('vertical')}
+            title="左右分割"
+            aria-label="左右分割"
+          >
+            ⇆
+          </button>
+        </div>
+        <div className="toolbar-group">
+          <button
+            type="button"
+            className={`toolbar-button${isTraceVisible ? ' toolbar-button--active' : ''}`}
+            onClick={toggleTraceVisibility}
+            title="トレース表示有効"
+            aria-label="トレース表示有効"
+          >
+            ⛓️
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${excludeSelfTrace ? ' toolbar-button--active' : ''}`}
+            onClick={toggleTraceRecirculation}
+            title="トレース強調の還流許可 (ON: 自パネル除外)"
+            aria-label="トレース強調の還流許可"
+          >
+            🔁
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${showOffscreenConnectors ? ' toolbar-button--active' : ''}`}
+            onClick={toggleOffscreenConnectors}
+            title="スクロール外カードのコネクタ表示"
+            aria-label="スクロール外カードのコネクタ表示"
+          >
+            🛰️
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${markdownPreviewGlobalEnabled ? ' toolbar-button--active' : ''}`}
+            onClick={toggleMarkdownPreviewGlobal}
+            title="Markdownプレビュー一括切替"
+            aria-label="Markdownプレビュー一括切替"
+          >
+            🅼
+          </button>
+        </div>
+        <div className="toolbar-group">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={handleCycleStatus}
+            title="ステータスを切り替え"
+            aria-label="ステータスを切り替え"
+          >
+            🔄
           </button>
         </div>
         <div className="toolbar-group">
@@ -3025,42 +3096,8 @@ export const App = () => {
           >
             💔
           </button>
-          <button
-            type="button"
-            className={`toolbar-button${isTraceVisible ? ' toolbar-button--active' : ''}`}
-            onClick={toggleTraceVisibility}
-            title="トレース表示有効"
-            aria-label="トレース表示有効"
-          >
-            ⛓️
-          </button>
-          <button
-            type="button"
-            className={`toolbar-button${excludeSelfTrace ? ' toolbar-button--active' : ''}`}
-            onClick={toggleTraceRecirculation}
-            title="トレース強調の還流許可 (ON: 自パネル除外)"
-            aria-label="トレース強調の還流許可"
-          >
-            🔁
-          </button>
-          <button
-            type="button"
-            className={`toolbar-button${showOffscreenConnectors ? ' toolbar-button--active' : ''}`}
-            onClick={toggleOffscreenConnectors}
-            title="スクロール外カードのコネクタ表示"
-            aria-label="スクロール外カードのコネクタ表示"
-          >
-            🛰️
-          </button>
-          <button
-            type="button"
-            className={`toolbar-button${markdownPreviewGlobalEnabled ? ' toolbar-button--active' : ''}`}
-            onClick={toggleMarkdownPreviewGlobal}
-            title="Markdownプレビュー一括切替"
-            aria-label="Markdownプレビュー一括切替"
-          >
-            🅼
-          </button>
+        </div>
+        <div className="toolbar-group">
           <button
             type="button"
             ref={traceFilterButtonRef}
@@ -3089,35 +3126,6 @@ export const App = () => {
               </div>
             </div>
           ) : null}
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={handleCycleStatus}
-            title="ステータスを切り替え"
-            aria-label="ステータスを切り替え"
-          >
-            🔄
-          </button>
-        </div>
-        <div className="toolbar-group">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => handleSplit('horizontal')}
-            title="上下分割"
-            aria-label="上下分割"
-          >
-            ⇅
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => handleSplit('vertical')}
-            title="左右分割"
-            aria-label="左右分割"
-          >
-            ⇆
-          </button>
         </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-group toolbar-group--right">
@@ -3185,7 +3193,7 @@ export const App = () => {
                           const fileIcon = isTraceFile ? '📈' : '📄';
                           // 現在開いているファイルかどうかを判定
                           const isOpen = Object.values(tabs).some((tab) => tab.fileName === file);
-                          const displayIcon = isOpen ? '📂' : fileIcon;
+                          const displayIcon = isOpen ? '📜' : fileIcon;
 
                           return (
                             <li
