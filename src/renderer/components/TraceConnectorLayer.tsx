@@ -57,6 +57,10 @@ interface ConnectorPathEntry {
   memo?: string;
   sourceLabel: string;
   targetLabel: string;
+  sourceFileName: string;
+  targetFileName: string;
+  sourceCardId: string;
+  targetCardId: string;
 }
 
 interface ConnectorTooltipState {
@@ -497,6 +501,10 @@ export const TraceConnectorLayer = ({
         memo: link.memo,
         sourceLabel: `${source.fileName}:${source.cardId}`,
         targetLabel: `${target.fileName}:${target.cardId}`,
+        sourceFileName: source.fileName,
+        targetFileName: target.fileName,
+        sourceCardId: source.cardId,
+        targetCardId: target.cardId,
       });
       return acc;
     }, []);
@@ -562,6 +570,31 @@ export const TraceConnectorLayer = ({
     },
     [toTooltipState],
   );
+
+  const handleConnectorDoubleClick = useCallback(
+    async (entry: ConnectorPathEntry, event: ReactMouseEvent<SVGPathElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const matrixApi = window.app?.matrix;
+      if (!matrixApi?.open) {
+        return;
+      }
+      try {
+        await matrixApi.open({ leftFile: entry.sourceFileName, rightFile: entry.targetFileName });
+        const broadcastSelection = (fileName: string, cardId: string) => {
+          window.app?.matrix?.broadcastCardSelection({ fileName, selectedCardIds: [cardId], source: 'cards-panel' });
+        };
+        const sendSelections = () => {
+          broadcastSelection(entry.sourceFileName, entry.sourceCardId);
+          broadcastSelection(entry.targetFileName, entry.targetCardId);
+        };
+        sendSelections();
+        window.setTimeout(sendSelections, 300);
+      } catch (error) {
+        console.error('[TraceConnectorLayer] failed to open matrix window', error);
+      }
+    },
+    []);
 
   useEffect(() => {
     if (!selectedConnector) {
@@ -632,6 +665,7 @@ export const TraceConnectorLayer = ({
               onMouseMove={(event) => handleConnectorMouseMove(connector, event)}
               onMouseLeave={handleConnectorMouseLeave}
               onClick={(event) => handleConnectorClick(connector, event)}
+              onDoubleClick={(event) => handleConnectorDoubleClick(connector, event)}
             />
           );
         })}

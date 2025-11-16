@@ -37,9 +37,11 @@ export const TraceMatrixDialog: React.FC = () => {
   const defaultRelationKind = useMatrixStore((state) => state.defaultRelationKind);
   const defaultDirection = useMatrixStore((state) => state.defaultDirection);
   const confirmMemoDeletion = useMatrixStore((state) => state.confirmMemoDeletion);
+  const exportIncludeMemo = useMatrixStore((state) => state.exportIncludeMemo);
   const setDefaultRelationKind = useMatrixStore((state) => state.setDefaultRelationKind);
   const setDefaultDirection = useMatrixStore((state) => state.setDefaultDirection);
   const setConfirmMemoDeletion = useMatrixStore((state) => state.setConfirmMemoDeletion);
+  const setExportIncludeMemo = useMatrixStore((state) => state.setExportIncludeMemo);
 
   const relationLookup = useMemo(() => {
     const map = new Map<string, TraceabilityRelation>();
@@ -110,6 +112,33 @@ export const TraceMatrixDialog: React.FC = () => {
 
   const rowHighlightSet = useMemo(() => new Set(highlightedRowCardIds), [highlightedRowCardIds]);
   const columnHighlightSet = useMemo(() => new Set(highlightedColumnCardIds), [highlightedColumnCardIds]);
+  const rowTraceCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredLeftCards.forEach((leftCard) => {
+      let count = 0;
+      filteredRightCards.forEach((rightCard) => {
+        if (relationLookup.has(makeRelationKey(leftCard.id, rightCard.id))) {
+          count += 1;
+        }
+      });
+      counts.set(leftCard.id, count);
+    });
+    return counts;
+  }, [filteredLeftCards, filteredRightCards, relationLookup]);
+
+  const columnTraceCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredRightCards.forEach((rightCard) => {
+      let count = 0;
+      filteredLeftCards.forEach((leftCard) => {
+        if (relationLookup.has(makeRelationKey(leftCard.id, rightCard.id))) {
+          count += 1;
+        }
+      });
+      counts.set(rightCard.id, count);
+    });
+    return counts;
+  }, [filteredLeftCards, filteredRightCards, relationLookup]);
 
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -392,11 +421,15 @@ export const TraceMatrixDialog: React.FC = () => {
           ? result.fileName.endsWith('.csv') ? result.fileName : `${result.fileName}.csv`
           : result.fileName.endsWith('.xlsx') ? result.fileName : `${result.fileName}.xlsx`;
         if (format === 'csv') {
-          const csv = exportMatrixToCSV(leftCards, rightCards, useMatrixStore.getState().relations);
+          const csv = exportMatrixToCSV(leftCards, rightCards, useMatrixStore.getState().relations, {
+            includeMemo: exportIncludeMemo,
+          });
           await window.app.matrix.export({ fileName: normalized, content: csv, format: 'csv', encoding: 'utf8' });
           setExportMessage(`${normalized} にCSVを保存しました。`);
         } else {
-          const base64 = exportMatrixToExcel(leftCards, rightCards, useMatrixStore.getState().relations);
+          const base64 = exportMatrixToExcel(leftCards, rightCards, useMatrixStore.getState().relations, {
+            includeMemo: exportIncludeMemo,
+          });
           await window.app.matrix.export({ fileName: normalized, content: base64, format: 'excel', encoding: 'base64' });
           setExportMessage(`${normalized} にExcelを保存しました。`);
         }
@@ -407,7 +440,7 @@ export const TraceMatrixDialog: React.FC = () => {
         setExporting(false);
       }
     },
-    [leftCards, rightCards, leftFile, rightFile],
+    [exportIncludeMemo, leftCards, rightCards, leftFile, rightFile],
   );
 
   const handleRowHeaderClick = useCallback((card: Card) => {
@@ -440,6 +473,8 @@ export const TraceMatrixDialog: React.FC = () => {
         onChangeDefaultDirection={setDefaultDirection}
         confirmMemoDeletion={confirmMemoDeletion}
         onChangeConfirmMemoDeletion={setConfirmMemoDeletion}
+        exportIncludeMemo={exportIncludeMemo}
+        onChangeExportIncludeMemo={setExportIncludeMemo}
       />
       {isSaving ? <p className="trace-matrix-status">保存中…</p> : null}
       {isRefreshing ? <p className="trace-matrix-status">更新中…</p> : null}
@@ -451,26 +486,80 @@ export const TraceMatrixDialog: React.FC = () => {
             <table className="trace-matrix-table">
               <thead>
                 <tr>
-                  <th className="trace-matrix-table__corner" />
-                  {filteredRightCards.map((card) => (
-                    <th key={card.id} className="trace-matrix-table__column-header">
-                      <button type="button" onClick={() => handleColumnHeaderClick(card)} title={formatCardTooltip(card)}>
-                        <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
-                        <span className="trace-matrix-grid__title">{card.title}</span>
-                      </button>
-                    </th>
-                  ))}
+                  <th className="trace-matrix-table__corner" rowSpan={2}>
+                    左カード
+                  </th>
+                  <th className="trace-matrix-table__row-count-header" rowSpan={2}>
+                    行トレース数
+                  </th>
+                  {filteredRightCards.map((card) => {
+                    const columnCount = columnTraceCounts.get(card.id) ?? 0;
+                    const columnZero = columnCount === 0;
+                    return (
+                      <th
+                        key={card.id}
+                        className={[
+                          'trace-matrix-table__column-header',
+                          columnZero ? 'trace-matrix-table__column-header--zero' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <button type="button" onClick={() => handleColumnHeaderClick(card)} title={formatCardTooltip(card)}>
+                          <span className="trace-matrix-grid__card-id">{card.cardId ?? card.id}</span>
+                          <span className="trace-matrix-grid__title">{card.title}</span>
+                        </button>
+                      </th>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  {filteredRightCards.map((card) => {
+                    const columnCount = columnTraceCounts.get(card.id) ?? 0;
+                    const isZero = columnCount === 0;
+                    return (
+                      <th
+                        key={`count-${card.id}`}
+                        className={[
+                          'trace-matrix-table__column-count',
+                          isZero ? 'trace-matrix-table__count--zero' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        {columnCount}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {filteredLeftCards.map((leftCard) => (
                   <tr key={leftCard.id}>
-                    <th className="trace-matrix-table__row-header" scope="row">
+                    <th
+                      className={[
+                        'trace-matrix-table__row-header',
+                        (rowTraceCounts.get(leftCard.id) ?? 0) === 0 ? 'trace-matrix-table__row-title--zero' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      scope="row"
+                    >
                       <button type="button" onClick={() => handleRowHeaderClick(leftCard)} title={formatCardTooltip(leftCard)}>
                         <span className="trace-matrix-grid__card-id">{leftCard.cardId ?? leftCard.id}</span>
                         <span className="trace-matrix-grid__title">{leftCard.title}</span>
                       </button>
                     </th>
+                    <td
+                      className={[
+                        'trace-matrix-table__row-count',
+                        (rowTraceCounts.get(leftCard.id) ?? 0) === 0 ? 'trace-matrix-table__count--zero' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {rowTraceCounts.get(leftCard.id) ?? 0}
+                    </td>
                     {filteredRightCards.map((rightCard) => {
                       const relation = relationLookup.get(makeRelationKey(leftCard.id, rightCard.id));
                       return (

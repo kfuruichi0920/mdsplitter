@@ -73,6 +73,7 @@ export interface MatrixState {
   defaultRelationKind: TraceRelationKind;
   defaultDirection: TraceabilityRelation['directed'];
   confirmMemoDeletion: boolean;
+  exportIncludeMemo: boolean;
   initializeFromPayload: (payload: MatrixInitPayload) => void;
   setTraceMetadata: (fileName: string | null, header: TraceabilityHeader | null) => void;
   setCards: (side: 'left' | 'right', cards: Card[]) => void;
@@ -89,6 +90,7 @@ export interface MatrixState {
   setDefaultRelationKind: (kind: TraceRelationKind) => void;
   setDefaultDirection: (direction: TraceabilityRelation['directed']) => void;
   setConfirmMemoDeletion: (value: boolean) => void;
+  setExportIncludeMemo: (value: boolean) => void;
   reset: () => void;
 }
 
@@ -112,6 +114,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   defaultRelationKind: 'trace',
   defaultDirection: 'left_to_right',
   confirmMemoDeletion: true,
+  exportIncludeMemo: false,
   initializeFromPayload: (payload) =>
     set(() => ({
       windowId: payload.windowId,
@@ -172,6 +175,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   setDefaultRelationKind: (kind) => set(() => ({ defaultRelationKind: kind })),
   setDefaultDirection: (direction) => set(() => ({ defaultDirection: direction })),
   setConfirmMemoDeletion: (value) => set(() => ({ confirmMemoDeletion: value })),
+  setExportIncludeMemo: (value) => set(() => ({ exportIncludeMemo: value })),
   reset: () =>
     set(() => ({
       windowId: null,
@@ -191,5 +195,6 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       defaultRelationKind: 'trace',
       defaultDirection: 'left_to_right',
       confirmMemoDeletion: true,
+      exportIncludeMemo: false,
     })),
 }));

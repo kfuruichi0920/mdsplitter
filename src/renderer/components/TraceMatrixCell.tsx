@@ -24,6 +24,7 @@ export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
   onContextMenu,
 }) => {
   const hasMemo = Boolean(memo?.trim());
+  const glyph = hasTrace ? getDirectionGlyph(direction) : '';
   const classes = [
     'trace-matrix-cell',
     hasTrace ? 'trace-matrix-cell--active' : '',
@@ -57,8 +58,8 @@ export const TraceMatrixCell: React.FC<TraceMatrixCellProps> = ({
         onContextMenu(event);
       }}
       title={title}
-      >
-      {hasTrace ? '●' : ''}
+    >
+      {hasTrace ? <span className="trace-matrix-cell__glyph">{glyph}</span> : ''}
     </button>
   );
 };
@@ -73,5 +74,16 @@ const formatDirection = (value?: TraceabilityRelation['directed']): string => {
       return '双方向';
     default:
       return '行→列';
+  }
+};
+
+const getDirectionGlyph = (value?: TraceabilityRelation['directed']): string => {
+  switch (value) {
+    case 'right_to_left':
+      return '◀';
+    case 'bidirectional':
+      return '⇔';
+    default:
+      return '▲';
   }
 };

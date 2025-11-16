@@ -16,6 +16,8 @@ interface TraceMatrixToolbarProps {
   onChangeDefaultDirection: (direction: TraceabilityRelation['directed']) => void;
   confirmMemoDeletion: boolean;
   onChangeConfirmMemoDeletion: (value: boolean) => void;
+  exportIncludeMemo: boolean;
+  onChangeExportIncludeMemo: (value: boolean) => void;
 }
 
 export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
@@ -32,6 +34,8 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
   onChangeDefaultDirection,
   confirmMemoDeletion,
   onChangeConfirmMemoDeletion,
+  exportIncludeMemo,
+  onChangeExportIncludeMemo,
 }) => (
   <div className="trace-matrix-toolbar">
     <div className="trace-matrix-toolbar__stats">
@@ -76,6 +80,14 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
           onChange={(event) => onChangeConfirmMemoDeletion(event.target.checked)}
         />
         <span>メモ削除時に確認</span>
+      </label>
+      <label className="trace-matrix-toolbar__checkbox">
+        <input
+          type="checkbox"
+          checked={exportIncludeMemo}
+          onChange={(event) => onChangeExportIncludeMemo(event.target.checked)}
+        />
+        <span>エクスポートにメモを含める</span>
       </label>
     </div>
   </div>

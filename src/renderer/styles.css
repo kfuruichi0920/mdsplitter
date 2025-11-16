@@ -37,6 +37,12 @@
   input {
     @apply font-sans;
   }
+
+  :root {
+    --matrix-row-header-width: 220px;
+    --matrix-row-count-width: 72px;
+    --matrix-header-row-height: 52px;
+  }
 }
 
 @layer components {
@@ -1148,6 +1154,7 @@
     stroke-width: 2;
     transition: stroke 0.2s ease;
     cursor: pointer;
+    pointer-events: visibleStroke;
   }
 
   .trace-connector-path--placeholder {
@@ -1570,11 +1577,11 @@
   }
 
   .trace-matrix-dialog {
-    @apply flex h-full flex-col gap-2 px-4 pb-4;
+    @apply flex h-full min-h-0 flex-col gap-2 px-4 pb-4;
   }
 
   .trace-matrix-content {
-    @apply flex flex-1 gap-4;
+    @apply flex flex-1 min-h-0 gap-4;
   }
 
   .trace-matrix-header {
@@ -1622,7 +1629,7 @@
   }
 
   .trace-matrix-grid {
-    @apply flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-800;
   }
 
   .trace-matrix-grid__column-header-row {
@@ -1679,7 +1686,7 @@
   }
 
   .trace-matrix-cell--active {
-    @apply font-semibold text-slate-900 dark:text-white;
+    @apply font-semibold;
   }
 
   .trace-matrix-cell--row-highlight {
@@ -1788,8 +1795,7 @@
   }
 
   .trace-matrix-grid__scroll {
-    @apply h-full w-full overflow-auto;
-    max-height: 60vh;
+    @apply flex-1 min-h-0 h-full w-full overflow-auto;
   }
 
   .trace-matrix-table {
@@ -1803,11 +1809,21 @@
   }
 
   .trace-matrix-table__corner {
-    @apply w-48 bg-slate-100 dark:bg-slate-800;
+    @apply bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300;
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 5;
+    width: var(--matrix-row-header-width);
+    min-width: var(--matrix-row-header-width);
+    max-width: var(--matrix-row-header-width);
   }
 
   .trace-matrix-table__column-header {
     @apply bg-slate-100 text-left text-xs dark:bg-slate-800;
+    position: sticky;
+    top: 0;
+    z-index: 4;
   }
 
   .trace-matrix-table__column-header button,
@@ -1817,6 +1833,52 @@
 
   .trace-matrix-table__row-header {
     @apply bg-slate-100 text-xs dark:bg-slate-800;
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    width: var(--matrix-row-header-width);
+    min-width: var(--matrix-row-header-width);
+    max-width: var(--matrix-row-header-width);
+  }
+
+  .trace-matrix-table__row-title--zero button {
+    @apply text-rose-500 dark:text-rose-300;
+  }
+
+  .trace-matrix-table__row-count-header {
+    @apply bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300;
+    position: sticky;
+    top: 0;
+    left: var(--matrix-row-header-width);
+    width: var(--matrix-row-count-width);
+    min-width: var(--matrix-row-count-width);
+    max-width: var(--matrix-row-count-width);
+    z-index: 4;
+  }
+
+  .trace-matrix-table__row-count {
+    @apply bg-white text-center text-sm font-semibold align-middle dark:bg-slate-800;
+    position: sticky;
+    left: var(--matrix-row-header-width);
+    width: var(--matrix-row-count-width);
+    min-width: var(--matrix-row-count-width);
+    max-width: var(--matrix-row-count-width);
+    z-index: 3;
+  }
+
+  .trace-matrix-table__column-count {
+    @apply bg-slate-50 text-center text-xs font-semibold align-middle dark:bg-slate-900;
+    position: sticky;
+    top: var(--matrix-header-row-height);
+    z-index: 3;
+  }
+
+  .trace-matrix-table__count--zero {
+    @apply text-rose-500 dark:text-rose-300;
+  }
+
+  .trace-matrix-table__column-header--zero button {
+    @apply text-rose-500 dark:text-rose-300;
   }
 
   .trace-matrix-table__cell {
@@ -1836,6 +1898,10 @@
     font-size: 0.65rem;
     color: var(--matrix-memo-indicator, #10b981);
     pointer-events: none;
+  }
+
+  .trace-matrix-cell__glyph {
+    @apply text-xl;
   }
 
   .trace-memo-dialog {
