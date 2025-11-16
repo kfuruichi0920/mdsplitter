@@ -504,11 +504,11 @@ export const App = () => {
   const tabs = useWorkspaceStore((state) => state.tabs);
   const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
+  const closeTab = useWorkspaceStore((state) => state.closeTab);
   const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
   const markSaved = useWorkspaceStore((state) => state.markSaved);
-  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const addCard = useWorkspaceStore((state) => state.addCard);
   const deleteCards = useWorkspaceStore((state) => state.deleteCards);
   const copySelection = useWorkspaceStore((state) => state.copySelection);
@@ -2593,6 +2593,34 @@ export const App = () => {
         }
 
         if (!event.altKey) {
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            const leafId = effectiveLeafId;
+            if (!leafId) {
+              return;
+            }
+            const state = useWorkspaceStore.getState();
+            const leaf = state.leafs[leafId];
+            if (!leaf || leaf.tabIds.length === 0) {
+              return;
+            }
+            const ids = leaf.tabIds;
+            const currentIndex = leaf.activeTabId ? ids.indexOf(leaf.activeTabId) : -1;
+            const nextIndex = event.shiftKey
+              ? (currentIndex <= 0 ? ids.length - 1 : currentIndex - 1)
+              : (currentIndex + 1) % ids.length;
+            state.setActiveTab(leafId, ids[nextIndex]);
+            return;
+          }
+
+          if (key === 'w' && !event.shiftKey) {
+            event.preventDefault();
+            if (effectiveLeafId && activeTabId) {
+              closeTab(effectiveLeafId, activeTabId);
+            }
+            return;
+          }
+
           if (key === ',' && !event.shiftKey) {
             event.preventDefault();
             handleSettingsOpen();
@@ -2805,6 +2833,7 @@ export const App = () => {
     pasteClipboard,
     pushLog,
     redo,
+    closeTab,
     selectedCount,
     undo,
   ]);
