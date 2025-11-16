@@ -505,6 +505,7 @@ export const App = () => {
   const leafs = useWorkspaceStore((state) => state.leafs);
   const openTab = useWorkspaceStore((state) => state.openTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
   const createUntitledTab = useWorkspaceStore((state) => state.createUntitledTab);
   const cycleCardStatus = useWorkspaceStore((state) => state.cycleCardStatus);
   const closeLeafWorkspace = useWorkspaceStore((state) => state.closeLeaf);
@@ -526,6 +527,7 @@ export const App = () => {
   const showOffscreenConnectors = useTracePreferenceStore((state) => state.showOffscreenConnectors);
   const toggleOffscreenConnectors = useTracePreferenceStore((state) => state.toggleOffscreenConnectors);
   const enabledRelationKinds = useTracePreferenceStore((state) => state.enabledKinds, shallow);
+
   const toggleRelationKindPreference = useTracePreferenceStore((state) => state.toggleRelationKind);
   const setAllRelationKinds = useTracePreferenceStore((state) => state.setAllKinds);
   const creationRelationKind = useTracePreferenceStore((state) => state.creationRelationKind);
@@ -2599,8 +2601,7 @@ export const App = () => {
             if (!leafId) {
               return;
             }
-            const state = useWorkspaceStore.getState();
-            const leaf = state.leafs[leafId];
+            const leaf = useWorkspaceStore.getState().leafs[leafId];
             if (!leaf || leaf.tabIds.length === 0) {
               return;
             }
@@ -2609,7 +2610,7 @@ export const App = () => {
             const nextIndex = event.shiftKey
               ? (currentIndex <= 0 ? ids.length - 1 : currentIndex - 1)
               : (currentIndex + 1) % ids.length;
-            state.setActiveTab(leafId, ids[nextIndex]);
+            setActiveTab(leafId, ids[nextIndex]);
             return;
           }
 
@@ -2770,7 +2771,7 @@ export const App = () => {
         }
       }
 
-      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+      if (event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
 
