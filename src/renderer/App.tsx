@@ -45,7 +45,7 @@ import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { ConversionModal } from './components/ConversionModal';
-import { applyThemeColors, applySplitterWidth } from './utils/themeUtils';
+import { applyThemeColors, applySplitterWidth, applyTypography } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
 import { createSearchMatcher, buildSnippet } from './utils/search';
 import { convertDocument } from '@/shared/conversion/pipeline';
@@ -190,6 +190,8 @@ const applyThemeFromSettings = (
   const colors = resolved === 'dark' ? themeConfig.dark : themeConfig.light;
   applyThemeColors(colors);
   applySplitterWidth(themeConfig.splitterWidth);
+  applyTypography(themeConfig.fontSize, themeConfig.fontFamily);
+  document.querySelector('.app-shell')?.setAttribute('data-compact', themeConfig.compact ? 'true' : 'false');
   return resolved;
 };
 
@@ -1027,6 +1029,8 @@ export const App = () => {
       const updated = await window.app.settings.update(draft);
       setAppSettings(updated);
       applyThemeFromSettings(updated.theme, updated.theme.mode, setThemeStore);
+      applyTypography(updated.theme.fontSize, updated.theme.fontFamily);
+      document.querySelector('.app-shell')?.setAttribute('data-compact', updated.theme.compact ? 'true' : 'false');
       notify('success', '設定を保存しました。');
       pushLog({
         id: `settings-save-${Date.now()}`,
@@ -1108,6 +1112,8 @@ export const App = () => {
         const settings = await window.app.settings.load();
         setAppSettings(settings);
         applyThemeFromSettings(settings.theme, settings.theme.mode, setThemeStore);
+        applyTypography(settings.theme.fontSize, settings.theme.fontFamily);
+        document.querySelector('.app-shell')?.setAttribute('data-compact', settings.theme.compact ? 'true' : 'false');
 
         notify('success', `設定を読み込みました (テーマ: ${settings.theme.mode}).`);
         pushLog({

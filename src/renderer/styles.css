@@ -26,7 +26,9 @@
   }
 
   body {
-    @apply h-full overflow-hidden bg-slate-50 text-sm text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    @apply h-full overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    font-size: var(--theme-font-size, 14px);
+    font-family: var(--theme-font-family, 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif');
   }
 
   #root {
@@ -48,6 +50,10 @@
 @layer components {
   .app-shell {
     @apply grid h-screen min-h-0 grid-rows-[28px_36px_minmax(0,1fr)_22px] bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  .app-shell[data-compact='true'] * {
+    letter-spacing: -0.01em;
   }
 
   .menu-bar {

@@ -77,6 +77,9 @@ export interface ThemeColorSettings {
 export interface ThemeSettings {
   mode: ThemeModeSetting;
   splitterWidth: number;      ///< 分割境界の幅（px）
+  fontSize: number;           ///< 基本文字サイズ(px)
+  fontFamily: string;        ///< フォントファミリー
+  compact: boolean;          ///< 余白最小化フラグ
   light: ThemeColorSettings;  ///< ライトモード色設定
   dark: ThemeColorSettings;   ///< ダークモード色設定
 }
@@ -98,6 +101,9 @@ export const defaultSettings: AppSettings = {
   theme: {
     mode: 'dark',
     splitterWidth: 4,
+    fontSize: 14,
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    compact: false,
     light: {
       background: '#ffffff',
       foreground: '#1f2937',

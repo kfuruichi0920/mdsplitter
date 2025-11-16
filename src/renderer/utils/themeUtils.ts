@@ -74,3 +74,9 @@ export const applySplitterWidth = (widthPx: number): void => {
   const root = document.documentElement;
   root.style.setProperty('--theme-splitter-width', `${widthPx}px`);
 };
+
+export const applyTypography = (fontSize: number, fontFamily: string): void => {
+  const root = document.documentElement;
+  root.style.setProperty('--theme-font-size', `${fontSize}px`);
+  root.style.setProperty('--theme-font-family', fontFamily);
+};
