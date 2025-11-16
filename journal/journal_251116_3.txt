@@ -1,0 +1,63 @@
+# 作業記録 - 2025-11-16（第3回）
+
+## 作業内容
+サイドバーとエクスプローラのUI変更
+
+## 実装した仕様
+### サイドバー
+- 検索機能を削除
+  - 理由: 新規ダイアログで今後新たに機能追加の予定のため
+  - 検索関連のUI要素（検索セクション、検索フォーム、検索結果表示）をサイドバーから削除
+  - 検索関連のロジックは残存（将来的に別ダイアログで再利用予定）
+
+### エクスプローラ
+- _inputフォルダを非表示にし、_outのみ表示
+- トレース情報ファイルのアイコンを📈に変更
+  - 判定条件: ファイル名が`.trace.json`で終わる
+- 開いているファイルのアイコンを📂に変更
+  - 判定条件: `Object.values(tabs).some((tab) => tab.fileName === file)`
+
+## 変更ファイル
+
+### src/renderer/App.tsx
+
+**変更内容:**
+- サイドバーのaria-labelを「エクスプローラと検索」→「エクスプローラ」に変更（3155行目）
+- _inputフォルダのセクションを削除（3174-3202行目を削除）
+- _outフォルダのみ表示するように変更（3174-3211行目）
+- 検索セクション全体を削除（旧3235-3340行目を削除）
+- ファイルアイコン判定ロジックを追加:
+  ```typescript
+  const isTraceFile = file.endsWith('.trace.json');
+  const fileIcon = isTraceFile ? '📈' : '📄';
+  const isOpen = Object.values(tabs).some((tab) => tab.fileName === file);
+  const displayIcon = isOpen ? '📂' : fileIcon;
+  ```
+
+**根拠:**
+- 仕様: サイドバーから検索を削除、エクスプローラは_outのみ表示
+- トレース情報ファイルは📈、開いているファイルは📂で識別しやすくする
+
+## 決定事項
+
+### ファイルアイコンの優先順位
+1. 開いているファイル: 📂（最優先）
+2. トレース情報ファイル: 📈
+3. その他のファイル: 📄
+
+### 検索機能の扱い
+- UI上からは削除したが、関連コード（state、関数、型定義）は残存
+- 理由:
+  - 将来的に別ダイアログで検索機能を実装する予定
+  - コードを残しておくことで、実装時に再利用可能
+  - Ctrl+Fキーバインドも将来の検索ダイアログで使用予定
+
+## コミット対象ファイル
+- src/renderer/App.tsx
+
+## 備考
+- 検索関連のstate（isSearchOpen, searchQuery, searchScope, searchUseRegex, searchResults, searching, searchError）は残存
+- 検索関連の関数（openSearchPanel, handleSearchToggle, handleSearchSubmit, handleSearchClear, handleSearchResultNavigate）は残存
+- 検索関連のインポート（createSearchMatcher, buildSnippet）は残存
+- これらは将来的に別ダイアログ実装時に活用予定
+- 型チェックエラーは既存のもの（workspace.settings.test.ts、workspaceStore.test.ts）で今回の変更とは無関係

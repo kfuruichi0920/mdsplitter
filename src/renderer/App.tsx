@@ -3152,7 +3152,7 @@ export const App = () => {
       >
         <div className="workspace__content" ref={contentRef} style={contentStyle}>
           {sidebarVisible && (
-            <aside className="sidebar" aria-label="エクスプローラと検索">
+            <aside className="sidebar" aria-label="エクスプローラ">
             <div className="sidebar__section">
               <button
                 type="button"
@@ -3172,35 +3172,6 @@ export const App = () => {
               >
                 <ul className="sidebar__tree" role="tree">
                   <li role="treeitem" aria-expanded="true">
-                    📁 _input
-                    <ul role="group">
-                      {cardFiles.length === 0 ? (
-                        <li role="treeitem" className="sidebar__tree-empty">
-                          カードファイルがありません
-                        </li>
-                      ) : (
-                        cardFiles.map((file) => (
-                          <li
-                            key={file}
-                            role="treeitem"
-                            className="sidebar__tree-file"
-                            onDoubleClick={() => handleLoadCardFile(file)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                void handleLoadCardFile(file);
-                              }
-                            }}
-                            tabIndex={0}
-                            title={`ダブルクリックして ${file} を読み込む`}
-                          >
-                            📄 {file}
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  </li>
-                  <li role="treeitem" aria-expanded="true">
                     📁 _out
                     <ul role="group">
                       {outputFiles.length === 0 ? (
@@ -3208,134 +3179,37 @@ export const App = () => {
                           出力ファイルがありません
                         </li>
                       ) : (
-                        outputFiles.map((file) => (
-                          <li
-                            key={file}
-                            role="treeitem"
-                            className="sidebar__tree-file"
-                            onDoubleClick={() => handleLoadOutputFile(file)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                void handleLoadOutputFile(file);
-                              }
-                            }}
-                            tabIndex={0}
-                            title={`ダブルクリックして ${file} を読み込む (_out)`}
-                          >
-                            📄 {file}
-                          </li>
-                        ))
+                        outputFiles.map((file) => {
+                          // トレース情報ファイルかどうかを判定
+                          const isTraceFile = file.endsWith('.trace.json');
+                          const fileIcon = isTraceFile ? '📈' : '📄';
+                          // 現在開いているファイルかどうかを判定
+                          const isOpen = Object.values(tabs).some((tab) => tab.fileName === file);
+                          const displayIcon = isOpen ? '📂' : fileIcon;
+
+                          return (
+                            <li
+                              key={file}
+                              role="treeitem"
+                              className="sidebar__tree-file"
+                              onDoubleClick={() => handleLoadOutputFile(file)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  void handleLoadOutputFile(file);
+                                }
+                              }}
+                              tabIndex={0}
+                              title={`ダブルクリックして ${file} を読み込む (_out)`}
+                            >
+                              {displayIcon} {file}
+                            </li>
+                          );
+                        })
                       )}
                     </ul>
                   </li>
                 </ul>
-              </div>
-            </div>
-            <div className="sidebar__section sidebar__section--search">
-              <button
-                type="button"
-                className="sidebar__section-toggle"
-                onClick={handleSearchToggle}
-                aria-expanded={isSearchOpen}
-                aria-controls="sidebar-search-panel"
-              >
-                <span className="sidebar__toggle-icon">{isSearchOpen ? '▾' : '▸'}</span>
-                <span className="sidebar__header">検索</span>
-              </button>
-              <div
-                id="sidebar-search-panel"
-                className={`sidebar__content sidebar__content--search${isSearchOpen ? '' : ' sidebar__content--collapsed'}`}
-                role="region"
-                aria-hidden={!isSearchOpen}
-              >
-                <form className="sidebar__search-form" onSubmit={handleSearchSubmit}>
-                  <label className="sidebar__label" htmlFor="sidebar-search">
-                    🔍 検索
-                  </label>
-                  <input
-                    id="sidebar-search"
-                    ref={searchInputRef}
-                    className="sidebar__search"
-                    type="search"
-                    autoComplete="off"
-                    placeholder="キーワードを入力"
-                    value={searchQuery}
-                    onChange={(event) => {
-                      setSearchQuery(event.target.value);
-                      if (searchError) {
-                        setSearchError(null);
-                      }
-                    }}
-                  />
-                  <div className="sidebar__search-options">
-                    <label className="sidebar__search-field">
-                      <span className="sidebar__search-field-label">検索範囲</span>
-                      <select
-                        className="sidebar__search-select"
-                        value={searchScope}
-                        onChange={(event) => setSearchScope(event.target.value as SearchScope)}
-                      >
-                        {searchScopeEntries.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="sidebar__search-field sidebar__search-field--checkbox">
-                      <input
-                        type="checkbox"
-                        checked={searchUseRegex}
-                        onChange={(event) => setSearchUseRegex(event.target.checked)}
-                      />
-                      <span>正規表現</span>
-                    </label>
-                  </div>
-                  <div className="sidebar__search-actions">
-                    <button
-                      type="submit"
-                      className="sidebar__search-button"
-                      disabled={searching}
-                    >
-                      {searching ? '検索中…' : '検索実行'}
-                    </button>
-                    <button
-                      type="button"
-                      className="sidebar__search-button sidebar__search-button--ghost"
-                      onClick={handleSearchClear}
-                      disabled={!canClearSearch}
-                    >
-                      クリア
-                    </button>
-                  </div>
-                  <div className={searchStatusClass} aria-live="polite">
-                    {searchStatusText}
-                  </div>
-                </form>
-                {searchResults.length > 0 ? (
-                  <ul className="search-results" role="list">
-                    {searchResults.map((result) => (
-                      <li key={result.id}>
-                        <button
-                          type="button"
-                          className="search-results__item"
-                          onClick={() => {
-                            void handleSearchResultNavigate(result);
-                          }}
-                        >
-                          <div className="search-results__meta">
-                            <span className="search-results__scope">{result.source === 'open' ? '開いているタブ' : '_input'}</span>
-                            <span className="search-results__file">{result.fileName ?? '未保存タブ'}</span>
-                            <span className="search-results__count">{result.matchCount}件</span>
-                          </div>
-                          <div className="search-results__title">{result.cardTitle || '無題カード'}</div>
-                          <p className="search-results__snippet">{result.snippet || '（本文なし）'}</p>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
               </div>
             </div>
           </aside>
