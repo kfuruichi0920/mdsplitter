@@ -82,6 +82,7 @@
     },
     "files": [
       "dist/main/**",
+      "dist/shared/**",
       "dist/renderer/**",
       "package.json",
       "node_modules/**"
