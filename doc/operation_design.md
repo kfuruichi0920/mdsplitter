@@ -8,6 +8,7 @@
 4. [検索と置換](#検索と置換)
 5. [キーボードショートカット](#キーボードショートカット)
 6. [効率的な使い方のヒント](#効率的な使い方のヒント)
+7. [配布とインストール](#配布とインストール)
 
 ---
 
@@ -453,3 +454,34 @@ A: メニュー > `編集` > `設定` > `外観` > テーマで切替可能で�
 
 **最終更新**: 2025-10-19  
 **バージョン**: 1.0
+## 配布とインストール
+
+### 📦 ビルドの作成（Electron Builder）
+
+1. 依存をインストール（初回のみ）
+   - `npm install`
+2. 事前ビルド（renderer/main）
+   - `npm run build`
+3. 各OS向けパッケージ生成
+   - Windows インストーラ + ポータブル: `npm run dist:win`
+   - macOS (dmg/zip): `npm run dist:mac`
+   - Linux (AppImage/deb): `npm run dist:linux`
+   - まとめて全OS: `npm run dist:electron`
+
+生成物は `release/` 配下に出力されます。`dist/` 配下の実行物を掴みに行く必要はありません。
+
+### 🪟 Windows での配布/インストール
+- **インストーラ（.exe / NSIS）**: ダブルクリックしてウィザードに従う。インストール先を変更可能。
+- **ポータブル（.exe / portable）**: 展開不要。任意フォルダに置いて実行可能。レジストリ書き込みなし。
+
+### 🍎 macOS での配布/インストール
+- **dmg**: dmg を開き、`mdsplitter.app` を Applications へドラッグ。
+- **zip**: 展開して `mdsplitter.app` を任意の場所に配置。Gatekeeper 警告が出た場合は「右クリック > 開く」で一度許可。
+
+### 🐧 Linux での配布/インストール
+- **AppImage**: `chmod +x mdsplitter-*.AppImage` 後に実行。
+- **deb**: `sudo apt install ./mdsplitter-*.deb` でインストール。
+
+### よくあるトラブル
+- 署名なしのため、macOS/Gatekeeper でブロックされる場合は右クリックで開く／セキュリティ設定から許可。
+- Windows SmartScreen が出る場合、発行元未確認として表示されることがあります。署名が必要な場合は別途コードサインを行ってください。

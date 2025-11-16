@@ -17,6 +17,10 @@
     "build": "npm run build:renderer && npm run build:main",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
+    "dist:electron": "electron-builder -mwl",
+    "dist:win": "electron-builder --win nsis portable",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:linux": "electron-builder --linux AppImage deb",
     "electron": "cross-env NODE_ENV=production electron dist/main/main.js",
     "test": "npm run test:unit",
     "test:unit": "jest --runInBand",
@@ -27,6 +31,7 @@
     "perf:trace": "node scripts/trace-benchmark.js"
   },
   "devDependencies": {
+    "electron-builder": "^24.13.3",
     "@playwright/test": "^1.48.2",
     "@testing-library/jest-dom": "^6.1.4",
     "@testing-library/react": "^14.1.2",
@@ -67,5 +72,47 @@
     "react-window": "^1.8.10",
     "xlsx": "^0.18.5",
     "zustand": "^4.5.2"
+  },
+  "build": {
+    "appId": "com.md2data.mdsplitter",
+    "productName": "mdsplitter",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/main/**",
+      "dist/renderer/**",
+      "package.json",
+      "node_modules/**"
+    ],
+    "extraMetadata": {
+      "main": "dist/main/main.js"
+    },
+    "asar": true,
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility",
+      "maintainer": "mdsplitter"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
   }
 }
