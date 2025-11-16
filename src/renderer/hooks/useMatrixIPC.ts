@@ -1,9 +1,31 @@
 import { useEffect } from 'react';
 
+import type { WorkspaceSnapshot } from '@/shared/workspace';
 import { useMatrixStore } from '@/renderer/store/matrixStore';
 
 const loadCards = async (fileName: string) => {
-  const snapshot = await window.app.workspace.loadCardFile(fileName);
+  const workspace = window.app?.workspace;
+  if (!workspace) {
+    console.warn('[Matrix] workspace API is unavailable.');
+    return [];
+  }
+
+  const safeLoadOutput = async (): Promise<WorkspaceSnapshot | null> => {
+    if (!workspace.loadOutputFile) {
+      return null;
+    }
+    try {
+      return await workspace.loadOutputFile(fileName);
+    } catch (error) {
+      console.warn(`[Matrix] failed to load ${fileName} from _out`, error);
+      return null;
+    }
+  };
+
+  const snapshot = await safeLoadOutput();
+  if (!snapshot) {
+    console.warn(`[Matrix] card snapshot not found in _out for ${fileName}`);
+  }
   return snapshot?.cards ?? [];
 };
 
