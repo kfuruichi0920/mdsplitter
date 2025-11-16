@@ -73,6 +73,11 @@ interface TraceState {
     rightFile: string;
     relations: TraceabilityRelation[];
   }) => Promise<TraceCacheEntry>;
+  applyRelations: (params: {
+    leftFile: string;
+    rightFile: string;
+    relations: TraceabilityRelation[];
+  }) => TraceCacheEntry;
   getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
   getRelatedCards: (seeds: TraceSeed[]) => Record<string, Set<string>>;
   getRelatedNodeKeys: (seeds: TraceSeed[]) => Set<string>;
@@ -87,6 +92,14 @@ interface TraceState {
  * @return キャッシュキー文字列。
  */
 const toKey = (leftFile: string, rightFile: string): string => `${leftFile}|||${rightFile}`;
+
+const sanitizeTraceToken = (token: string): string => token.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+const deriveTraceFileName = (leftFile: string, rightFile: string): string => {
+  const leftBase = sanitizeTraceToken(leftFile.replace(/\.json$/i, ''));
+  const rightBase = sanitizeTraceToken(rightFile.replace(/\.json$/i, ''));
+  return `trace_${leftBase}__${rightBase}.json`;
+};
 
 
 /**
@@ -372,6 +385,23 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
       },
     };
 
+    const entry = convertLoadedFile(leftFile, rightFile, loaded);
+    set((state) => ({ cache: { ...state.cache, [key]: entry } }));
+    return entry;
+  },
+  applyRelations: ({ leftFile, rightFile, relations }) => {
+    const key = toKey(leftFile, rightFile);
+    const cached = get().cache[key];
+    const loaded: LoadedTraceabilityFile = {
+      fileName: cached?.fileName ?? cached?.sourceFileName ?? deriveTraceFileName(leftFile, rightFile),
+      payload: {
+        schemaVersion: cached?.schemaVersion ?? TRACEABILITY_FILE_SCHEMA_VERSION,
+        header: cached?.header,
+        left_file: leftFile,
+        right_file: rightFile,
+        relations,
+      },
+    } satisfies LoadedTraceabilityFile;
     const entry = convertLoadedFile(leftFile, rightFile, loaded);
     set((state) => ({ cache: { ...state.cache, [key]: entry } }));
     return entry;

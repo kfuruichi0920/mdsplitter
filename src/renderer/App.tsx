@@ -855,6 +855,14 @@ export const App = () => {
           relations: nextRelations,
         });
 
+        if (window.app?.matrix) {
+          window.app.matrix.broadcastTraceChange({
+            leftFile: leftSelection.fileName,
+            rightFile: rightSelection.fileName,
+            relations: updatedEntry.relations,
+          });
+        }
+
         const nextLeftSet = relationCardSet(updatedEntry.relations, 'left');
         const nextRightSet = relationCardSet(updatedEntry.relations, 'right');
         const workspaceActions = useWorkspaceStore.getState();
@@ -1152,6 +1160,41 @@ export const App = () => {
 
     void loadFileList();
   }, [pushLog]);
+
+  useEffect(() => {
+    if (!window.app?.matrix?.onTraceChanged) {
+      return;
+    }
+    const unsubscribe = window.app.matrix.onTraceChanged((event) => {
+      if (!event?.leftFile || !event?.rightFile) {
+        return;
+      }
+      const relations = event.relations ?? [];
+      const traceState = useTraceStore.getState();
+      const prevEntry = traceState.getCached(event.leftFile, event.rightFile);
+      const prevLeftSet = relationCardSet(prevEntry?.relations ?? [], 'left');
+      const prevRightSet = relationCardSet(prevEntry?.relations ?? [], 'right');
+      const nextEntry = traceState.applyRelations({
+        leftFile: event.leftFile,
+        rightFile: event.rightFile,
+        relations,
+      });
+      const nextLeftSet = relationCardSet(nextEntry.relations, 'left');
+      const nextRightSet = relationCardSet(nextEntry.relations, 'right');
+      const workspace = useWorkspaceStore.getState();
+      const leftUpdates = buildTraceFlagUpdates(prevLeftSet, nextLeftSet, 'hasRightTrace');
+      if (Object.keys(leftUpdates).length > 0) {
+        workspace.setCardTraceFlags(event.leftFile, leftUpdates);
+      }
+      const rightUpdates = buildTraceFlagUpdates(prevRightSet, nextRightSet, 'hasLeftTrace');
+      if (Object.keys(rightUpdates).length > 0) {
+        workspace.setCardTraceFlags(event.rightFile, rightUpdates);
+      }
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
 
   useEffect(() => {
     //! アプリ終了時の未保存変更確認

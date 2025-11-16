@@ -172,9 +172,14 @@ const api: AppAPI = {
       return () => ipcRenderer.removeListener('matrix:init', listener);
     },
     onTraceChanged: (callback) => {
-      const listener = (_event: Electron.IpcRendererEvent, payload: TraceChangeEvent) => callback(payload);
-      ipcRenderer.on('matrix:trace-changed', listener);
-      return () => ipcRenderer.removeListener('matrix:trace-changed', listener);
+      const matrixListener = (_event: Electron.IpcRendererEvent, payload: TraceChangeEvent) => callback(payload);
+      const mainListener = (_event: Electron.IpcRendererEvent, payload: TraceChangeEvent) => callback(payload);
+      ipcRenderer.on('matrix:trace-changed', matrixListener);
+      ipcRenderer.on('trace:changed', mainListener);
+      return () => {
+        ipcRenderer.removeListener('matrix:trace-changed', matrixListener);
+        ipcRenderer.removeListener('trace:changed', mainListener);
+      };
     },
     onCardSelectionChanged: (callback) => {
       const listener = (_event: Electron.IpcRendererEvent, payload: CardSelectionChangeEvent) => callback(payload);
