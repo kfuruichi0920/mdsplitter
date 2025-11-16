@@ -1,3 +1,22 @@
+/**
+ * @file pipeline.ts
+ * @brief ドキュメント→カード変換パイプライン。
+ * @details
+ * ルールベースまたはLLMベースの変換戦略を選択し、カードID自動付与を含む変換処理を実行。
+ * AbortSignal対応により中断可能。
+ * 例:
+ * @code
+ * const result = await convertDocument(doc, 'rule', {
+ *   cardIdOptions: { prefix: 'REQ', startNumber: 1, digits: 3, assignmentRule: 'all' }
+ * });
+ * @endcode
+ * @author K.Furuichi
+ * @date 2025-11-16
+ * @version 0.2
+ * @copyright MIT
+ * @see ruleEngine.ts, llmAdapter.ts
+ */
+
 import type { ConverterStrategy } from '@/shared/settings';
 
 import type {
