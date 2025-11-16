@@ -1,6 +1,6 @@
 # mdsplitter 詳細設計
 
-最終更新日: 2025-11-16
+最終更新日: 2025-11-16 (API化構想追加)
 対象リポジトリ: `mdsplitter`
 
 ## 1. システム概要
@@ -435,3 +435,145 @@ Deprecated --> Draft : 再利用
   - `CardPanel.tsx` のツールバーとメニューに 🧩 ボタンを追加し、`mergeValidation` で親ID/level/child有無/連続性を検証。要件を満たさない場合は INFO/WARN ログを出力し、選択変更に応じて状態を更新する。統合後は `mergeDialogCards` のスナップショットを用いて `mergeCards` を呼び出し、ダイアログをクローズする。
   - `workspaceStore.mergeCards` を実装し、Undo/Redo スタックへ統合前のカード配列を保存した上で新規カードを挿入。`removeOriginals` に応じて元カードを削除、`inheritTraces` に応じて `hasLeftTrace`/`hasRightTrace` を OR 結合し、`dirtyCardIds`/選択状態を更新する。子カードを持つ項目や非連続選択はストアで拒否し、単体テスト（`workspaceStore.test.ts`）で正常系/異常系/保持ケースを検証。
   - トレース引き継ぎは `CardPanel` 内の `reassignTracesForMerge` で実装し、`useTraceStore` のキャッシュにロード済みのファイルペアだけを対象に relation の `left_ids`/`right_ids` を置換した後 `saveRelationsForPair` で永続化する。未ロードのトレースファイルについては現行仕様上検出できないため、ユーザーに必要に応じてペアを開いてから再統合する運用想定。
+
+## 9. 将来の拡張: API化構想
+
+### 9.1 API化の背景と目的
+
+2025-11-16 時点で、mdsplitterをAPI経由で利用可能にする構想が検討されている。主な目的は以下の通り:
+
+1. **トレーサビリティ情報を利用したLLMの自動化分析**
+   - 要求仕様から設計、実装、テストまでのトレーサビリティを機械的に分析
+   - 影響範囲分析、カバレッジ分析、整合性チェックの自動化
+   - LLMを活用した文書レビュー支援
+
+2. **ローカル検索機能のクライアント・サーバ分離**
+   - 本ツールをサーバとして、検索機能をクライアントとして分離
+   - 複数クライアントからの並行アクセス
+   - リモート環境からのアクセス
+
+3. **他ツールとの連携**
+   - CI/CDパイプラインとの統合
+   - ドキュメント生成ツールとの連携
+   - プロジェクト管理ツールとの連携
+
+### 9.2 提案されているアーキテクチャ
+
+**段階的な実装アプローチ（フェーズ1〜7）:**
+
+1. **フェーズ1: コアロジックの分離とライブラリ化（2〜3週間）**
+   - 既存コードから再利用可能なコアロジックを `src/core/` に切り出し
+   - カードファイルの読み書き、トレーサビリティ管理、検索機能をライブラリ化
+   - Electronアプリとサーバの両方から利用可能にする
+
+2. **フェーズ2: HTTP REST APIサーバの基礎実装（3〜4週間）**
+   - Express.jsベースのREST APIサーバを `src/server/rest/` に実装
+   - 基本的なCRUD操作と検索機能を提供
+   - OpenAPI (Swagger) ドキュメントを自動生成
+
+3. **フェーズ3: トレーサビリティ・分析APIの実装（3〜4週間）**
+   - トレーサビリティ経路探索、影響範囲分析、カバレッジ分析
+   - 統計・分析API
+   - パフォーマンス最適化
+
+4. **フェーズ4: MCPサーバとLLM連携機能の実装（3〜4週間）**
+   - Claude Desktopから利用できるMCPサーバを `src/mcp/` に実装
+   - カード要約、トレース妥当性チェック、不整合検出などのツール提供
+   - OpenAI/Gemini APIクライアントの実装
+
+5. **フェーズ5: 認証・認可とセキュリティ強化（2〜3週間）**
+   - JWTトークンベースの認証
+   - ロールベースのアクセス制御（RBAC）
+   - レート制限とDoS対策
+
+6. **フェーズ6: GraphQL API実装（オプション、3〜4週間）**
+   - Apollo ServerベースのGraphQL API
+   - 複雑なクエリが必要な場合に追加
+
+7. **フェーズ7: 本番環境対応とデプロイ準備（2〜3週間）**
+   - Dockerコンテナ化
+   - ヘルスチェックとメトリクス
+   - デプロイドキュメント
+
+### 9.3 主要API仕様（抜粋）
+
+**カード検索API:**
+```
+GET /api/v1/cards/search
+  ?query=プロジェクト
+  &useRegex=false
+  &scope=all
+  &type=heading,paragraph
+  &status=approved
+  &limit=20
+  &offset=0
+```
+
+**影響範囲分析API:**
+```
+GET /api/v1/traces/impact
+  ?file=requirements.json
+  &cardId=card-001
+  &direction=forward
+  &maxDepth=3
+```
+
+**カバレッジ分析API:**
+```
+GET /api/v1/traces/coverage
+  ?sourceFile=requirements.json
+  &targetFile=design.json
+```
+
+**MCPツール（LLM連携）:**
+- `search_cards`: カード検索
+- `analyze_impact`: 影響範囲分析
+- `analyze_coverage`: カバレッジ分析
+- `summarize_cards`: カード要約
+- `validate_trace`: トレース妥当性チェック
+- `suggest_traces`: 未トレースカードの推奨
+- `detect_inconsistencies`: 不整合検出
+
+### 9.4 必要なライブラリ・技術スタック
+
+**HTTP REST APIサーバ:**
+- Express.js または Fastify
+- cors, helmet, compression
+- swagger-ui-express, swagger-jsdoc
+
+**MCPサーバ:**
+- @modelcontextprotocol/sdk
+- stdio-transport または sse-transport
+
+**LLM連携:**
+- openai
+- @google/generative-ai
+- langchain（任意）
+
+**テスト:**
+- supertest (HTTP APIテスト)
+- nock (HTTP モック)
+- @modelcontextprotocol/sdk/testing
+
+### 9.5 推奨される開発順序
+
+**最小構成（MVP）:** フェーズ1 + フェーズ2 → 5〜7週間
+**推奨構成:** フェーズ1 + フェーズ2 + フェーズ3 + フェーズ4 → 11〜15週間
+**フル機能:** 全フェーズ → 18〜25週間
+
+### 9.6 参考資料
+
+詳細な検討結果は `doc/api_architecture_report.md` を参照。同レポートには以下が含まれる:
+- API機能の詳細仕様
+- 実現方法の比較検討
+- タスクの詳細分割
+- リスクと対策
+- API仕様サンプル
+- MCPツール仕様サンプル
+
+**関連ドキュメント:**
+- `doc/api_architecture_report.md`: API化構想の詳細検討レポート（2025-11-16作成）
+- `spec/SW要求仕様書.md`: 現状の機能要件
+- `src/shared/traceability.ts`: トレーサビリティデータモデル
+- `src/shared/workspace.ts`: カードファイルデータモデル
+- `src/renderer/utils/search.ts`: 検索機能の実装
