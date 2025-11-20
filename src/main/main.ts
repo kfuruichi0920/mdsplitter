@@ -23,19 +23,19 @@ import type { OpenDialogOptions, SaveDialogOptions } from 'electron';
 import type { LogLevel } from '../shared/settings';
 
 import {
-  getWorkspacePaths,
-  initializeWorkspace,
-  listCardFiles,
-  listOutputFiles,
-  loadCardFile,
-  loadOutputFile,
-  loadTraceFile,
-  saveTraceFile,
-  loadSettings,
-  loadWorkspaceSnapshot,
-  saveCardFileSnapshot,
-  saveWorkspaceSnapshot,
-  updateSettings,
+	getWorkspacePaths,
+	initializeWorkspace,
+	listCardFiles,
+	listOutputFiles,
+	loadCardFile,
+	loadOutputFile,
+	loadTraceFile,
+	saveTraceFile,
+	loadSettings,
+	loadWorkspaceSnapshot,
+	saveCardFileSnapshot,
+	saveWorkspaceSnapshot,
+	updateSettings,
 } from './workspace';
 import type { WorkspacePaths } from './workspace';
 import type { TraceFileSaveRequest } from '../shared/traceability';
@@ -46,14 +46,16 @@ import { appendCardHistoryVersion, loadCardHistory } from './history';
 import type { AppendCardHistoryRequest } from '../shared/history';
 import { MatrixWindowManager } from './matrixWindowManager';
 import type {
-  CardSelectionChangeEvent,
-  MatrixCloseRequest,
-  MatrixOpenRequest,
-  MatrixOpenResult,
-  MatrixExportRequest,
-  MatrixExportResult,
-  TraceChangeEvent,
+	CardSelectionChangeEvent,
+	MatrixCloseRequest,
+	MatrixOpenRequest,
+	MatrixOpenResult,
+	MatrixExportRequest,
+	MatrixExportResult,
+	TraceChangeEvent,
 } from '../shared/matrixProtocol';
+import { exportCards } from './export';
+import type { ExportFormat, ExportOptions } from '../shared/export';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -79,29 +81,29 @@ const matrixWindowManager = new MatrixWindowManager();
  * @todo 複数ウィンドウ対応。
  */
 const createWindow = () => {
-  mainWindow = new BrowserWindow({
-    width: 1280,        ///< 初期幅
-    height: 800,        ///< 初期高さ
-    minWidth: 960,      ///< 最小幅
-    minHeight: 600,     ///< 最小高さ
-    show: false,        ///< 初期非表示
-    webPreferences: {
-      preload: resolvePreloadPath(), ///< preloadスクリプト
-      contextIsolation: true,        ///< コンテキスト分離
-      nodeIntegration: false,        ///< Node.js無効
-      sandbox: true                  ///< サンドボックス有効
-    }
-  });
+	mainWindow = new BrowserWindow({
+		width: 1280,        ///< 初期幅
+		height: 800,        ///< 初期高さ
+		minWidth: 960,      ///< 最小幅
+		minHeight: 600,     ///< 最小高さ
+		show: false,        ///< 初期非表示
+		webPreferences: {
+			preload: resolvePreloadPath(), ///< preloadスクリプト
+			contextIsolation: true,        ///< コンテキスト分離
+			nodeIntegration: false,        ///< Node.js無効
+			sandbox: true                  ///< サンドボックス有効
+		}
+	});
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show(); //!< ウィンドウ表示
-  });
+	mainWindow.once('ready-to-show', () => {
+		mainWindow?.show(); //!< ウィンドウ表示
+	});
 
-  mainWindow.loadFile(resolveRendererIndexFile()); //!< レンダラー読込
+	mainWindow.loadFile(resolveRendererIndexFile()); //!< レンダラー読込
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' }); //!< DevTools分離表示
-  }
+	if (isDev) {
+		mainWindow.webContents.openDevTools({ mode: 'detach' }); //!< DevTools分離表示
+	}
 };
 
 
@@ -113,280 +115,293 @@ const createWindow = () => {
  * @note デバッグ用。副作用: ログ出力。
  */
 ipcMain.handle('app:ping', async (_event, payload: string) => {
-  console.log(`[main] received ping: ${payload}`); //!< 受信ログ
-  return { ok: true, timestamp: Date.now() };
+	console.log(`[main] received ping: ${payload}`); //!< 受信ログ
+	return { ok: true, timestamp: Date.now() };
 });
 
 ipcMain.handle('settings:load', async () => {
-  return loadSettings();
+	return loadSettings();
 });
 
 ipcMain.handle('settings:update', async (_event, patch) => {
-  if (typeof patch !== 'object' || patch === null) {
-    throw new Error('Invalid settings payload');
-  }
+	if (typeof patch !== 'object' || patch === null) {
+		throw new Error('Invalid settings payload');
+	}
 
-  const updated = await updateSettings(patch);
-  updateLoggerSettings(updated);
-  logMessage('info', '設定を更新しました');
-  return updated;
+	const updated = await updateSettings(patch);
+	updateLoggerSettings(updated);
+	logMessage('info', '設定を更新しました');
+	return updated;
 });
 
 ipcMain.handle('log:write', async (_event, payload: { level: LogLevel; message: string }) => {
-  if (!payload || typeof payload.message !== 'string') {
-    throw new Error('Invalid log payload');
-  }
+	if (!payload || typeof payload.message !== 'string') {
+		throw new Error('Invalid log payload');
+	}
 
-  logMessage(payload.level, payload.message);
-  return { ok: true };
+	logMessage(payload.level, payload.message);
+	return { ok: true };
 });
 
 ipcMain.handle('workspace:save', async (_event, snapshot) => {
-  if (!snapshot || typeof snapshot !== 'object') {
-    throw new Error('Invalid workspace payload');
-  }
+	if (!snapshot || typeof snapshot !== 'object') {
+		throw new Error('Invalid workspace payload');
+	}
 
-  if (!Array.isArray(snapshot.cards)) {
-    throw new Error('Workspace payload requires cards array');
-  }
+	if (!Array.isArray(snapshot.cards)) {
+		throw new Error('Workspace payload requires cards array');
+	}
 
-  const path = await saveWorkspaceSnapshot(snapshot);
-  logMessage('info', `ワークスペースを保存しました: ${path}`);
-  return { path };
+	const path = await saveWorkspaceSnapshot(snapshot);
+	logMessage('info', `ワークスペースを保存しました: ${path}`);
+	return { path };
 });
 
 ipcMain.handle('workspace:saveCardFile', async (_event, payload) => {
-  const { fileName, snapshot } = payload ?? {};
-  if (typeof fileName !== 'string') {
-    throw new Error('保存ファイル名が無効です');
-  }
-  if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.cards)) {
-    throw new Error('カードスナップショットが無効です');
-  }
+	const { fileName, snapshot } = payload ?? {};
+	if (typeof fileName !== 'string') {
+		throw new Error('保存ファイル名が無効です');
+	}
+	if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.cards)) {
+		throw new Error('カードスナップショットが無効です');
+	}
 
-  const savedPath = await saveCardFileSnapshot(fileName, snapshot);
-  logMessage('info', `カードファイルを保存しました: ${savedPath}`);
-  return { path: savedPath };
+	const savedPath = await saveCardFileSnapshot(fileName, snapshot);
+	logMessage('info', `カードファイルを保存しました: ${savedPath}`);
+	return { path: savedPath };
 });
 
 ipcMain.handle('workspace:load', async () => {
-  const snapshot = await loadWorkspaceSnapshot();
-  if (snapshot) {
-    logMessage('info', 'ワークスペーススナップショットを読み込みました');
-  }
-  return snapshot;
+	const snapshot = await loadWorkspaceSnapshot();
+	if (snapshot) {
+		logMessage('info', 'ワークスペーススナップショットを読み込みました');
+	}
+	return snapshot;
 });
 
 ipcMain.handle('workspace:listCardFiles', async () => {
-  const files = await listCardFiles();
-  logMessage('info', `カードファイル一覧を取得しました: ${files.length}件`);
-  return files;
+	const files = await listCardFiles();
+	logMessage('info', `カードファイル一覧を取得しました: ${files.length}件`);
+	return files;
 });
 
 ipcMain.handle('workspace:listOutputFiles', async () => {
-  const files = await listOutputFiles();
-  logMessage('info', `出力ファイル一覧を取得しました: ${files.length}件`);
-  return files;
+	const files = await listOutputFiles();
+	logMessage('info', `出力ファイル一覧を取得しました: ${files.length}件`);
+	return files;
 });
 
 ipcMain.handle('workspace:loadCardFile', async (_event, fileName: string) => {
-  logMessage('info', `カードファイルを読み込みます (_input): ${fileName}`);
-  const snapshot = await loadCardFile(fileName);
-  if (snapshot) {
-    logMessage('info', `カードファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
-  } else {
-    logMessage('warn', `カードファイルの読み込みに失敗しました: ${fileName}`);
-  }
-  return snapshot;
+	logMessage('info', `カードファイルを読み込みます (_input): ${fileName}`);
+	const snapshot = await loadCardFile(fileName);
+	if (snapshot) {
+		logMessage('info', `カードファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
+	} else {
+		logMessage('warn', `カードファイルの読み込みに失敗しました: ${fileName}`);
+	}
+	return snapshot;
 });
 
 ipcMain.handle('workspace:loadOutputFile', async (_event, fileName: string) => {
-  logMessage('info', `出力ファイルを読み込みます (_out): ${fileName}`);
-  const snapshot = await loadOutputFile(fileName);
-  if (snapshot) {
-    logMessage('info', `出力ファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
-  } else {
-    logMessage('warn', `出力ファイルの読み込みに失敗しました: ${fileName}`);
-  }
-  return snapshot;
+	logMessage('info', `出力ファイルを読み込みます (_out): ${fileName}`);
+	const snapshot = await loadOutputFile(fileName);
+	if (snapshot) {
+		logMessage('info', `出力ファイルを読み込みました: ${fileName} (${snapshot.cards.length}枚)`);
+	} else {
+		logMessage('warn', `出力ファイルの読み込みに失敗しました: ${fileName}`);
+	}
+	return snapshot;
 });
 
 ipcMain.handle('history:load', async (_event, payload: { fileName: string; cardId: string }) => {
-  const { fileName, cardId } = payload ?? {};
-  if (typeof fileName !== 'string' || typeof cardId !== 'string') {
-    throw new Error('Invalid history load payload');
-  }
-  return loadCardHistory(fileName, cardId);
+	const { fileName, cardId } = payload ?? {};
+	if (typeof fileName !== 'string' || typeof cardId !== 'string') {
+		throw new Error('Invalid history load payload');
+	}
+	return loadCardHistory(fileName, cardId);
 });
 
 ipcMain.handle('history:appendVersion', async (_event, payload: AppendCardHistoryRequest) => {
-  if (!payload || typeof payload.fileName !== 'string' || typeof payload.cardId !== 'string' || typeof payload.version !== 'object') {
-    throw new Error('Invalid history append payload');
-  }
-  const saved = await appendCardHistoryVersion(payload);
-  logMessage('info', `カード履歴を更新しました: ${payload.fileName} / ${payload.cardId}`);
-  return saved;
+	if (!payload || typeof payload.fileName !== 'string' || typeof payload.cardId !== 'string' || typeof payload.version !== 'object') {
+		throw new Error('Invalid history append payload');
+	}
+	const saved = await appendCardHistoryVersion(payload);
+	logMessage('info', `カード履歴を更新しました: ${payload.fileName} / ${payload.cardId}`);
+	return saved;
 });
 
 ipcMain.handle('workspace:loadTraceFile', async (_event, args: { leftFile: string; rightFile: string }) => {
-  const { leftFile, rightFile } = args;
-  logMessage('debug', `トレーサビリティファイルを探索します: left=${leftFile}, right=${rightFile}`);
-  const trace = await loadTraceFile(leftFile, rightFile);
-  if (trace) {
-    logMessage('info', `トレーサビリティファイルを読み込みました: ${trace.fileName}`);
-  } else {
-    logMessage('debug', '対応するトレーサビリティファイルが見つかりませんでした');
-  }
-  return trace;
+	const { leftFile, rightFile } = args;
+	logMessage('debug', `トレーサビリティファイルを探索します: left=${leftFile}, right=${rightFile}`);
+	const trace = await loadTraceFile(leftFile, rightFile);
+	if (trace) {
+		logMessage('info', `トレーサビリティファイルを読み込みました: ${trace.fileName}`);
+	} else {
+		logMessage('debug', '対応するトレーサビリティファイルが見つかりませんでした');
+	}
+	return trace;
 });
 
 ipcMain.handle('workspace:saveTraceFile', async (_event, payload: TraceFileSaveRequest) => {
-  logMessage('info', `トレーサビリティファイルを保存します: left=${payload.leftFile}, right=${payload.rightFile}`);
-  const result = await saveTraceFile(payload);
-  logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
-  return result;
+	logMessage('info', `トレーサビリティファイルを保存します: left=${payload.leftFile}, right=${payload.rightFile}`);
+	const result = await saveTraceFile(payload);
+	logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
+	return result;
 });
 
 ipcMain.handle('matrix:open', async (_event, payload: MatrixOpenRequest): Promise<MatrixOpenResult> => {
-  if (!payload || typeof payload.leftFile !== 'string' || typeof payload.rightFile !== 'string') {
-    throw new Error('matrix:open payload is invalid');
-  }
-  const windowId = matrixWindowManager.openFromRequest(payload);
-  logMessage('info', `マトリクスウィンドウを生成しました: ${windowId}`);
-  return { windowId };
+	if (!payload || typeof payload.leftFile !== 'string' || typeof payload.rightFile !== 'string') {
+		throw new Error('matrix:open payload is invalid');
+	}
+	const windowId = matrixWindowManager.openFromRequest(payload);
+	logMessage('info', `マトリクスウィンドウを生成しました: ${windowId}`);
+	return { windowId };
 });
 
 ipcMain.handle('matrix:close', async (_event, payload: MatrixCloseRequest) => {
-  if (!payload || typeof payload.windowId !== 'string') {
-    throw new Error('matrix:close payload is invalid');
-  }
-  matrixWindowManager.closeMatrixWindow(payload.windowId);
-  return { ok: true };
+	if (!payload || typeof payload.windowId !== 'string') {
+		throw new Error('matrix:close payload is invalid');
+	}
+	matrixWindowManager.closeMatrixWindow(payload.windowId);
+	return { ok: true };
 });
 
 ipcMain.on('matrix:trace-change', (_event, payload: TraceChangeEvent) => {
-  if (!payload?.leftFile || !payload?.rightFile || !Array.isArray(payload.relations)) {
-    return;
-  }
-  matrixWindowManager.broadcastTraceChange(payload);
-  mainWindow?.webContents.send('trace:changed', payload);
+	if (!payload?.leftFile || !payload?.rightFile || !Array.isArray(payload.relations)) {
+		return;
+	}
+	matrixWindowManager.broadcastTraceChange(payload);
+	mainWindow?.webContents.send('trace:changed', payload);
 });
 
 ipcMain.on('matrix:card-selection', (event, payload: CardSelectionChangeEvent) => {
-  if (!payload?.fileName || !Array.isArray(payload.selectedCardIds)) {
-    return;
-  }
-  const senderWindowId = matrixWindowManager.getWindowIdByWebContentsId(event.sender.id);
-  matrixWindowManager.broadcastCardSelection(payload, { excludeWindowId: senderWindowId });
-  mainWindow?.webContents.send('matrix:card-selection', payload);
+	if (!payload?.fileName || !Array.isArray(payload.selectedCardIds)) {
+		return;
+	}
+	const senderWindowId = matrixWindowManager.getWindowIdByWebContentsId(event.sender.id);
+	matrixWindowManager.broadcastCardSelection(payload, { excludeWindowId: senderWindowId });
+	mainWindow?.webContents.send('matrix:card-selection', payload);
 });
 
 ipcMain.handle('matrix:export', async (_event, payload: MatrixExportRequest): Promise<MatrixExportResult> => {
-  if (!payload || typeof payload.fileName !== 'string' || typeof payload.content !== 'string' || typeof payload.encoding !== 'string') {
-    throw new Error('matrix:export payload is invalid');
-  }
-  const paths = getWorkspacePaths();
-  const safeName = payload.fileName.trim().length > 0 ? payload.fileName.trim() : 'trace-matrix.csv';
-  const resolved = path.join(paths.outputDir, safeName);
-  const buffer = payload.encoding === 'base64' ? Buffer.from(payload.content, 'base64') : Buffer.from(payload.content, 'utf8');
-  await fs.writeFile(resolved, buffer);
-  logMessage('info', `トレースマトリクスを保存しました (${payload.format}): ${resolved}`);
-  return { savedPath: resolved } satisfies MatrixExportResult;
+	if (!payload || typeof payload.fileName !== 'string' || typeof payload.content !== 'string' || typeof payload.encoding !== 'string') {
+		throw new Error('matrix:export payload is invalid');
+	}
+	const paths = getWorkspacePaths();
+	const safeName = payload.fileName.trim().length > 0 ? payload.fileName.trim() : 'trace-matrix.csv';
+	const resolved = path.join(paths.outputDir, safeName);
+	const buffer = payload.encoding === 'base64' ? Buffer.from(payload.content, 'base64') : Buffer.from(payload.content, 'utf8');
+	await fs.writeFile(resolved, buffer);
+	logMessage('info', `トレースマトリクスを保存しました (${payload.format}): ${resolved}`);
+	return { savedPath: resolved } satisfies MatrixExportResult;
 });
 
 ipcMain.handle('document:pickSource', async () => {
-  const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
-  const paths = getWorkspacePaths();
-  const options: OpenDialogOptions = {
-    title: '変換するテキスト/Markdownファイルを選択',
-    defaultPath: paths.inputDir,
-    filters: [
-      { name: 'Markdown', extensions: ['md', 'markdown'] },
-      { name: 'Text', extensions: ['txt'] },
-      { name: 'すべて', extensions: ['txt', 'md', 'markdown'] },
-    ],
-    properties: ['openFile'],
-  };
+	const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+	const paths = getWorkspacePaths();
+	const options: OpenDialogOptions = {
+		title: '変換するテキスト/Markdownファイルを選択',
+		defaultPath: paths.inputDir,
+		filters: [
+			{ name: 'Markdown', extensions: ['md', 'markdown'] },
+			{ name: 'Text', extensions: ['txt'] },
+			{ name: 'すべて', extensions: ['txt', 'md', 'markdown'] },
+		],
+		properties: ['openFile'],
+	};
 
-  const result = browserWindow
-    ? await dialog.showOpenDialog(browserWindow, options)
-    : await dialog.showOpenDialog(options);
+	const result = browserWindow
+		? await dialog.showOpenDialog(browserWindow, options)
+		: await dialog.showOpenDialog(options);
 
-  if (result.canceled || result.filePaths.length === 0) {
-    return { canceled: true };
-  }
+	if (result.canceled || result.filePaths.length === 0) {
+		return { canceled: true };
+	}
 
-  try {
-    const settings = await loadSettings();
-    const document = await loadDocumentFromPath(result.filePaths[0], settings);
-    const imported = await importSourceDocument(document, paths);
-    logMessage(
-      document.sizeStatus === 'warn' ? 'warn' : 'info',
-      `入力ファイルを読み込みました: ${document.fileName} (${document.encoding}, ${document.sizeBytes} bytes)`,
-    );
-    return {
-      canceled: false,
-      document: {
-        fileName: document.fileName,
-        baseName: document.baseName,
-        extension: document.extension,
-        sizeBytes: document.sizeBytes,
-        encoding: document.encoding,
-        content: document.content,
-        isMarkdown: document.isMarkdown,
-        sizeStatus: document.sizeStatus,
-        workspaceFileName: imported?.fileName ?? null,
-        workspacePath: imported?.absolutePath ?? null,
-      },
-    };
-  } catch (error) {
-    if (error instanceof DocumentLoadError) {
-      logMessage('warn', `入力ファイルの読み込みに失敗しました (${error.code}): ${error.message}`);
-      return { canceled: false, error: { message: error.message, code: error.code } };
-    }
-    logMessage('error', `入力ファイル読み込みで予期せぬ例外: ${String(error)}`);
-    return { canceled: false, error: { message: '入力ファイルの読み込み中にエラーが発生しました。', code: 'READ_FAILED' } };
-  }
+	try {
+		const settings = await loadSettings();
+		const document = await loadDocumentFromPath(result.filePaths[0], settings);
+		const imported = await importSourceDocument(document, paths);
+		logMessage(
+			document.sizeStatus === 'warn' ? 'warn' : 'info',
+			`入力ファイルを読み込みました: ${document.fileName} (${document.encoding}, ${document.sizeBytes} bytes)`,
+		);
+		return {
+			canceled: false,
+			document: {
+				fileName: document.fileName,
+				baseName: document.baseName,
+				extension: document.extension,
+				sizeBytes: document.sizeBytes,
+				encoding: document.encoding,
+				content: document.content,
+				isMarkdown: document.isMarkdown,
+				sizeStatus: document.sizeStatus,
+				workspaceFileName: imported?.fileName ?? null,
+				workspacePath: imported?.absolutePath ?? null,
+			},
+		};
+	} catch (error) {
+		if (error instanceof DocumentLoadError) {
+			logMessage('warn', `入力ファイルの読み込みに失敗しました (${error.code}): ${error.message}`);
+			return { canceled: false, error: { message: error.message, code: error.code } };
+		}
+		logMessage('error', `入力ファイル読み込みで予期せぬ例外: ${String(error)}`);
+		return { canceled: false, error: { message: '入力ファイルの読み込み中にエラーが発生しました。', code: 'READ_FAILED' } };
+	}
 });
 
 ipcMain.handle('dialog:promptSaveFile', async (_event, options: { defaultFileName?: string } = {}) => {
-  const paths = getWorkspacePaths();
-  const sanitizedDefault = typeof options.defaultFileName === 'string' && options.defaultFileName.trim().length > 0
-    ? options.defaultFileName.trim()
-    : 'cards.json';
-  const defaultPath = path.join(paths.outputDir, sanitizedDefault);
-  const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
-  const dialogOptions: SaveDialogOptions = {
-    title: 'カードファイルを保存',
-    defaultPath,
-    filters: [{ name: 'JSON Files', extensions: ['json'] }],
-    properties: ['showOverwriteConfirmation', 'createDirectory'],
-  };
+	const paths = getWorkspacePaths();
+	const sanitizedDefault = typeof options.defaultFileName === 'string' && options.defaultFileName.trim().length > 0
+		? options.defaultFileName.trim()
+		: 'cards.json';
+	const defaultPath = path.join(paths.outputDir, sanitizedDefault);
+	const browserWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+	const dialogOptions: SaveDialogOptions = {
+		title: 'カードファイルを保存',
+		defaultPath,
+		filters: [{ name: 'JSON Files', extensions: ['json'] }],
+		properties: ['showOverwriteConfirmation', 'createDirectory'],
+	};
 
-  const result = browserWindow
-    ? await dialog.showSaveDialog(browserWindow, dialogOptions)
-    : await dialog.showSaveDialog(dialogOptions);
-  if (result.canceled || !result.filePath) {
-    return { canceled: true };
-  }
-  return { canceled: false, fileName: path.basename(result.filePath) };
+	const result = browserWindow
+		? await dialog.showSaveDialog(browserWindow, dialogOptions)
+		: await dialog.showSaveDialog(dialogOptions);
+	if (result.canceled || !result.filePath) {
+		return { canceled: true };
+	}
+	return { canceled: false, fileName: path.basename(result.filePath) };
+});
+
+ipcMain.handle('export:cards', async (_event, format: ExportFormat, options: ExportOptions, cards: any[]) => {
+	if (!format || !options || !Array.isArray(cards)) {
+		throw new Error('Invalid export payload');
+	}
+	try {
+		const result = await exportCards(format, options, cards);
+		return result;
+	} catch (error) {
+		logMessage('error', `エクスポートに失敗しました: ${String(error)}`);
+		throw error;
+	}
 });
 
 
 // アプリ起動時の初期化処理
 app.whenReady().then(async () => {
-  const paths = await initializeWorkspace();
-  const settings = await loadSettings();
-  await initLogger(settings, paths);
-  logMessage('info', 'アプリケーションを起動しました');
+	const paths = await initializeWorkspace();
+	const settings = await loadSettings();
+	await initLogger(settings, paths);
+	logMessage('info', 'アプリケーションを起動しました');
 
-  createWindow(); //!< 初回ウィンドウ生成
+	createWindow(); //!< 初回ウィンドウ生成
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(); //!< macOSで全ウィンドウ閉時の再生成
-    }
-  });
+	app.on('activate', () => {
+		if (BrowserWindow.getAllWindows().length === 0) {
+			createWindow(); //!< macOSで全ウィンドウ閉時の再生成
+		}
+	});
 });
 
 
@@ -396,71 +411,71 @@ app.whenReady().then(async () => {
  * macOS以外ではアプリ終了。macOSは慣例的に残す。
  */
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit(); //!< アプリ終了
-  }
+	if (process.platform !== 'darwin') {
+		app.quit(); //!< アプリ終了
+	}
 });
 const sanitizeInputFileName = (fileName: string, fallbackExt = '.txt'): string => {
-  const trimmed = fileName?.trim?.() ?? '';
-  const ext = path.extname(trimmed) || fallbackExt;
-  const base = (ext ? trimmed.slice(0, -ext.length) : trimmed) || 'imported_document';
-  const safeBase = base.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const safeExt = ext.replace(/[^a-zA-Z0-9._-]/g, '').length > 0 ? ext : fallbackExt;
-  return `${safeBase}${safeExt}`;
+	const trimmed = fileName?.trim?.() ?? '';
+	const ext = path.extname(trimmed) || fallbackExt;
+	const base = (ext ? trimmed.slice(0, -ext.length) : trimmed) || 'imported_document';
+	const safeBase = base.replace(/[^a-zA-Z0-9._-]/g, '_');
+	const safeExt = ext.replace(/[^a-zA-Z0-9._-]/g, '').length > 0 ? ext : fallbackExt;
+	return `${safeBase}${safeExt}`;
 };
 
 const fileExists = async (targetPath: string): Promise<boolean> => {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch (error) {
-    return false;
-  }
+	try {
+		await fs.access(targetPath);
+		return true;
+	} catch (error) {
+		return false;
+	}
 };
 
 const ensureUniqueInputFileName = async (dir: string, preferred: string): Promise<string> => {
-  const ext = path.extname(preferred);
-  const base = ext ? preferred.slice(0, -ext.length) : preferred;
-  let attempt = preferred;
-  let counter = 1;
-  while (await fileExists(path.join(dir, attempt))) {
-    attempt = `${base}_${String(counter).padStart(2, '0')}${ext}`;
-    counter += 1;
-  }
-  return attempt;
+	const ext = path.extname(preferred);
+	const base = ext ? preferred.slice(0, -ext.length) : preferred;
+	let attempt = preferred;
+	let counter = 1;
+	while (await fileExists(path.join(dir, attempt))) {
+		attempt = `${base}_${String(counter).padStart(2, '0')}${ext}`;
+		counter += 1;
+	}
+	return attempt;
 };
 
 const isWithinDirectory = (targetPath: string, directory: string): boolean => {
-  const relative = path.relative(directory, targetPath);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+	const relative = path.relative(directory, targetPath);
+	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 };
 
 const importSourceDocument = async (
-  doc: LoadedDocument,
-  paths: WorkspacePaths,
+	doc: LoadedDocument,
+	paths: WorkspacePaths,
 ): Promise<{ fileName: string; absolutePath: string } | null> => {
-  const resolvedInputDir = path.resolve(paths.inputDir);
-  const resolvedOriginal = path.resolve(doc.originalPath);
-  if (isWithinDirectory(resolvedOriginal, resolvedInputDir)) {
-    return {
-      fileName: path.basename(resolvedOriginal),
-      absolutePath: resolvedOriginal,
-    };
-  }
+	const resolvedInputDir = path.resolve(paths.inputDir);
+	const resolvedOriginal = path.resolve(doc.originalPath);
+	if (isWithinDirectory(resolvedOriginal, resolvedInputDir)) {
+		return {
+			fileName: path.basename(resolvedOriginal),
+			absolutePath: resolvedOriginal,
+		};
+	}
 
-  try {
-    const sanitized = sanitizeInputFileName(doc.fileName, doc.extension || '.txt');
-    const uniqueName = await ensureUniqueInputFileName(resolvedInputDir, sanitized);
-    const destination = path.join(resolvedInputDir, uniqueName);
-    await fs.copyFile(resolvedOriginal, destination);
-    logMessage('info', `入力ファイルをワークスペースにコピーしました: ${uniqueName}`);
-    return {
-      fileName: uniqueName,
-      absolutePath: destination,
-    };
-  } catch (error) {
-    console.error('[main] failed to import source document', error);
-    logMessage('warn', '入力ファイルのコピーに失敗しました。元ファイルを直接参照します。');
-    return null;
-  }
+	try {
+		const sanitized = sanitizeInputFileName(doc.fileName, doc.extension || '.txt');
+		const uniqueName = await ensureUniqueInputFileName(resolvedInputDir, sanitized);
+		const destination = path.join(resolvedInputDir, uniqueName);
+		await fs.copyFile(resolvedOriginal, destination);
+		logMessage('info', `入力ファイルをワークスペースにコピーしました: ${uniqueName}`);
+		return {
+			fileName: uniqueName,
+			absolutePath: destination,
+		};
+	} catch (error) {
+		console.error('[main] failed to import source document', error);
+		logMessage('warn', '入力ファイルのコピーに失敗しました。元ファイルを直接参照します。');
+		return null;
+	}
 };
