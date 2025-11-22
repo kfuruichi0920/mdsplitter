@@ -20,7 +20,7 @@ const MODE_LABELS: Record<SearchMode, string> = {
 const SCOPE_LABELS: Record<SearchScope, string> = {
   current: 'アクティブタブ',
   open: '開いているタブ',
-  input: '_input',
+  input: 'すべて',
 };
 
 const API_ORIGIN = (port: number | null) => `http://127.0.0.1:${port ?? 0}`;

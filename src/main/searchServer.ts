@@ -3,7 +3,7 @@ import { URL } from 'node:url';
 import { nanoid } from 'nanoid';
 import type { BrowserWindow } from 'electron';
 
-import { listCardFiles, loadCardFile } from './workspace';
+import { listCardFiles, loadCardFile, listOutputFiles, loadOutputFile, getWorkspacePaths } from './workspace';
 import { runSearch, type SearchDataset, type SearchRequest, type SearchResult } from '../shared/search';
 
 type OpenTabsSnapshot = {
@@ -51,7 +51,7 @@ const readBody = async (req: http.IncomingMessage): Promise<any> => {
 const sendJson = (res: http.ServerResponse, status: number, payload: unknown): void => {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': 'http://127.0.0.1',
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
@@ -62,7 +62,7 @@ const notFound = (res: http.ServerResponse) => sendJson(res, 404, { error: 'not 
 
 const handleOptions = (res: http.ServerResponse) => {
   res.writeHead(204, {
-    'Access-Control-Allow-Origin': 'http://127.0.0.1',
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
@@ -127,6 +127,7 @@ const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
       }
 
       const datasets: SearchDataset[] = [];
+      console.info(`[searchServer] search scope=${request.scope}, mode=${request.mode}`);
       if (request.scope === 'open' || request.scope === 'current') {
         if (!state.openTabs?.tabs?.length) {
           sendJson(res, 400, { error: '開いているタブ情報がありません。メイン画面から検索を再度実行してください。' });
@@ -143,12 +144,24 @@ const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
           datasets.push(...state.openTabs.tabs);
         }
       } else if (request.scope === 'input') {
-        const files = await listCardFiles();
+        // 仕様変更: 検索対象は _out 配下のカードファイル
+        const paths = getWorkspacePaths();
+        console.info(`[searchServer] _output dir: ${paths.outputDir}`);
+        const files = await listOutputFiles();
+        console.info(`[searchServer] _output files found: ${files.length}`);
         for (const file of files) {
-          const snapshot = await loadCardFile(file);
-          if (snapshot?.cards) {
-            datasets.push({ source: 'input', fileName: file, cards: snapshot.cards });
+          try {
+            const snapshot = await loadOutputFile(file);
+            if (snapshot?.cards) {
+              datasets.push({ source: 'input', fileName: file, cards: snapshot.cards });
+            }
+          } catch (error) {
+            console.error('[searchServer] failed to load card file from _output', file, error);
           }
+        }
+        if (datasets.length === 0) {
+          sendJson(res, 400, { error: `_output に検索対象のカードファイルがありません。dir=${paths.outputDir}` });
+          return;
         }
       } else {
         sendJson(res, 400, { error: 'unsupported scope' });

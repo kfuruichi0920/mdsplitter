@@ -1359,7 +1359,10 @@ export const App = () => {
           }
         }
 
-        const snapshot = await window.app.workspace.loadCardFile(fileName);
+        let snapshot = await window.app.workspace.loadCardFile(fileName);
+        if (!snapshot && window.app.workspace.loadOutputFile) {
+          snapshot = await window.app.workspace.loadOutputFile(fileName);
+        }
         if (!snapshot) {
           notify('error', `カードファイルの読み込みに失敗しました: ${fileName}`);
           pushLog({
