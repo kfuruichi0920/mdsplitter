@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import type { SearchMode, SearchRequest, SearchResult, SearchScope } from '@/shared/search';
 import { applyThemeColors, applyTypography, applySplitterWidth } from '../utils/themeUtils';
 import { defaultSettings } from '@/shared/settings';
+import type { ThemeSettings } from '@/shared/settings';
 import { AdvancedSearchBuilder, type ConditionRow } from '../components/AdvancedSearchBuilder';
 
 type Status = 'idle' | 'loading' | 'error' | 'ready';
@@ -73,6 +74,21 @@ export const SearchApp = () => {
         console.error('[SearchApp] failed to apply theme', err);
       }
     })();
+    const unsubscribe = window.app.theme.onChanged((theme: ThemeSettings['theme']) => {
+      const mode = resolveThemeMode(theme.mode ?? defaultSettings.theme.mode);
+      const colors = mode === 'dark' ? theme.dark : theme.light;
+      applyThemeColors(colors);
+      applyTypography(theme.fontSize, theme.fontFamily);
+      applySplitterWidth(theme.splitterWidth);
+      if (mode === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+    return () => {
+      unsubscribe?.();
+    };
   }, []);
 
   const requestBody = useMemo<SearchRequest>(() => {

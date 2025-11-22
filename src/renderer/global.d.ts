@@ -28,6 +28,7 @@ import type {
 import type { ExportFormat, ExportOptions } from '@/shared/export';
 import type { Card } from '@/shared/workspace';
 import type { SearchDataset } from '@/shared/search';
+import type { ThemeSettings } from '@/shared/settings';
 
 export { };
 
@@ -100,6 +101,9 @@ declare global {
 				updateOpenTabs: (payload: { tabs: SearchDataset[]; activeTabId?: string | null; activeLeafId?: string | null }) => Promise<void>;
 				getServerInfo: () => Promise<{ port: number | null }>;
 				onFocus: (callback: (payload: { fileName: string; cardId: string; tabId?: string | null }) => void) => () => void;
+			};
+			theme: {
+				onChanged: (callback: (theme: ThemeSettings) => void) => () => void;
 			};
 		};
 	}

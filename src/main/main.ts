@@ -178,6 +178,9 @@ ipcMain.handle('settings:update', async (_event, patch) => {
 	const updated = await updateSettings(patch);
 	updateLoggerSettings(updated);
 	logMessage('info', '設定を更新しました');
+	BrowserWindow.getAllWindows().forEach((win) => {
+		win.webContents.send('theme:changed', updated.theme);
+	});
 	return updated;
 });
 

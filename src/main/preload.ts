@@ -35,6 +35,7 @@ import type {
 import type { ExportFormat, ExportOptions } from '../shared/export';
 import type { Card } from '../shared/workspace';
 import type { SearchDataset } from '../shared/search';
+import type { ThemeSettings } from '../shared/settings';
 
 
 /**
@@ -107,6 +108,9 @@ type AppAPI = {
 		updateOpenTabs: (payload: { tabs: SearchDataset[]; activeTabId?: string | null; activeLeafId?: string | null }) => Promise<void>;
 		getServerInfo: () => Promise<{ port: number | null }>;
 		onFocus: (callback: (payload: { fileName: string; cardId: string; tabId?: string | null }) => void) => () => void;
+	};
+	theme: {
+		onChanged: (callback: (theme: ThemeSettings) => void) => () => void;
 	};
 };
 
@@ -217,6 +221,13 @@ const api: AppAPI = {
 			};
 			ipcRenderer.on('search:focus', listener);
 			return () => ipcRenderer.removeListener('search:focus', listener);
+		},
+	},
+	theme: {
+		onChanged: (callback) => {
+			const listener = (_event: Electron.IpcRendererEvent, payload: ThemeSettings) => callback(payload);
+			ipcRenderer.on('theme:changed', listener);
+			return () => ipcRenderer.removeListener('theme:changed', listener);
 		},
 	},
 };
