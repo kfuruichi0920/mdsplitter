@@ -11,6 +11,7 @@
  */
 import type { AppSettings, AppSettingsPatch, LogLevel } from '@/shared/settings';
 import type { WorkspaceSnapshot } from '@/shared/workspace';
+import type { ProjectFile, ProjectValidationResult } from '@/shared/project';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '@/shared/traceability';
 import type { AppendCardHistoryRequest, CardHistory } from '@/shared/history';
 import type { DocumentLoadErrorCode } from '@/main/documentLoader';
@@ -52,8 +53,14 @@ declare global {
 				loadOutputFile: (fileName: string) => Promise<WorkspaceSnapshot | null>;
 				loadTraceFile: (leftFile: string, rightFile: string) => Promise<LoadedTraceabilityFile | null>;
 			};
+			project: {
+				load: (filePath: string) => Promise<ProjectFile>;
+				save: (project: ProjectFile, filePath: string) => Promise<{ path: string }>;
+				validate: (project: ProjectFile) => Promise<ProjectValidationResult>;
+			};
 			dialogs: {
 				promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
+				openProjectFile: () => Promise<{ canceled: boolean; filePath: string | null }>;
 			};
 			document: {
 				pickSource: () => Promise<

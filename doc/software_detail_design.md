@@ -439,3 +439,8 @@ Deprecated --> Draft : 再利用
   - `CardPanel.tsx` のツールバーとメニューに 🧩 ボタンを追加し、`mergeValidation` で親ID/level/child有無/連続性を検証。要件を満たさない場合は INFO/WARN ログを出力し、選択変更に応じて状態を更新する。統合後は `mergeDialogCards` のスナップショットを用いて `mergeCards` を呼び出し、ダイアログをクローズする。
   - `workspaceStore.mergeCards` を実装し、Undo/Redo スタックへ統合前のカード配列を保存した上で新規カードを挿入。`removeOriginals` に応じて元カードを削除、`inheritTraces` に応じて `hasLeftTrace`/`hasRightTrace` を OR 結合し、`dirtyCardIds`/選択状態を更新する。子カードを持つ項目や非連続選択はストアで拒否し、単体テスト（`workspaceStore.test.ts`）で正常系/異常系/保持ケースを検証。
   - トレース引き継ぎは `CardPanel` 内の `reassignTracesForMerge` で実装し、`useTraceStore` のキャッシュにロード済みのファイルペアだけを対象に relation の `left_ids`/`right_ids` を置換した後 `saveRelationsForPair` で永続化する。未ロードのトレースファイルについては現行仕様上検出できないため、ユーザーに必要に応じてペアを開いてから再統合する運用想定。
+- **P7-01 プロジェクトファイル(.msp)機能の骨格 (2025-11-22)**
+  - `src/shared/project.ts` に ProjectFile 定義とバリデーションガード、`PROJECT_FILE_VERSION` を追加。
+  - `src/main/project.ts` で .msp の読み書きと簡易整合性チェック（カード/トレースファイル存在、left/right の参照検証）を実装し、IPC `project:load/save/validate` を `main.ts` へ追加。
+  - `preload.ts` と `global.d.ts` で `window.app.project` API を公開。
+  - `src/renderer/components/ProjectManagementDialog.tsx` を新設し、出力カードファイルの選択、検出トレース一覧、.msp 保存/読込、整合性チェック、カードファイルのワークスペース復元（leaf "main" へタブを開く）を提供する暫定UIを用意。

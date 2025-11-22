@@ -1872,6 +1872,113 @@
     @apply rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800;
   }
 
+  /* Project management dialog */
+  .project-dialog {
+    @apply fixed inset-0 z-50 flex items-center justify-center text-sm;
+  }
+
+  .project-dialog__backdrop {
+    @apply absolute inset-0 bg-slate-900/60 backdrop-blur-sm;
+  }
+
+  .project-dialog__body {
+    @apply relative z-10 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900;
+  }
+
+  .project-dialog__header {
+    @apply mb-4 flex items-center justify-between gap-4;
+  }
+
+  .project-dialog__header h2 {
+    @apply text-lg font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .project-dialog__grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .project-dialog__field {
+    @apply mb-2.5 flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-200;
+  }
+
+  .project-dialog__field input,
+  .project-dialog__field textarea {
+    @apply rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .project-dialog__list {
+    @apply mt-2.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .project-dialog__list-head {
+    @apply mb-2 flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300;
+  }
+
+  .project-dialog__files {
+    @apply max-h-52 space-y-1.5 overflow-y-auto pr-1;
+  }
+
+  .project-dialog__checkbox {
+    @apply flex items-center gap-2 text-xs text-slate-800 dark:text-slate-100;
+  }
+
+  .project-dialog__trace {
+    @apply mt-2 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  }
+
+  .project-dialog__trace-title {
+    @apply mb-1 font-semibold text-slate-700 dark:text-slate-200;
+  }
+
+  .project-dialog__trace-list {
+    @apply space-y-1;
+  }
+
+  .project-dialog__trace-item {
+    @apply flex items-center justify-between gap-2 text-xs;
+  }
+
+  .project-dialog__trace-empty {
+    @apply text-slate-500;
+  }
+
+  .project-dialog__actions {
+    @apply mt-2 flex flex-wrap gap-1.5;
+  }
+
+  .project-dialog__result {
+    @apply mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .project-dialog__issue {
+    @apply text-[11px] text-slate-700 dark:text-slate-200;
+  }
+
+  .project-dialog__issue--error {
+    @apply text-rose-500;
+  }
+
+  .project-dialog__issue--warn {
+    @apply text-amber-500;
+  }
+
+  .project-dialog .btn-primary,
+  .project-dialog .btn-secondary {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .btn-compact {
+    @apply px-2 py-1 text-[11px];
+  }
+
+  .project-dialog__inline {
+    @apply flex items-center gap-2;
+  }
+
+  .project-dialog__inline-btn {
+    @apply px-3 py-1 text-xs;
+  }
+
   /* カードID編集 */
   .card__card-id-edit-container {
     @apply inline-flex items-center gap-1;

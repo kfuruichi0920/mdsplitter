@@ -62,6 +62,9 @@ import {
 	updateOpenTabsSnapshot,
 	getSearchServerPort,
 } from './searchServer';
+import { loadProjectFile, saveProjectFile, validateTraceConsistency } from './project';
+import { showProjectOpenDialog } from './projectDialogs';
+import { projectOpenDialogOptions } from './projectDialogs';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -190,6 +193,32 @@ ipcMain.handle('log:write', async (_event, payload: { level: LogLevel; message: 
 
 	logMessage(payload.level, payload.message);
 	return { ok: true };
+});
+
+ipcMain.handle('project:load', async (_event, filePath: string) => {
+	if (typeof filePath !== 'string' || !filePath) {
+		throw new Error('プロジェクトファイルパスが不正です');
+	}
+	return loadProjectFile(filePath);
+});
+
+ipcMain.handle('project:save', async (_event, payload: { project: any; filePath: string }) => {
+	if (!payload || typeof payload.filePath !== 'string' || !payload.project) {
+		throw new Error('プロジェクト保存パラメータが不正です');
+	}
+	return saveProjectFile(payload.project, payload.filePath);
+});
+
+ipcMain.handle('project:validate', async (_event, project) => {
+	if (!project) {
+		throw new Error('プロジェクトが指定されていません');
+	}
+	return validateTraceConsistency(project);
+});
+
+ipcMain.handle('dialog:openProjectFile', async () => {
+	const path = await showProjectOpenDialog();
+	return { canceled: !path, filePath: path ?? null };
 });
 
 ipcMain.handle('workspace:save', async (_event, snapshot) => {

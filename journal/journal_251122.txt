@@ -19,3 +19,5 @@
 ## 決定事項 / メモ
 - Ctrl+FはSearchDialogを開くのみとし、入力フォーカスと履歴管理はダイアログ側で処理。
 - 旧サイドバー検索UIは廃止し、SearchDialogへ一本化（`.sidebar__search*`は今後整理予定）。
+[2025-11-22] プロジェクトファイル(.msp)機能の骨格実装。sharedにProject型を追加し、main側でload/save/validateを実装、IPC(project:*), preload/global.d.tsへ公開。rendererにProjectManagementDialogを新規追加し、出力カードファイル一覧から.msp保存/読込と整合性チェック、ワークスペース復元(leaf=mainにタブを開く)を暫定実装。フィルタパネル初期非表示とスクロール対応も反映済み。
+[2025-11-22] プロジェクト管理導線追加: toolbarボタンでProjectManagementDialog起動、.msp保存/読込にファイルダイアログ接続。プロジェクト整合性チェックをカードID単位で検証。プロジェクト復元を既存パネルにラウンドロビン配置するよう拡張。

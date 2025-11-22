@@ -18,6 +18,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AppSettings, AppSettingsPatch, LogLevel } from '../shared/settings';
 import type { WorkspaceSnapshot } from '../shared/workspace';
+import type { ProjectFile, ProjectValidationResult } from '../shared/project';
 import type { LoadedTraceabilityFile, TraceFileSaveRequest, TraceFileSaveResult } from '../shared/traceability';
 import type { AppendCardHistoryRequest, CardHistory } from '../shared/history';
 import type { DocumentLoadErrorCode } from './documentLoader';
@@ -60,6 +61,11 @@ type AppAPI = {
 	};
 	/** ログを書き込む。 */
 	log: (level: LogLevel, message: string) => Promise<void>;
+	project: {
+		load: (filePath: string) => Promise<ProjectFile>;
+		save: (project: ProjectFile, filePath: string) => Promise<{ path: string }>;
+		validate: (project: ProjectFile) => Promise<ProjectValidationResult>;
+	};
 	workspace: {
 		/** カードスナップショットを保存する。 */
 		save: (snapshot: WorkspaceSnapshot) => Promise<{ path: string }>;
@@ -82,6 +88,7 @@ type AppAPI = {
 	};
 	dialogs: {
 		promptSaveFile: (options?: { defaultFileName?: string }) => Promise<{ canceled: boolean; fileName?: string }>;
+		openProjectFile: () => Promise<{ canceled: boolean; filePath: string | null }>;
 	};
 	document: {
 		pickSource: () => Promise<PickDocumentResult>;
@@ -154,6 +161,11 @@ const api: AppAPI = {
 		load: async () => ipcRenderer.invoke('settings:load'),
 		update: async (patch: AppSettingsPatch) => ipcRenderer.invoke('settings:update', patch),
 	},
+	project: {
+		load: async (filePath: string) => ipcRenderer.invoke('project:load', filePath),
+		save: async (project: ProjectFile, filePath: string) => ipcRenderer.invoke('project:save', { project, filePath }),
+		validate: async (project: ProjectFile) => ipcRenderer.invoke('project:validate', project),
+	},
 	log: async (level: LogLevel, message: string) => ipcRenderer.invoke('log:write', { level, message }),
 	workspace: {
 		save: async (snapshot: WorkspaceSnapshot) => ipcRenderer.invoke('workspace:save', snapshot),
@@ -171,6 +183,7 @@ const api: AppAPI = {
 	},
 	dialogs: {
 		promptSaveFile: async (options) => ipcRenderer.invoke('dialog:promptSaveFile', options ?? {}),
+		openProjectFile: async () => ipcRenderer.invoke('dialog:openProjectFile'),
 	},
 	document: {
 		pickSource: async () => ipcRenderer.invoke('document:pickSource'),

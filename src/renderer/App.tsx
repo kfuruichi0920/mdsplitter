@@ -45,6 +45,7 @@ import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { ConversionModal } from './components/ConversionModal';
+import { ProjectManagementDialog } from './components/ProjectManagementDialog';
 import { applyThemeColors, applySplitterWidth, applyTypography } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
 import { convertDocument } from '@/shared/conversion/pipeline';
@@ -471,6 +472,7 @@ export const App = () => {
   const [isSaving, setSaving] = useState<boolean>(false); ///< 保存処理中フラグ。
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsModalState, setSettingsModalState] = useState<SettingsModalState>(createSettingsModalState);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [conversionState, setConversionState] = useState<ConversionModalDisplayState>(() =>
     buildConversionState(defaultSettings.converter.strategy),
   );
@@ -518,6 +520,9 @@ export const App = () => {
   const toggleMarkdownPreviewGlobal = useUiStore((state) => state.toggleMarkdownPreviewGlobal);
   const notify = useNotificationStore((state) => state.add);
   const splitRoot = useSplitStore((state) => state.root);
+
+  const handleProjectDialogOpen = useCallback(() => setProjectDialogOpen(true), []);
+  const handleProjectDialogClose = useCallback(() => setProjectDialogOpen(false), []);
   const splitLeaf = useSplitStore((state) => state.splitLeaf);
   const activeLeafId = useSplitStore((state) => state.activeLeafId);
   const setActiveLeaf = useSplitStore((state) => state.setActiveLeaf);
@@ -2799,6 +2804,7 @@ export const App = () => {
         onCardIdAssignmentRuleChange={handleCardIdAssignmentRuleChange}
         onMaxTitleLengthChange={handleMaxTitleLengthChange}
       />
+      {projectDialogOpen ? <ProjectManagementDialog onClose={handleProjectDialogClose} /> : null}
       <header className="menu-bar" role="menubar">
         <nav className="menu-bar__items">
           <button className="menu-bar__item" type="button">ファイル(F)</button>
@@ -2864,6 +2870,15 @@ export const App = () => {
             aria-label="名前を付けて保存"
           >
             📝
+          </button>
+          <button
+            type="button"
+            className={`toolbar-button${projectDialogOpen ? ' toolbar-button--active' : ''}`}
+            onClick={handleProjectDialogOpen}
+            title="プロジェクト管理"
+            aria-label="プロジェクト管理を開く"
+          >
+            📦
           </button>
         </div>
         <div className="toolbar-group">
