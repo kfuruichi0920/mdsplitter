@@ -151,7 +151,7 @@ export const TraceMatrixDialog: React.FC = () => {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filterVisible, setFilterVisible] = useState(true);
+  const [filterVisible, setFilterVisible] = useState(false);
   const [memoEditor, setMemoEditor] = useState<{
     relationId: string;
     leftLabel: string;
