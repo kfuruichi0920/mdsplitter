@@ -27,6 +27,7 @@ import type {
 } from '@/shared/matrixProtocol';
 import type { ExportFormat, ExportOptions } from '@/shared/export';
 import type { Card } from '@/shared/workspace';
+import type { SearchDataset } from '@/shared/search';
 
 export { };
 
@@ -93,6 +94,12 @@ declare global {
 			};
 			export: {
 				exportCards: (format: ExportFormat, options: ExportOptions, cards: Card[]) => Promise<boolean>;
+			};
+			search: {
+				openWindow: () => Promise<{ port: number | null }>;
+				updateOpenTabs: (payload: { tabs: SearchDataset[]; activeTabId?: string | null; activeLeafId?: string | null }) => Promise<void>;
+				getServerInfo: () => Promise<{ port: number | null }>;
+				onFocus: (callback: (payload: { fileName: string; cardId: string; tabId?: string | null }) => void) => () => void;
 			};
 		};
 	}

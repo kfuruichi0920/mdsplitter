@@ -34,6 +34,7 @@ import type {
 } from '../shared/matrixProtocol';
 import type { ExportFormat, ExportOptions } from '../shared/export';
 import type { Card } from '../shared/workspace';
+import type { SearchDataset } from '../shared/search';
 
 
 /**
@@ -100,6 +101,12 @@ type AppAPI = {
 	};
 	export: {
 		exportCards: (format: ExportFormat, options: ExportOptions, cards: Card[]) => Promise<boolean>;
+	};
+	search: {
+		openWindow: () => Promise<{ port: number | null }>;
+		updateOpenTabs: (payload: { tabs: SearchDataset[]; activeTabId?: string | null; activeLeafId?: string | null }) => Promise<void>;
+		getServerInfo: () => Promise<{ port: number | null }>;
+		onFocus: (callback: (payload: { fileName: string; cardId: string; tabId?: string | null }) => void) => () => void;
 	};
 };
 
@@ -197,6 +204,20 @@ const api: AppAPI = {
 	},
 	export: {
 		exportCards: async (format, options, cards) => ipcRenderer.invoke('export:cards', format, options, cards),
+	},
+	search: {
+		openWindow: async () => ipcRenderer.invoke('search:openWindow'),
+		updateOpenTabs: async (payload) => {
+			await ipcRenderer.invoke('search:updateTabs', payload);
+		},
+		getServerInfo: async () => ipcRenderer.invoke('search:getServerInfo'),
+		onFocus: (callback) => {
+			const listener = (_event: Electron.IpcRendererEvent, payload: { fileName: string; cardId: string; tabId?: string | null }) => {
+				callback(payload);
+			};
+			ipcRenderer.on('search:focus', listener);
+			return () => ipcRenderer.removeListener('search:focus', listener);
+		},
 	},
 };
 

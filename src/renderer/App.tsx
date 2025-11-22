@@ -41,18 +41,15 @@ import type { TraceDirection, TraceRelationKind, TraceabilityRelation } from '@/
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
-import { SearchDialog } from './components/SearchDialog';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { ConversionModal } from './components/ConversionModal';
 import { applyThemeColors, applySplitterWidth, applyTypography } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
-import type { SearchResult } from './utils/search';
 import { convertDocument } from '@/shared/conversion/pipeline';
 import type { NormalizedDocument } from '@/shared/conversion/types';
 import type { CardIdAssignmentRule, ConversionModalDisplayState, ConversionSourceSummary } from './types/conversion';
-import { useSearchStore } from './store/searchStore';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -520,9 +517,6 @@ export const App = () => {
   const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
   const toggleMarkdownPreviewGlobal = useUiStore((state) => state.toggleMarkdownPreviewGlobal);
   const notify = useNotificationStore((state) => state.add);
-  const searchIsOpen = useSearchStore((state) => state.isOpen);
-  const openSearchDialog = useSearchStore((state) => state.open);
-  const closeSearchDialog = useSearchStore((state) => state.close);
   const splitRoot = useSplitStore((state) => state.root);
   const splitLeaf = useSplitStore((state) => state.splitLeaf);
   const activeLeafId = useSplitStore((state) => state.activeLeafId);
@@ -2128,24 +2122,44 @@ export const App = () => {
     [activeLeafId, notify, pushLog, splitLeaf, splitRoot],
   );
 
+  const buildOpenTabDatasets = useCallback(() => {
+    const workspaceState = useWorkspaceStore.getState();
+    return Object.values(workspaceState.tabs).map((tab) => ({
+      source: 'open' as const,
+      fileName: tab.fileName,
+      tabId: tab.id,
+      leafId: tab.leafId,
+      cards: tab.cards,
+    }));
+  }, []);
+
   /**
-   * @brief 検索パネルを開いて検索欄へフォーカスする。
+   * @brief 検索ウィンドウを開き、RESTサーバへタブ情報を同期する。
    */
   const openSearchPanel = useCallback(() => {
-    if (!searchIsOpen) {
-      openSearchDialog();
-      const now = new Date();
-      notify('info', '検索ダイアログを表示しました。');
-      pushLog({
-        id: `search-open-${now.valueOf()}`,
-        level: 'INFO',
-        message: '検索ダイアログを表示しました。',
-        timestamp: now,
-      });
-      return;
-    }
-    openSearchDialog();
-  }, [notify, openSearchDialog, pushLog, searchIsOpen]);
+    void (async () => {
+      try {
+        const tabsSnapshot = buildOpenTabDatasets();
+        await window.app.search.updateOpenTabs({
+          tabs: tabsSnapshot,
+          activeTabId: activeTabId,
+          activeLeafId: effectiveLeafId,
+        });
+        await window.app.search.openWindow();
+        const now = new Date();
+        notify('info', '検索ウィンドウを表示しました。');
+        pushLog({
+          id: `search-open-${now.valueOf()}`,
+          level: 'INFO',
+          message: '検索ウィンドウを表示しました。',
+          timestamp: now,
+        });
+      } catch (error) {
+        console.error('[App] failed to open search window', error);
+        notify('error', '検索ウィンドウの起動に失敗しました。');
+      }
+    })();
+  }, [activeTabId, buildOpenTabDatasets, effectiveLeafId, notify, pushLog]);
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {
@@ -2353,7 +2367,7 @@ export const App = () => {
   );
 
   const handleSearchResultNavigate = useCallback(
-    async (result: SearchResult) => {
+    async (result: { fileName: string | null; cardId: string; tabId?: string | null; leafId?: string | null }) => {
       const focusCard = (tabId: string, leafId: string, cardId: string) => {
         const store = useWorkspaceStore.getState();
         store.setActiveTab(leafId, tabId);
@@ -2393,6 +2407,19 @@ export const App = () => {
     },
     [handleLoadCardFile],
   );
+
+  useEffect(() => {
+    const unsubscribe = window.app.search.onFocus(async (payload) => {
+      await handleSearchResultNavigate({
+        fileName: payload.fileName ?? null,
+        cardId: payload.cardId,
+        tabId: payload.tabId ?? null,
+      });
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, [handleSearchResultNavigate]);
 
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -2685,18 +2712,6 @@ export const App = () => {
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
       <NotificationCenter />
-      <SearchDialog
-        onNavigate={handleSearchResultNavigate}
-        onClose={() => {
-          const now = new Date();
-          pushLog({
-            id: `search-close-${now.valueOf()}`,
-            level: 'INFO',
-            message: '検索ダイアログを閉じました。',
-            timestamp: now,
-          });
-        }}
-      />
       <SettingsModal
         isOpen={settingsModalState.open}
         isLoading={settingsModalState.loading}

@@ -56,6 +56,12 @@ import type {
 } from '../shared/matrixProtocol';
 import { exportCards } from './export';
 import type { ExportFormat, ExportOptions } from '../shared/export';
+import {
+	startSearchServer,
+	setMainWindowResolver,
+	updateOpenTabsSnapshot,
+	getSearchServerPort,
+} from './searchServer';
 
 const isDev = process.env.NODE_ENV === 'development'; ///< 開発モード判定
 
@@ -73,6 +79,7 @@ const resolvePreloadPath = () => path.join(__dirname, 'preload.js');
 
 let mainWindow: BrowserWindow | null = null; ///< メインウィンドウ参照
 const matrixWindowManager = new MatrixWindowManager();
+let searchWindow: BrowserWindow | null = null;
 
 /**
  * @brief メインウィンドウを生成・初期化。
@@ -104,6 +111,36 @@ const createWindow = () => {
 	if (isDev) {
 		mainWindow.webContents.openDevTools({ mode: 'detach' }); //!< DevTools分離表示
 	}
+};
+
+const openSearchWindow = async () => {
+	const port = await startSearchServer();
+	if (searchWindow && !searchWindow.isDestroyed()) {
+		searchWindow.focus();
+		return;
+	}
+
+	searchWindow = new BrowserWindow({
+		width: 960,
+		height: 720,
+		minWidth: 720,
+		minHeight: 480,
+		show: false,
+		parent: mainWindow ?? undefined,
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+		},
+	});
+
+	searchWindow.once('ready-to-show', () => searchWindow?.show());
+	searchWindow.on('closed', () => {
+		searchWindow = null;
+	});
+
+	const url = `http://127.0.0.1:${port}/search`;
+	await searchWindow.loadURL(url);
 };
 
 
@@ -247,6 +284,28 @@ ipcMain.handle('workspace:saveTraceFile', async (_event, payload: TraceFileSaveR
 	const result = await saveTraceFile(payload);
 	logMessage('info', `トレーサビリティファイルを保存しました: ${result.fileName}`);
 	return result;
+});
+
+ipcMain.handle('search:openWindow', async () => {
+	await openSearchWindow();
+	return { port: getSearchServerPort() };
+});
+
+ipcMain.handle('search:updateTabs', async (_event, payload) => {
+	if (!payload || !Array.isArray(payload.tabs)) {
+		throw new Error('invalid tabs payload');
+	}
+	updateOpenTabsSnapshot({
+		tabs: payload.tabs,
+		activeLeafId: payload.activeLeafId ?? null,
+		activeTabId: payload.activeTabId ?? null,
+	});
+	return { ok: true };
+});
+
+ipcMain.handle('search:getServerInfo', async () => {
+	const port = await startSearchServer();
+	return { port };
 });
 
 ipcMain.handle('matrix:open', async (_event, payload: MatrixOpenRequest): Promise<MatrixOpenResult> => {
@@ -396,6 +455,7 @@ app.whenReady().then(async () => {
 	logMessage('info', 'アプリケーションを起動しました');
 
 	createWindow(); //!< 初回ウィンドウ生成
+	setMainWindowResolver(() => mainWindow);
 
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) {

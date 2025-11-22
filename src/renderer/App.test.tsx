@@ -119,6 +119,12 @@ describe('App', () => {
       document: {
         pickSource: pickSourceMock,
       },
+      search: {
+        openWindow: jest.fn().mockResolvedValue({ port: 0 }),
+        updateOpenTabs: jest.fn().mockResolvedValue(undefined),
+        getServerInfo: jest.fn().mockResolvedValue({ port: 0 }),
+        onFocus: jest.fn().mockReturnValue(() => undefined),
+      },
     };
 
     act(() => {
