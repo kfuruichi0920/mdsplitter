@@ -19,6 +19,7 @@ const detectTraceFiles = (files: string[]): string[] =>
 
 export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = ({ onClose }) => {
   const [cardFiles, setCardFiles] = useState<ProjectListItem[]>([]);
+  const [inputFiles, setInputFiles] = useState<string[]>([]);
   const [traceFiles, setTraceFiles] = useState<string[]>([]);
   const [name, setName] = useState('新規プロジェクト');
   const [description, setDescription] = useState('');
@@ -31,9 +32,11 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
     const fetch = async () => {
       try {
         const outputs = await window.app.workspace.listOutputFiles();
+        const inputs = await window.app.workspace.listCardFiles();
         const traces = detectTraceFiles(outputs);
         setTraceFiles(traces);
         setCardFiles(outputs.map((f) => ({ name: f, selected: true })));
+        setInputFiles(inputs);
       } catch (error) {
         console.error('[ProjectDialog] failed to list output files', error);
       }
@@ -51,7 +54,9 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
+    paths: { inputDir: '_input', outputDir: '_out' },
     files: {
+      inputFiles,
       cardFiles: selectedCardFiles,
       traceFiles,
     },
@@ -97,6 +102,7 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
       setLoadedProject(project);
       setTraceFiles(project.files.traceFiles);
       setCardFiles(project.files.cardFiles.map((f) => ({ name: f, selected: true })));
+      setInputFiles(project.files.inputFiles ?? []);
       const result = await window.app.project.validate(project);
       setIssues(result.issues);
     } catch (error) {

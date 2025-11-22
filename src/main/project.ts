@@ -29,6 +29,11 @@ export const saveProjectFile = async (project: ProjectFile, filePath: string): P
       ...project.metadata,
       updatedAt: new Date().toISOString(),
     },
+    paths: project.paths ?? { inputDir: '_input', outputDir: '_out' },
+    files: {
+      ...project.files,
+      inputFiles: project.files.inputFiles ?? [],
+    },
   };
   await fs.writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8');
   return { path: filePath };
@@ -69,8 +74,9 @@ export const validateTraceConsistency = async (project: ProjectFile): Promise<Pr
     }
   };
 
+  const outputDir = project.paths?.outputDir ? path.isAbsolute(project.paths.outputDir) ? project.paths.outputDir : path.join(paths.root, project.paths.outputDir) : paths.outputDir;
   for (const cardFile of project.files.cardFiles) {
-    const target = path.join(paths.outputDir, cardFile);
+    const target = path.join(outputDir, cardFile);
     try {
       await fs.access(target);
     } catch {
@@ -79,7 +85,7 @@ export const validateTraceConsistency = async (project: ProjectFile): Promise<Pr
   }
 
   for (const traceFile of project.files.traceFiles) {
-    const target = path.join(paths.outputDir, traceFile);
+    const target = path.join(outputDir, traceFile);
     let parsed: any;
     try {
       const raw = await fs.readFile(target, 'utf8');

@@ -14,9 +14,14 @@ export interface ProjectFile {
     createdAt: string;
     updatedAt: string;
   };
+  paths?: {
+    inputDir?: string;
+    outputDir?: string;
+  };
   files: {
-    cardFiles: string[];
-    traceFiles: string[];
+    inputFiles?: string[]; // _input 配下などの原文ファイル
+    cardFiles: string[]; // _out 配下のカードファイル
+    traceFiles: string[]; // _out 配下のトレースファイル
   };
   settings?: {
     theme?: ThemeSettings;
@@ -53,6 +58,9 @@ export const isProjectFile = (value: unknown): value is ProjectFile => {
     return false;
   }
   if (!Array.isArray(files.cardFiles) || !Array.isArray(files.traceFiles)) {
+    return false;
+  }
+  if (files.inputFiles && !Array.isArray(files.inputFiles)) {
     return false;
   }
   return true;
