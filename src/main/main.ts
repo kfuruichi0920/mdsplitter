@@ -135,7 +135,6 @@ const openSearchWindow = async () => {
 		minWidth: 720,
 		minHeight: 480,
 		show: false,
-		parent: mainWindow ?? undefined,
 		webPreferences: {
 			preload: resolvePreloadPath(),
 			contextIsolation: true,
