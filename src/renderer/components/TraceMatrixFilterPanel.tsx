@@ -1,12 +1,13 @@
 import React from 'react';
 
 import type { MatrixFilter } from '@/renderer/store/matrixStore';
-import type { Card, CardStatus } from '@/shared/workspace';
+import type { Card, CardStatus, CardKind } from '@/shared/workspace';
 
 interface TraceMatrixFilterPanelProps {
   filter: MatrixFilter;
-  onQueryChange: (field: 'cardIdQuery' | 'titleQuery', value: string) => void;
-  onToggleStatus: (status: CardStatus) => void;
+  onQueryChange: (field: 'rowTitleQuery' | 'columnTitleQuery', value: string) => void;
+  onToggleStatus: (side: 'row' | 'column', status: CardStatus) => void;
+  onToggleKind: (side: 'row' | 'column', kind: CardKind) => void;
   onFocusRow: (cardId: string | null) => void;
   onFocusColumn: (cardId: string | null) => void;
   onReset: () => void;
@@ -21,10 +22,21 @@ const STATUS_LABELS: Record<CardStatus, string> = {
   deprecated: 'Deprecated',
 };
 
+const KIND_LABELS: Record<CardKind, string> = {
+  heading: 'Heading',
+  paragraph: 'Paragraph',
+  bullet: 'Bullet',
+  figure: 'Figure',
+  table: 'Table',
+  test: 'Test',
+  qa: 'Q&A',
+};
+
 export const TraceMatrixFilterPanel: React.FC<TraceMatrixFilterPanelProps> = ({
   filter,
   onQueryChange,
   onToggleStatus,
+  onToggleKind,
   onFocusRow,
   onFocusColumn,
   onReset,
@@ -35,37 +47,84 @@ export const TraceMatrixFilterPanel: React.FC<TraceMatrixFilterPanelProps> = ({
     <div className="trace-matrix-filter__section">
       <h3>テキストフィルタ</h3>
       <label>
-        <span>カードID</span>
+        <span>行タイトル</span>
         <input
           type="text"
-          value={filter.cardIdQuery}
-          onChange={(event) => onQueryChange('cardIdQuery', event.target.value)}
-          placeholder="例: SPEC-001"
+          value={filter.rowTitleQuery}
+          onChange={(event) => onQueryChange('rowTitleQuery', event.target.value)}
+          placeholder="例: 認証"
         />
       </label>
       <label>
-        <span>タイトル</span>
+        <span>列タイトル</span>
         <input
           type="text"
-          value={filter.titleQuery}
-          onChange={(event) => onQueryChange('titleQuery', event.target.value)}
+          value={filter.columnTitleQuery}
+          onChange={(event) => onQueryChange('columnTitleQuery', event.target.value)}
           placeholder="例: 認証"
         />
       </label>
     </div>
     <div className="trace-matrix-filter__section">
       <h3>ステータス</h3>
-      <div className="trace-matrix-filter__status-grid">
-        {(Object.keys(STATUS_LABELS) as CardStatus[]).map((status) => (
-          <label key={status} className="trace-matrix-filter__checkbox">
-            <input
-              type="checkbox"
-              checked={filter.status[status]}
-              onChange={() => onToggleStatus(status)}
-            />
-            <span>{STATUS_LABELS[status]}</span>
-          </label>
-        ))}
+      <div className="trace-matrix-filter__status-grid trace-matrix-filter__status-grid--two-column">
+        <div>
+          <p className="trace-matrix-filter__subheading">行</p>
+          {(Object.keys(STATUS_LABELS) as CardStatus[]).map((status) => (
+            <label key={`row-${status}`} className="trace-matrix-filter__checkbox trace-matrix-filter__checkbox--compact">
+              <input
+                type="checkbox"
+                checked={filter.statusRow[status]}
+                onChange={() => onToggleStatus('row', status)}
+              />
+              <span>{STATUS_LABELS[status]}</span>
+            </label>
+          ))}
+        </div>
+        <div>
+          <p className="trace-matrix-filter__subheading">列</p>
+          {(Object.keys(STATUS_LABELS) as CardStatus[]).map((status) => (
+            <label key={`col-${status}`} className="trace-matrix-filter__checkbox trace-matrix-filter__checkbox--compact">
+              <input
+                type="checkbox"
+                checked={filter.statusColumn[status]}
+                onChange={() => onToggleStatus('column', status)}
+              />
+              <span>{STATUS_LABELS[status]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+    <div className="trace-matrix-filter__section">
+      <h3>カード種別</h3>
+      <div className="trace-matrix-filter__status-grid trace-matrix-filter__status-grid--two-column">
+        <div>
+          <p className="trace-matrix-filter__subheading">行</p>
+          {(Object.keys(KIND_LABELS) as CardKind[]).map((kind) => (
+            <label key={`row-${kind}`} className="trace-matrix-filter__checkbox trace-matrix-filter__checkbox--compact">
+              <input
+                type="checkbox"
+                checked={filter.kindRow[kind]}
+                onChange={() => onToggleKind('row', kind)}
+              />
+              <span>{KIND_LABELS[kind]}</span>
+            </label>
+          ))}
+        </div>
+        <div>
+          <p className="trace-matrix-filter__subheading">列</p>
+          {(Object.keys(KIND_LABELS) as CardKind[]).map((kind) => (
+            <label key={`col-${kind}`} className="trace-matrix-filter__checkbox trace-matrix-filter__checkbox--compact">
+              <input
+                type="checkbox"
+                checked={filter.kindColumn[kind]}
+                onChange={() => onToggleKind('column', kind)}
+              />
+              <span>{KIND_LABELS[kind]}</span>
+            </label>
+          ))}
+        </div>
       </div>
     </div>
     <div className="trace-matrix-filter__section">
@@ -100,7 +159,7 @@ export const TraceMatrixFilterPanel: React.FC<TraceMatrixFilterPanelProps> = ({
       </label>
     </div>
     <div className="trace-matrix-filter__section">
-      <button type="button" className="btn-secondary w-full" onClick={onReset}>
+      <button type="button" className="btn-primary w-full" onClick={onReset}>
         フィルタをリセット
       </button>
     </div>

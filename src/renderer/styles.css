@@ -41,9 +41,9 @@
   }
 
   :root {
-    --matrix-row-header-width: 220px;
-    --matrix-row-count-width: 72px;
-    --matrix-header-row-height: 52px;
+    --matrix-row-header-width: 180px;
+    --matrix-row-count-width: 52px;
+    --matrix-header-row-height: 64px;
   }
 }
 
@@ -2092,6 +2092,18 @@
     @apply grid grid-cols-2 gap-2;
   }
 
+  .trace-matrix-filter__status-grid--two-column {
+    @apply grid grid-cols-2 gap-3;
+  }
+
+  .trace-matrix-filter__subheading {
+    @apply mb-1 text-xs font-semibold text-slate-500 dark:text-slate-300;
+  }
+
+  .trace-matrix-filter__checkbox--compact {
+    @apply text-xs gap-1;
+  }
+
   .trace-matrix-filter__checkbox {
     @apply flex items-center gap-2 text-xs;
   }
@@ -2145,6 +2157,16 @@
     table-layout: fixed;
   }
 
+  .trace-matrix-table thead th {
+    position: sticky;
+    z-index: 6;
+  }
+
+  /* 2行目（トレース数行）は1行目の高さ分だけ下に固定する */
+  .trace-matrix-table thead tr:nth-child(2) th {
+    top: var(--matrix-header-row-height);
+  }
+
   .trace-matrix-table th,
   .trace-matrix-table td {
     @apply border border-slate-200 align-top dark:border-slate-700;
@@ -2159,13 +2181,16 @@
     width: var(--matrix-row-header-width);
     min-width: var(--matrix-row-header-width);
     max-width: var(--matrix-row-header-width);
+    height: var(--matrix-header-row-height);
   }
 
   .trace-matrix-table__column-header {
     @apply bg-slate-100 text-left text-xs dark:bg-slate-800;
     position: sticky;
     top: 0;
-    z-index: 4;
+    z-index: 6;
+    height: var(--matrix-header-row-height);
+    min-height: var(--matrix-header-row-height);
   }
 
   .trace-matrix-table__column-header button,
@@ -2207,7 +2232,9 @@
     width: var(--matrix-row-count-width);
     min-width: var(--matrix-row-count-width);
     max-width: var(--matrix-row-count-width);
-    z-index: 4;
+    z-index: 6;
+    height: var(--matrix-header-row-height);
+    min-height: var(--matrix-header-row-height);
   }
 
   .trace-matrix-table__row-count {
@@ -2221,10 +2248,16 @@
   }
 
   .trace-matrix-table__column-count {
-    @apply bg-slate-50 text-center text-xs font-semibold align-middle dark:bg-slate-900;
+    @apply bg-slate-50 text-center text-xs font-semibold align-middle px-1 dark:bg-slate-900;
     position: sticky;
     top: var(--matrix-header-row-height);
-    z-index: 3;
+    z-index: 6;
+    background-color: theme('colors.slate.50');
+    /* dark mode fallback */
+    background-color: var(--tw-prose-body, #f8fafc);
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
   }
 
   .trace-matrix-table__count--zero {

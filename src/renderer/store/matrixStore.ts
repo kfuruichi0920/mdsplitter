@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { Card, CardStatus } from '@/shared/workspace';
+import type { Card, CardStatus, CardKind } from '@/shared/workspace';
 import type { TraceabilityRelation, TraceabilityHeader, TraceRelationKind } from '@/shared/traceability';
 import type { MatrixInitPayload, TraceChangeEvent } from '@/shared/matrixProtocol';
 
@@ -29,9 +29,12 @@ type StatusMap = Record<CardStatus, boolean>;
 const CARD_STATUSES: CardStatus[] = ['draft', 'review', 'approved', 'deprecated'];
 
 export interface MatrixFilter {
-  cardIdQuery: string;
-  titleQuery: string;
-  status: StatusMap;
+  rowTitleQuery: string;
+  columnTitleQuery: string;
+  statusRow: StatusMap;
+  statusColumn: StatusMap;
+  kindRow: Record<CardKind, boolean>;
+  kindColumn: Record<CardKind, boolean>;
   columnTraceFocus: string | null; // right card id
   rowTraceFocus: string | null; // left card id
 }
@@ -43,13 +46,26 @@ const createInitialStatusMap = (): StatusMap => ({
   deprecated: true,
 });
 
-const initialFilter: MatrixFilter = {
-  cardIdQuery: '',
-  titleQuery: '',
-  status: createInitialStatusMap(),
+const createInitialKindMap = (): Record<CardKind, boolean> => ({
+  heading: true,
+  paragraph: true,
+  bullet: true,
+  figure: true,
+  table: true,
+  test: true,
+  qa: true,
+});
+
+const createInitialFilter = (): MatrixFilter => ({
+  rowTitleQuery: '',
+  columnTitleQuery: '',
+  statusRow: createInitialStatusMap(),
+  statusColumn: createInitialStatusMap(),
+  kindRow: createInitialKindMap(),
+  kindColumn: createInitialKindMap(),
   columnTraceFocus: null,
   rowTraceFocus: null,
-};
+});
 
 export interface MatrixState {
   windowId: string | null;
@@ -83,8 +99,9 @@ export interface MatrixState {
   setHighlightedColumnCardIds: (cardIds: string[]) => void;
   setError: (message: string | null) => void;
   finishLoading: () => void;
-  setFilterQuery: (field: 'cardIdQuery' | 'titleQuery', value: string) => void;
-  toggleFilterStatus: (status: CardStatus) => void;
+  setFilterQuery: (field: 'rowTitleQuery' | 'columnTitleQuery', value: string) => void;
+  toggleFilterStatus: (side: 'row' | 'column', status: CardStatus) => void;
+  toggleFilterKind: (side: 'row' | 'column', kind: CardKind) => void;
   setTraceFocus: (side: 'row' | 'column', cardId: string | null) => void;
   resetFilter: () => void;
   setDefaultRelationKind: (kind: TraceRelationKind) => void;
@@ -110,7 +127,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   stats: initialStats,
   isLoading: false,
   error: null,
-  filter: initialFilter,
+  filter: createInitialFilter(),
   defaultRelationKind: 'trace',
   defaultDirection: 'left_to_right',
   confirmMemoDeletion: true,
@@ -156,11 +173,32 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
   finishLoading: () => set(() => ({ isLoading: false })),
   setFilterQuery: (field, value) =>
     set((state) => ({ filter: { ...state.filter, [field]: value } })),
-  toggleFilterStatus: (status) =>
+  toggleFilterStatus: (side, status) =>
     set((state) => ({
       filter: {
         ...state.filter,
-        status: { ...state.filter.status, [status]: !state.filter.status[status] },
+        statusRow:
+          side === 'row'
+            ? { ...state.filter.statusRow, [status]: !state.filter.statusRow[status] }
+            : state.filter.statusRow,
+        statusColumn:
+          side === 'column'
+            ? { ...state.filter.statusColumn, [status]: !state.filter.statusColumn[status] }
+            : state.filter.statusColumn,
+      },
+    })),
+  toggleFilterKind: (side, kind) =>
+    set((state) => ({
+      filter: {
+        ...state.filter,
+        kindRow:
+          side === 'row'
+            ? { ...state.filter.kindRow, [kind]: !state.filter.kindRow[kind] }
+            : state.filter.kindRow,
+        kindColumn:
+          side === 'column'
+            ? { ...state.filter.kindColumn, [kind]: !state.filter.kindColumn[kind] }
+            : state.filter.kindColumn,
       },
     })),
   setTraceFocus: (side, cardId) =>
@@ -171,7 +209,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
         rowTraceFocus: side === 'row' ? cardId : state.filter.rowTraceFocus,
       },
     })),
-  resetFilter: () => set(() => ({ filter: initialFilter })),
+  resetFilter: () => set(() => ({ filter: createInitialFilter() })),
   setDefaultRelationKind: (kind) => set(() => ({ defaultRelationKind: kind })),
   setDefaultDirection: (direction) => set(() => ({ defaultDirection: direction })),
   setConfirmMemoDeletion: (value) => set(() => ({ confirmMemoDeletion: value })),
@@ -191,7 +229,7 @@ export const useMatrixStore = create<MatrixState>()((set, get) => ({
       stats: initialStats,
       isLoading: false,
       error: null,
-      filter: initialFilter,
+      filter: createInitialFilter(),
       defaultRelationKind: 'trace',
       defaultDirection: 'left_to_right',
       confirmMemoDeletion: true,

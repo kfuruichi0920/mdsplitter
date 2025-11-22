@@ -18,6 +18,8 @@ interface TraceMatrixToolbarProps {
   onChangeConfirmMemoDeletion: (value: boolean) => void;
   exportIncludeMemo: boolean;
   onChangeExportIncludeMemo: (value: boolean) => void;
+  filterPanelVisible?: boolean;
+  onToggleFilterPanel?: () => void;
 }
 
 export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
@@ -36,6 +38,8 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
   onChangeConfirmMemoDeletion,
   exportIncludeMemo,
   onChangeExportIncludeMemo,
+  filterPanelVisible,
+  onToggleFilterPanel,
 }) => (
   <div className="trace-matrix-toolbar">
     <div className="trace-matrix-toolbar__stats">
@@ -44,14 +48,17 @@ export const TraceMatrixToolbar: React.FC<TraceMatrixToolbarProps> = ({
       <span>未トレース（列）: {untracedRightCount}</span>
     </div>
     <div className="trace-matrix-toolbar__actions">
-      <button type="button" className="btn-secondary" onClick={onRefresh} disabled={!onRefresh || isRefreshing}>
+      <button type="button" className="btn-primary" onClick={onRefresh} disabled={!onRefresh || isRefreshing}>
         {isRefreshing ? '更新中…' : '更新'}
       </button>
-      <button type="button" className="btn-secondary" onClick={onExportCSV} disabled={!onExportCSV}>
+      <button type="button" className="btn-primary" onClick={onExportCSV} disabled={!onExportCSV}>
         CSVエクスポート
       </button>
       <button type="button" className="btn-primary" onClick={onExportExcel} disabled={!onExportExcel}>
         Excelエクスポート
+      </button>
+      <button type="button" className="btn-secondary" onClick={onToggleFilterPanel} disabled={!onToggleFilterPanel}>
+        フィルタ{filterPanelVisible ? 'を隠す' : 'を表示'}
       </button>
     </div>
     <div className="trace-matrix-toolbar__settings">

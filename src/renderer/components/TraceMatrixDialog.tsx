@@ -30,6 +30,7 @@ export const TraceMatrixDialog: React.FC = () => {
   const setError = useMatrixStore((state) => state.setError);
   const setFilterQuery = useMatrixStore((state) => state.setFilterQuery);
   const toggleFilterStatus = useMatrixStore((state) => state.toggleFilterStatus);
+  const toggleFilterKind = useMatrixStore((state) => state.toggleFilterKind);
   const setTraceFocus = useMatrixStore((state) => state.setTraceFocus);
   const resetFilter = useMatrixStore((state) => state.resetFilter);
   const setHighlightedRowCardIds = useMatrixStore((state) => state.setHighlightedRowCardIds);
@@ -70,13 +71,13 @@ export const TraceMatrixDialog: React.FC = () => {
 
   const filteredLeftCards = useMemo(() => {
     return leftCards.filter((card) => {
-      if (filter.cardIdQuery && !(card.cardId ?? card.id).toLowerCase().includes(filter.cardIdQuery.toLowerCase())) {
+      if (filter.rowTitleQuery && !(card.title ?? '').toLowerCase().includes(filter.rowTitleQuery.toLowerCase())) {
         return false;
       }
-      if (filter.titleQuery && !(card.title ?? '').toLowerCase().includes(filter.titleQuery.toLowerCase())) {
+      if (!filter.statusRow[card.status]) {
         return false;
       }
-      if (!filter.status[card.status]) {
+      if (!filter.kindRow[card.kind]) {
         return false;
       }
       if (filter.columnTraceFocus) {
@@ -91,13 +92,13 @@ export const TraceMatrixDialog: React.FC = () => {
 
   const filteredRightCards = useMemo(() => {
     return rightCards.filter((card) => {
-      if (filter.cardIdQuery && !(card.cardId ?? card.id).toLowerCase().includes(filter.cardIdQuery.toLowerCase())) {
+      if (filter.columnTitleQuery && !(card.title ?? '').toLowerCase().includes(filter.columnTitleQuery.toLowerCase())) {
         return false;
       }
-      if (filter.titleQuery && !(card.title ?? '').toLowerCase().includes(filter.titleQuery.toLowerCase())) {
+      if (!filter.statusColumn[card.status]) {
         return false;
       }
-      if (!filter.status[card.status]) {
+      if (!filter.kindColumn[card.kind]) {
         return false;
       }
       if (filter.rowTraceFocus) {
@@ -150,6 +151,7 @@ export const TraceMatrixDialog: React.FC = () => {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(true);
   const [memoEditor, setMemoEditor] = useState<{
     relationId: string;
     leftLabel: string;
@@ -475,6 +477,8 @@ export const TraceMatrixDialog: React.FC = () => {
         onChangeConfirmMemoDeletion={setConfirmMemoDeletion}
         exportIncludeMemo={exportIncludeMemo}
         onChangeExportIncludeMemo={setExportIncludeMemo}
+        filterPanelVisible={filterVisible}
+        onToggleFilterPanel={() => setFilterVisible((v) => !v)}
       />
       {isSaving ? <p className="trace-matrix-status">保存中…</p> : null}
       {isRefreshing ? <p className="trace-matrix-status">更新中…</p> : null}
@@ -486,12 +490,8 @@ export const TraceMatrixDialog: React.FC = () => {
             <table className="trace-matrix-table">
               <thead>
                 <tr>
-                  <th className="trace-matrix-table__corner" rowSpan={2}>
-                    左カード
-                  </th>
-                  <th className="trace-matrix-table__row-count-header" rowSpan={2}>
-                    行トレース数
-                  </th>
+                  <th className="trace-matrix-table__corner" rowSpan={2} />
+                  <th className="trace-matrix-table__row-count-header" rowSpan={2} aria-label="行トレース数" />
                   {filteredRightCards.map((card) => {
                     const columnCount = columnTraceCounts.get(card.id) ?? 0;
                     const columnZero = columnCount === 0;
@@ -514,23 +514,14 @@ export const TraceMatrixDialog: React.FC = () => {
                   })}
                 </tr>
                 <tr>
-                  {filteredRightCards.map((card) => {
-                    const columnCount = columnTraceCounts.get(card.id) ?? 0;
-                    const isZero = columnCount === 0;
-                    return (
-                      <th
-                        key={`count-${card.id}`}
-                        className={[
-                          'trace-matrix-table__column-count',
-                          isZero ? 'trace-matrix-table__count--zero' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        {columnCount}
-                      </th>
-                    );
-                  })}
+                  {filteredRightCards.map((card) => (
+                    <th
+                      key={`count-${card.id}`}
+                      className="trace-matrix-table__column-count trace-matrix-table__column-count--compact"
+                    >
+                      {columnTraceCounts.get(card.id) ?? 0}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -588,16 +579,19 @@ export const TraceMatrixDialog: React.FC = () => {
             ) : null}
           </div>
         </div>
-        <TraceMatrixFilterPanel
-          filter={filter}
+        {filterVisible ? (
+          <TraceMatrixFilterPanel
+            filter={filter}
           onQueryChange={setFilterQuery}
           onToggleStatus={toggleFilterStatus}
-          onFocusRow={(id) => setTraceFocus('row', id)}
-          onFocusColumn={(id) => setTraceFocus('column', id)}
-          onReset={resetFilter}
-          leftCards={leftCards}
-          rightCards={rightCards}
-        />
+          onToggleKind={toggleFilterKind}
+            onFocusRow={(id) => setTraceFocus('row', id)}
+            onFocusColumn={(id) => setTraceFocus('column', id)}
+            onReset={resetFilter}
+            leftCards={leftCards}
+            rightCards={rightCards}
+          />
+        ) : null}
       </div>
       {contextMenu ? (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} sections={menuSections} onClose={() => setContextMenu(null)} />
