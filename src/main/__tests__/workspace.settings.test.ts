@@ -96,6 +96,7 @@ describe('workspace settings persistence', () => {
     //! カスタムテーマ色を設定
     const customPatch: AppSettingsPatch = {
       theme: {
+        ...initialSettings.theme,
         mode: 'light',
         splitterWidth: 8,
         light: {
@@ -109,7 +110,6 @@ describe('workspace settings persistence', () => {
           connectorActive: '#0080ff',
           connectorInactive: '#999999',
         },
-        dark: initialSettings.theme.dark, // 既定値を保持
       },
     };
     await updateSettings(customPatch);
