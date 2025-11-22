@@ -111,6 +111,15 @@ const createWindow = () => {
 	if (isDev) {
 		mainWindow.webContents.openDevTools({ mode: 'detach' }); //!< DevTools分離表示
 	}
+
+	mainWindow.on('close', () => {
+		// 本体クローズ前に子ウィンドウを閉じる
+		if (searchWindow && !searchWindow.isDestroyed()) {
+			searchWindow.destroy();
+			searchWindow = null;
+		}
+		matrixWindowManager.closeAll();
+	});
 };
 
 const openSearchWindow = async () => {

@@ -114,6 +114,15 @@ export class MatrixWindowManager {
     this.windows.delete(windowId);
   }
 
+  closeAll(): void {
+    this.windows.forEach(({ window }) => {
+      if (!window.isDestroyed()) {
+        window.destroy();
+      }
+    });
+    this.windows.clear();
+  }
+
   /**
    * @brief リクエストからマトリクスウィンドウを生成。
    * @details
