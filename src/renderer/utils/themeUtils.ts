@@ -33,6 +33,30 @@ const CSS_VAR_MAP: Record<
   connectorInactive: '--theme-connector-inactive',
 };
 
+/**
+ * @brief HEXカラーコードをRGBの空白区切り文字列に変換する。
+ * @param hex HEX文字列 (例: "#ffffff")
+ * @return RGB文字列 (例: "255 255 255")
+ */
+const hexToRgbChannels = (hex: string): string => {
+  // 短縮形 (#fff) の展開
+  const expandShort = (short: string) => {
+    const r = short[1];
+    const g = short[2];
+    const b = short[3];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  };
+
+  const normalized = hex.length === 4 ? expandShort(hex) : hex;
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalized);
+
+  if (!result) {
+    return '0 0 0';
+  }
+
+  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
+};
+
 const FALLBACK_TRACE_COLORS: Record<TraceRelationKind, string> = {
   trace: '#60a5fa',
   refines: '#10b981',
@@ -54,9 +78,11 @@ export const applyThemeColors = (colors: ThemeColorSettings): void => {
   const root = document.documentElement;
   Object.entries(CSS_VAR_MAP).forEach(([key, varName]) => {
     const colorKey = key as keyof typeof CSS_VAR_MAP;
-    root.style.setProperty(varName, colors[colorKey]);
+    // Tailwindで透明度を扱えるようにRGBチャネルとして設定する
+    root.style.setProperty(varName, hexToRgbChannels(colors[colorKey]));
   });
 
+  // SVG等で使用される変数はそのままの色コードを設定する（必要に応じてRGB版も用意可能）
   const highlightColor = colors.connectorHighlight ?? colors.connectorActive ?? '#93c5fd';
   root.style.setProperty('--trace-highlight-color', highlightColor);
 

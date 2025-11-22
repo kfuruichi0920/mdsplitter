@@ -26,7 +26,7 @@
   }
 
   body {
-    @apply h-full overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    @apply h-full overflow-hidden bg-theme-background text-theme-foreground transition-colors duration-300 ease-out;
     font-size: var(--theme-font-size, 14px);
     font-family: var(--theme-font-family, 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif');
   }
@@ -49,7 +49,7 @@
 
 @layer components {
   .app-shell {
-    @apply grid h-screen min-h-0 grid-rows-[28px_36px_minmax(0,1fr)_22px] bg-slate-50 text-slate-900 transition-colors duration-300 ease-out dark:bg-slate-950 dark:text-slate-100;
+    @apply grid h-screen min-h-0 grid-rows-[28px_36px_minmax(0,1fr)_22px] bg-theme-background text-theme-foreground transition-colors duration-300 ease-out;
   }
 
   .app-shell[data-compact='true'] * {
@@ -57,7 +57,7 @@
   }
 
   .menu-bar {
-    @apply flex items-center gap-2 border-b border-slate-200 bg-slate-100 px-3 text-xs font-medium dark:border-slate-800 dark:bg-slate-900;
+    @apply flex items-center gap-2 border-b border-theme-border bg-theme-background px-3 text-xs font-medium;
   }
 
   .menu-bar__items {
@@ -65,15 +65,15 @@
   }
 
   .menu-bar__item {
-    @apply rounded-md px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+    @apply rounded-md px-2.5 py-1 text-xs font-medium text-theme-foreground transition-colors hover:bg-theme-primary/10 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .top-toolbar {
-    @apply flex items-center gap-3 border-b border-slate-200 bg-slate-100 px-3 py-1 text-xs dark:border-slate-800 dark:bg-slate-900;
+    @apply flex items-center gap-3 border-b border-theme-border bg-theme-background px-3 py-1 text-xs;
   }
 
   .toolbar-group {
-    @apply flex items-center gap-1.5 border-r border-slate-200 pr-3 dark:border-slate-700;
+    @apply flex items-center gap-1.5 border-r border-theme-border pr-3;
   }
 
   .toolbar-group--trace {
@@ -93,19 +93,19 @@
   }
 
   .toolbar-button {
-    @apply inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-blue-200 dark:hover:bg-slate-700;
+    @apply inline-flex items-center gap-1.5 rounded-md bg-theme-primary/10 px-2.5 py-1 text-xs font-medium text-theme-primary transition-colors hover:bg-theme-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .toolbar-button--active {
-    @apply bg-blue-500 text-white dark:bg-blue-400 dark:text-slate-900;
+    @apply bg-theme-primary text-theme-background;
   }
 
   .toolbar-button:disabled {
-    @apply cursor-not-allowed opacity-60 hover:bg-blue-100 dark:hover:bg-slate-800;
+    @apply cursor-not-allowed opacity-60 hover:bg-theme-primary/10;
   }
 
   .toolbar-select {
-    @apply inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200;
+    @apply inline-flex items-center rounded-md border border-theme-border bg-theme-card px-2 py-0.5 text-xs font-medium text-theme-foreground;
   }
 
   .toolbar-select select {
@@ -113,11 +113,11 @@
   }
 
   .trace-filter-popover {
-    @apply absolute right-0 top-10 z-40 w-48 rounded-md border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800;
+    @apply absolute right-0 top-10 z-40 w-48 rounded-md border border-theme-border bg-theme-card p-3 shadow-lg;
   }
 
   .trace-filter-popover__item {
-    @apply flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200;
+    @apply flex items-center gap-2 text-xs text-theme-foreground;
   }
 
   .trace-filter-popover__item + .trace-filter-popover__item {
@@ -133,7 +133,7 @@
   }
 
   .workspace {
-    @apply grid h-full min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900;
+    @apply grid h-full min-h-0 overflow-hidden bg-theme-background;
   }
 
   .workspace__content {
@@ -141,7 +141,7 @@
   }
 
   .sidebar {
-    @apply flex min-w-0 flex-col gap-3 overflow-hidden border-r border-slate-200 bg-white px-3 py-3 shadow-inner dark:border-slate-800 dark:bg-slate-900;
+    @apply flex min-w-0 flex-col gap-3 overflow-hidden border-r border-theme-border bg-theme-card px-3 py-3 shadow-inner;
   }
 
   .sidebar__section {
@@ -153,11 +153,11 @@
   }
 
   .sidebar__section-toggle {
-    @apply flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-300 dark:hover:bg-slate-800;
+    @apply flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-theme-secondary transition-colors hover:bg-theme-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .sidebar__toggle-icon {
-    @apply text-slate-400 dark:text-slate-500;
+    @apply text-theme-secondary/70;
   }
 
   .sidebar__header {
@@ -188,24 +188,24 @@
   }
 
   .sidebar__tree li {
-    @apply cursor-pointer rounded-md px-2 py-1 text-xs text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+    @apply cursor-pointer rounded-md px-2 py-1 text-xs text-theme-secondary transition-colors hover:bg-theme-primary/10 hover:text-theme-primary;
     white-space: nowrap;
   }
 
   .sidebar__tree-file {
-    @apply cursor-pointer rounded-md px-2 py-1 text-xs text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+    @apply cursor-pointer rounded-md px-2 py-1 text-xs text-theme-secondary transition-colors hover:bg-theme-primary/10 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .sidebar__tree-empty {
-    @apply px-2 py-1 text-xs italic text-slate-400 dark:text-slate-500;
+    @apply px-2 py-1 text-xs italic text-theme-secondary/70;
   }
 
   .sidebar__label {
-    @apply text-[0.65rem] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500;
+    @apply text-[0.65rem] font-medium uppercase tracking-wide text-theme-secondary/70;
   }
 
   .sidebar__search {
-    @apply rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-background px-2.5 py-1.5 text-xs text-theme-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .sidebar__search-form {
@@ -217,7 +217,7 @@
   }
 
   .sidebar__search-field {
-    @apply flex flex-col gap-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply flex flex-col gap-1 text-[0.65rem] font-semibold uppercase tracking-wide text-theme-secondary;
   }
 
   .sidebar__search-field-label {
@@ -225,15 +225,15 @@
   }
 
   .sidebar__search-select {
-    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-background px-2 py-1 text-xs text-theme-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .sidebar__search-field--checkbox {
-    @apply flex flex-row items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200;
+    @apply flex flex-row items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-theme-secondary;
   }
 
   .sidebar__search-field--checkbox input {
-    @apply h-4 w-4 rounded border-slate-300 text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800;
+    @apply h-4 w-4 rounded border-theme-border text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .sidebar__search-actions {
@@ -241,15 +241,15 @@
   }
 
   .sidebar__search-button {
-    @apply flex-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply flex-1 rounded-md bg-theme-primary px-2.5 py-1 text-xs font-semibold text-theme-background transition-colors hover:bg-theme-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .sidebar__search-button--ghost {
-    @apply border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+    @apply border border-theme-border bg-theme-card text-theme-secondary hover:border-theme-primary/50 hover:text-theme-primary;
   }
 
   .sidebar__search-status {
-    @apply text-[0.65rem] text-slate-500 dark:text-slate-400;
+    @apply text-[0.65rem] text-theme-secondary;
   }
 
   .sidebar__search-status--error {
@@ -261,15 +261,15 @@
   }
 
   .search-results__item {
-    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition-colors hover:border-blue-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800;
+    @apply w-full rounded-lg border border-theme-card-border bg-theme-card px-3 py-2 text-left text-xs shadow-sm transition-colors hover:border-theme-primary/50 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .search-results__meta {
-    @apply flex items-center gap-2 text-[0.6rem] text-slate-500 dark:text-slate-400;
+    @apply flex items-center gap-2 text-[0.6rem] text-theme-secondary;
   }
 
   .search-results__scope {
-    @apply rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200;
+    @apply rounded-full bg-theme-secondary/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-theme-secondary;
   }
 
   .search-results__file {
@@ -277,24 +277,24 @@
   }
 
   .search-results__count {
-    @apply rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-100;
+    @apply rounded-full bg-theme-primary/10 px-2 py-0.5 text-[0.6rem] font-semibold text-theme-primary;
   }
 
   .search-results__title {
-    @apply mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100;
+    @apply mt-1 text-sm font-semibold text-theme-foreground;
   }
 
   .search-results__snippet {
-    @apply mt-0.5 whitespace-pre-wrap text-[0.65rem] text-slate-500 dark:text-slate-300;
+    @apply mt-0.5 whitespace-pre-wrap text-[0.65rem] text-theme-secondary;
   }
 
   .workspace__separator {
-    @apply relative bg-blue-200 transition-colors dark:bg-slate-700;
+    @apply relative bg-theme-border transition-colors;
   }
 
   .workspace__separator::after {
     content: '';
-    @apply absolute inset-0 bg-blue-300 opacity-0 transition-opacity dark:bg-slate-600;
+    @apply absolute inset-0 bg-theme-primary/30 opacity-0 transition-opacity;
   }
 
   [data-dragging='true'] .workspace__separator::after,
@@ -341,11 +341,11 @@
   }
 
   .split-node {
-    @apply flex flex-1 h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900/90;
+    @apply flex flex-1 h-full min-h-0 flex-col overflow-hidden rounded-lg border border-theme-border bg-theme-card shadow-md;
   }
 
   .split-node--active {
-    @apply border-blue-400 shadow-lg ring-2 ring-blue-300/40 dark:border-blue-400 dark:ring-blue-500/40;
+    @apply border-theme-primary shadow-lg ring-2 ring-theme-primary/40;
   }
 
   .split-node--semi-active {
@@ -353,7 +353,7 @@
   }
 
   .tab-bar {
-    @apply flex flex-shrink-0 items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
+    @apply flex flex-shrink-0 items-center gap-1.5 overflow-x-auto border-b border-theme-border bg-theme-background px-2 py-1.5 text-xs;
   }
 
   .tab-bar__tab-container {
@@ -361,15 +361,15 @@
   }
 
   .tab-bar__tab {
-    @apply rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+    @apply rounded-md px-2.5 py-1 text-xs font-medium text-theme-secondary transition-colors hover:bg-theme-primary/10 hover:text-theme-primary;
   }
 
   .tab-bar__tab--active {
-    @apply bg-blue-500 text-white shadow-sm dark:bg-blue-500;
+    @apply bg-theme-primary text-theme-background shadow-sm;
   }
 
   .tab-bar__tab--add {
-    @apply font-semibold text-slate-500 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300;
+    @apply font-semibold text-theme-secondary transition-colors hover:bg-theme-primary/10 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .tab-bar__tab-title {
@@ -381,7 +381,7 @@
   }
 
   .tab-bar__tab-close {
-    @apply rounded-md px-1.5 py-1 text-xs text-slate-500 transition-colors hover:bg-rose-100 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 dark:text-slate-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200;
+    @apply rounded-md px-1.5 py-1 text-xs text-theme-secondary transition-colors hover:bg-rose-100 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 dark:hover:bg-rose-500/20 dark:hover:text-rose-200;
   }
 
   .tab-bar__spacer {
@@ -389,19 +389,19 @@
   }
 
   .tab-bar__empty {
-    @apply px-2 text-slate-500 dark:text-slate-400;
+    @apply px-2 text-theme-secondary;
   }
 
   .tab-bar__close {
-    @apply rounded-md px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-rose-100 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:text-slate-200 dark:hover:bg-rose-500/20 dark:hover:text-rose-300;
+    @apply rounded-md px-2 py-1 text-xs font-medium text-theme-secondary transition-colors hover:bg-rose-100 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:hover:bg-rose-500/20 dark:hover:text-rose-300;
   }
 
   .panel-header {
-    @apply flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2 text-xs font-medium dark:border-slate-700 dark:bg-slate-900;
+    @apply flex items-center justify-between border-b border-theme-border bg-theme-card px-3 py-2 text-xs font-medium;
   }
 
   .panel-toolbar {
-    @apply flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900;
+    @apply flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-theme-border bg-theme-card px-3 py-1.5 text-xs;
   }
 
   .panel-toolbar__group {
@@ -409,23 +409,23 @@
   }
 
   .panel-toolbar__separator {
-    @apply h-5 w-px bg-slate-300 dark:bg-slate-600;
+    @apply h-5 w-px bg-theme-border;
   }
 
   .panel-toolbar__button {
-    @apply rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-blue-100 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
+    @apply rounded-md bg-theme-background px-2.5 py-1 text-xs font-medium text-theme-foreground transition-colors hover:bg-theme-primary/10 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .panel-toolbar__button--active {
-    @apply bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600;
+    @apply bg-theme-primary text-theme-background hover:bg-theme-primary/90;
   }
 
   .panel-toolbar__input {
-    @apply rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs text-theme-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .panel-toolbar__input--active {
-    @apply border-blue-300 bg-blue-50/70 dark:border-blue-400 dark:bg-slate-800;
+    @apply border-theme-primary/50 bg-theme-primary/5;
   }
 
   .panel-toolbar__popover-anchor {
@@ -433,7 +433,7 @@
   }
 
   .panel-filter-popover {
-    @apply absolute right-0 top-full z-30 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-2 text-xs shadow-2xl dark:border-slate-700 dark:bg-slate-800;
+    @apply absolute right-0 top-full z-30 mt-2 w-48 rounded-lg border border-theme-border bg-theme-card p-2 text-xs shadow-2xl;
   }
 
   .panel-filter-popover__list {
@@ -441,7 +441,7 @@
   }
 
   .panel-filter-popover__item {
-    @apply flex items-center gap-2 rounded-md px-2 py-1 text-slate-600 transition-colors hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700;
+    @apply flex items-center gap-2 rounded-md px-2 py-1 text-theme-secondary transition-colors hover:bg-theme-primary/10 hover:text-theme-primary;
   }
 
   .panel-filter-popover__icon {
@@ -453,7 +453,7 @@
   }
 
   .panel-filter-popover__actions button {
-    @apply flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-[0.65rem] text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+    @apply flex-1 rounded-md border border-theme-border bg-theme-card px-2 py-1 font-semibold text-[0.65rem] text-theme-secondary transition-colors hover:border-theme-primary/50 hover:text-theme-primary;
   }
 
   .panel-toolbar__select-wrapper {
@@ -461,7 +461,7 @@
   }
 
   .panel-toolbar__select {
-    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-card px-2 py-1 text-xs text-theme-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .panel-toolbar__spacer {
@@ -469,11 +469,11 @@
   }
 
   .panel-toolbar__meta {
-    @apply text-[0.65rem] text-slate-500 dark:text-slate-400;
+    @apply text-[0.65rem] text-theme-secondary;
   }
 
   .panel-cards {
-    @apply flex-1 min-h-0 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden bg-slate-50 p-3 dark:bg-slate-950;
+    @apply flex-1 min-h-0 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden bg-theme-background p-3;
   }
 
   .app-shell[data-compact='true'] .panel-cards {
@@ -481,7 +481,7 @@
   }
 
   .panel-cards__empty {
-    @apply rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400;
+    @apply rounded-md border border-dashed border-theme-border px-3 py-6 text-center text-xs text-theme-secondary;
   }
 
   .card-list-item {
@@ -576,11 +576,11 @@
   }
 
   .settings-modal {
-    @apply absolute left-1/2 top-1/2 flex w-[640px] max-w-[calc(100%-2rem)] max-h-[70vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900;
+    @apply absolute left-1/2 top-1/2 flex w-[640px] max-w-[calc(100%-2rem)] max-h-[70vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-theme-border bg-theme-card shadow-2xl;
   }
 
   .settings-modal__header {
-    @apply flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4 dark:border-slate-800;
+    @apply flex items-start justify-between gap-4 border-b border-theme-border px-6 py-4;
   }
 
   .settings-modal__header h2 {
@@ -588,27 +588,27 @@
   }
 
   .settings-modal__subtitle {
-    @apply text-xs text-slate-500 dark:text-slate-400;
+    @apply text-xs text-theme-secondary;
   }
 
   .settings-close-button {
-    @apply rounded-full border border-transparent p-1 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 dark:text-slate-300 dark:hover:border-slate-600;
+    @apply rounded-full border border-transparent p-1 text-theme-secondary transition hover:border-theme-border hover:text-theme-foreground;
   }
 
   .settings-modal__body {
-    @apply flex flex-1 min-h-0 divide-x divide-slate-200 dark:divide-slate-800;
+    @apply flex flex-1 min-h-0 divide-x divide-theme-border;
   }
 
   .settings-modal__nav {
-    @apply flex w-40 min-w-[140px] flex-col gap-1 bg-slate-50 p-4 text-left text-sm dark:bg-slate-950;
+    @apply flex w-40 min-w-[140px] flex-col gap-1 bg-theme-background p-4 text-left text-sm;
   }
 
   .settings-nav__item {
-    @apply flex items-center gap-2 rounded-md px-3 py-2 text-left text-slate-600 transition hover:bg-blue-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800;
+    @apply flex items-center gap-2 rounded-md px-3 py-2 text-left text-theme-secondary transition hover:bg-theme-primary/10 hover:text-theme-primary;
   }
 
   .settings-nav__item--active {
-    @apply bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-500;
+    @apply bg-theme-primary text-theme-background hover:bg-theme-primary/90;
   }
 
   .settings-modal__content {
@@ -628,11 +628,11 @@
   }
 
   .settings-field__label {
-    @apply text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply text-xs font-semibold uppercase tracking-wide text-theme-secondary;
   }
 
   .settings-field__note {
-    @apply text-xs text-slate-500 dark:text-slate-400;
+    @apply text-xs text-theme-secondary;
   }
 
   .settings-field__error {
@@ -644,11 +644,11 @@
   }
 
   .settings-radio {
-    @apply flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs transition hover:border-blue-400 dark:border-slate-700 dark:hover:border-blue-400;
+    @apply flex items-center gap-2 rounded-full border border-theme-border px-3 py-1 text-xs transition hover:border-theme-primary;
   }
 
   .settings-radio input {
-    @apply text-blue-500;
+    @apply text-theme-primary;
   }
 
   .settings-checkbox {
@@ -656,7 +656,7 @@
   }
 
   .settings-modal__footer {
-    @apply flex items-center justify-between gap-4 border-t border-slate-200 px-6 py-4 text-xs dark:border-slate-800;
+    @apply flex items-center justify-between gap-4 border-t border-theme-border px-6 py-4 text-xs;
   }
 
   .settings-modal__actions {
@@ -664,11 +664,11 @@
   }
 
   .settings-primary-button {
-    @apply rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-400;
+    @apply rounded-md bg-theme-primary px-4 py-2 text-sm font-semibold text-theme-background transition hover:bg-theme-primary/90 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .settings-secondary-button {
-    @apply rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800;
+    @apply rounded-md border border-theme-border px-4 py-2 text-sm font-medium text-theme-foreground hover:bg-theme-background disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .settings-modal__error {
@@ -676,11 +676,11 @@
   }
 
   .settings-loading {
-    @apply text-sm text-slate-500 dark:text-slate-400;
+    @apply text-sm text-theme-secondary;
   }
 
   .settings-recent-list {
-    @apply max-h-28 overflow-auto text-xs text-slate-500 dark:text-slate-400;
+    @apply max-h-28 overflow-auto text-xs text-theme-secondary;
   }
 
   .settings-recent-list li {
@@ -692,11 +692,11 @@
   }
 
   .conversion-modal {
-    @apply absolute left-1/2 top-1/2 flex w-[720px] max-w-[calc(100%-2rem)] max-h-[80vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-2xl dark:border-slate-700 dark:bg-slate-900;
+    @apply absolute left-1/2 top-1/2 flex w-[720px] max-w-[calc(100%-2rem)] max-h-[80vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-theme-border bg-theme-card text-sm shadow-2xl;
   }
 
   .conversion-modal__header {
-    @apply flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4 dark:border-slate-800;
+    @apply flex items-start justify-between gap-4 border-b border-theme-border px-6 py-4;
   }
 
   .conversion-modal__header h2 {
@@ -704,11 +704,11 @@
   }
 
   .conversion-modal__subtitle {
-    @apply text-xs text-slate-500 dark:text-slate-400;
+    @apply text-xs text-theme-secondary;
   }
 
   .conversion-modal__close {
-    @apply rounded-full border border-transparent px-2 py-1 text-lg text-slate-500 transition hover:border-slate-300 hover:text-slate-700 dark:text-slate-300 dark:hover:border-slate-600;
+    @apply rounded-full border border-transparent px-2 py-1 text-lg text-theme-secondary transition hover:border-theme-border hover:text-theme-foreground;
   }
 
   .conversion-modal__body {
@@ -716,7 +716,7 @@
   }
 
   .conversion-modal__section {
-    @apply flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/50;
+    @apply flex flex-col gap-3 rounded-2xl border border-theme-border bg-theme-background/70 p-4;
   }
 
   .conversion-modal__section-header {
@@ -724,19 +724,19 @@
   }
 
   .conversion-modal__file dl {
-    @apply grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400;
+    @apply grid grid-cols-2 gap-2 text-xs text-theme-secondary;
   }
 
   .conversion-modal__file dt {
-    @apply font-semibold text-slate-500 dark:text-slate-400;
+    @apply font-semibold text-theme-secondary/70;
   }
 
   .conversion-modal__preview {
-    @apply mt-3 max-h-40 overflow-auto rounded-lg border border-slate-200 bg-white p-3 text-xs font-mono leading-relaxed dark:border-slate-700 dark:bg-slate-900;
+    @apply mt-3 max-h-40 overflow-auto rounded-lg border border-theme-border bg-theme-card p-3 text-xs font-mono leading-relaxed;
   }
 
   .conversion-modal__empty {
-    @apply text-xs text-slate-500 dark:text-slate-400;
+    @apply text-xs text-theme-secondary/70;
   }
 
   .conversion-modal__warning {
@@ -752,11 +752,11 @@
   }
 
   .conversion-modal__radio {
-    @apply flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900/70;
+    @apply flex cursor-pointer gap-3 rounded-xl border border-theme-border bg-theme-card p-3 text-left transition hover:border-theme-primary;
   }
 
   .conversion-modal__radio input {
-    @apply mt-1 text-blue-500;
+    @apply mt-1 text-theme-primary;
   }
 
   .conversion-modal__error {
@@ -764,19 +764,19 @@
   }
 
   .conversion-modal__progress {
-    @apply px-6 pb-3 text-xs text-slate-600 dark:text-slate-300;
+    @apply px-6 pb-3 text-xs text-theme-secondary;
   }
 
   .conversion-modal__progress-bar {
-    @apply mb-1 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800;
+    @apply mb-1 h-2 w-full rounded-full bg-theme-background;
   }
 
   .conversion-modal__progress-bar > div {
-    @apply h-full rounded-full bg-blue-500 transition-all;
+    @apply h-full rounded-full bg-theme-primary transition-all;
   }
 
   .conversion-modal__footer {
-    @apply flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4 dark:border-slate-800;
+    @apply flex items-center justify-end gap-3 border-t border-theme-border px-6 py-4;
   }
 
   .btn-primary {
@@ -792,19 +792,19 @@
   }
 
   .card {
-    @apply relative flex cursor-pointer select-none flex-col gap-2 rounded-lg border border-transparent bg-white/80 p-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-slate-900/80;
+    @apply relative flex cursor-pointer select-none flex-col gap-2 rounded-lg border border-transparent bg-theme-card p-3 shadow-sm transition-all hover:border-theme-primary/30 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .card[data-tooltip]::after {
     content: attr(data-tooltip);
-    @apply pointer-events-none absolute left-1/2 top-full z-50 mt-2 max-w-[28rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-xs leading-snug text-slate-900 shadow-lg opacity-0 transition-opacity duration-150 ease-out dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100;
+    @apply pointer-events-none absolute left-1/2 top-full z-50 mt-2 max-w-[28rem] rounded-md border border-theme-border bg-theme-card px-3 py-2 text-xs leading-snug text-theme-foreground shadow-lg opacity-0 transition-opacity duration-150 ease-out;
     transform: translateX(-50%);
     white-space: pre-wrap;
   }
 
   .card[data-tooltip]::before {
     content: '';
-    @apply pointer-events-none absolute left-1/2 top-full z-40 mt-1 h-2 w-2 rotate-45 border border-slate-300 bg-white opacity-0 transition-opacity duration-150 ease-out dark:border-slate-600 dark:bg-slate-700;
+    @apply pointer-events-none absolute left-1/2 top-full z-40 mt-1 h-2 w-2 rotate-45 border border-theme-border bg-theme-card opacity-0 transition-opacity duration-150 ease-out;
     transform: translateX(-50%);
   }
 
@@ -817,7 +817,7 @@
 
 
   .card--selected-primary {
-    @apply border-l-4 border-blue-500 bg-blue-50/70 shadow-lg dark:bg-slate-800/80;
+    @apply border-l-4 border-theme-primary bg-theme-primary/10 shadow-lg;
   }
 
   .card--selected-secondary {
@@ -825,7 +825,7 @@
   }
 
   .card--selected-inactive {
-    @apply border-l-4 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800;
+    @apply border-l-4 border-theme-border bg-theme-card;
   }
 
   .card--dirty {
@@ -858,15 +858,15 @@
   }
 
   .card__connector-button {
-    @apply relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-blue-300;
+    @apply relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-theme-border text-xs text-theme-secondary transition-colors hover:border-theme-primary/50 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .card__connector-button:disabled {
-    @apply cursor-not-allowed opacity-50 hover:border-slate-300 hover:text-slate-500 dark:hover:border-slate-600 dark:hover:text-slate-400;
+    @apply cursor-not-allowed opacity-50 hover:border-theme-border hover:text-theme-secondary;
   }
 
   .card__connector--active {
-    @apply border-blue-400 text-blue-500 dark:border-blue-300 dark:text-blue-200;
+    @apply border-theme-connector-active text-theme-connector-active;
   }
 
   .card__connector--muted {
@@ -874,19 +874,19 @@
   }
 
   .card__connector-count {
-    @apply absolute -top-1 -right-1 min-w-[14px] rounded-full bg-blue-500 px-1 text-[0.55rem] font-bold leading-3 text-white dark:bg-blue-300 dark:text-slate-900;
+    @apply absolute -top-1 -right-1 min-w-[14px] rounded-full bg-theme-primary px-1 text-[0.55rem] font-bold leading-3 text-theme-background;
   }
 
   .card__markdown-button {
-    @apply inline-flex h-6 min-w-[32px] items-center justify-center rounded-md border border-slate-300 bg-white px-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200;
+    @apply inline-flex h-6 min-w-[32px] items-center justify-center rounded-md border border-theme-border bg-theme-card px-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-theme-secondary transition-colors hover:border-theme-primary/50 hover:text-theme-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .card__markdown-button--active {
-    @apply border-blue-400 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100;
+    @apply border-theme-primary bg-theme-primary/10 text-theme-primary;
   }
 
   .card--trace-related {
-    @apply ring-1 ring-offset-1 ring-blue-300/50 ring-offset-blue-50 dark:ring-blue-400/40 dark:ring-offset-slate-900/50;
+    @apply ring-1 ring-offset-1 ring-theme-primary/50 ring-offset-theme-primary/10;
   }
 
   .card__icon {
@@ -902,7 +902,7 @@
   }
 
   .card__status--draft {
-    @apply bg-slate-200 text-slate-600 dark:bg-slate-600/30 dark:text-slate-200;
+    @apply bg-theme-secondary/20 text-theme-secondary;
   }
 
   .card__status--review {
@@ -914,23 +914,23 @@
   }
 
   .card__title {
-    @apply flex-1 text-sm font-semibold text-slate-800 dark:text-slate-100;
+    @apply flex-1 text-sm font-semibold text-theme-foreground;
   }
 
   .card--editing {
-    @apply cursor-text bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-50;
+    @apply cursor-text bg-theme-card text-theme-foreground;
   }
 
   .card__title-input {
-    @apply flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-800 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400;
+    @apply flex-1 rounded-md border border-theme-border bg-theme-card px-2 py-1 text-sm font-semibold text-theme-foreground shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary placeholder:text-theme-secondary/70;
   }
 
   .card__body-input {
-    @apply mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm leading-relaxed text-slate-800 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400;
+    @apply mt-2 w-full rounded-md border border-theme-border bg-theme-card px-2 py-2 text-sm leading-relaxed text-theme-foreground shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary placeholder:text-theme-secondary/70;
   }
 
   .card__markdown-hint {
-    @apply mt-1 text-[0.65rem] text-slate-400 dark:text-slate-500;
+    @apply mt-1 text-[0.65rem] text-theme-secondary/70;
   }
 
   .card__title--truncate {
@@ -938,11 +938,11 @@
   }
 
   .card__body {
-    @apply whitespace-pre-wrap text-xs leading-relaxed text-slate-600 dark:text-slate-200;
+    @apply whitespace-pre-wrap text-xs leading-relaxed text-theme-secondary;
   }
 
   .card__body--markdown {
-    @apply text-xs leading-relaxed text-slate-700 dark:text-slate-200;
+    @apply text-xs leading-relaxed text-theme-foreground;
   }
 
   .card__body--markdown p {
@@ -991,11 +991,11 @@
   }
 
   .card__footer {
-    @apply text-[0.65rem] text-slate-400 dark:text-slate-500;
+    @apply text-[0.65rem] text-theme-secondary/70;
   }
 
   .card__expand-button {
-    @apply flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-xs text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200;
+    @apply flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-xs text-theme-secondary transition-colors hover:bg-theme-secondary/20 hover:text-theme-foreground;
   }
 
   .card__expand-placeholder {
@@ -1003,23 +1003,23 @@
   }
 
   .panel-placeholder {
-    @apply flex flex-1 items-center justify-center bg-slate-100 px-3 py-6 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400;
+    @apply flex flex-1 items-center justify-center bg-theme-background px-3 py-6 text-xs text-theme-secondary;
   }
 
   .log-area {
-    @apply flex flex-col border-t border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-slate-900;
+    @apply flex flex-col border-t border-theme-border bg-theme-card shadow-inner;
   }
 
   .log-area__header {
-    @apply flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 px-3 py-1.5 text-xs font-semibold dark:border-slate-800;
+    @apply flex flex-wrap items-start justify-between gap-2 border-b border-theme-border px-3 py-1.5 text-xs font-semibold;
   }
 
   .log-area__title {
-    @apply flex items-baseline gap-2 text-xs font-semibold text-slate-600 dark:text-slate-200;
+    @apply flex items-baseline gap-2 text-xs font-semibold text-theme-secondary;
   }
 
   .log-area__counter {
-    @apply rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+    @apply rounded-full bg-theme-background px-2 py-0.5 text-[0.6rem] font-semibold text-theme-secondary;
   }
 
   .log-area__filters {
@@ -1027,11 +1027,11 @@
   }
 
   .log-area__select {
-    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-card px-2 py-1 text-xs text-theme-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .log-area__filter-input {
-    @apply rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-card px-2 py-1 text-xs text-theme-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .log-area__clear {
@@ -1043,11 +1043,11 @@
   }
 
   .log-area__body {
-    @apply flex-1 overflow-auto bg-slate-50 px-3 py-2.5 font-mono text-[0.7rem] leading-relaxed text-slate-600 dark:bg-slate-950 dark:text-slate-300 select-text;
+    @apply flex-1 overflow-auto bg-theme-background px-3 py-2.5 font-mono text-[0.7rem] leading-relaxed text-theme-secondary select-text;
   }
 
   .status-bar {
-    @apply flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-100 px-3 text-[0.65rem] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400;
+    @apply flex items-center justify-between gap-3 border-t border-theme-border bg-theme-card px-3 text-[0.65rem] uppercase tracking-wide text-theme-secondary;
   }
 
   .status-bar__section {
@@ -1587,11 +1587,11 @@
 
   /* Trace Matrix */
   .trace-matrix-app {
-    @apply flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+    @apply flex h-screen flex-col bg-theme-background text-theme-foreground;
   }
 
   .trace-matrix-status {
-    @apply px-6 py-2 text-sm text-slate-600 dark:text-slate-300;
+    @apply px-6 py-2 text-sm text-theme-secondary;
   }
 
   .trace-matrix-status--error {
@@ -1607,27 +1607,27 @@
   }
 
   .trace-matrix-header {
-    @apply flex flex-wrap gap-6 rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-wrap gap-6 rounded-xl border border-theme-border bg-theme-card p-4 text-sm;
   }
 
   .trace-matrix-header__label {
-    @apply text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply text-xs uppercase tracking-wide text-theme-secondary/70;
   }
 
   .trace-matrix-header__value {
-    @apply block text-base font-semibold text-slate-900 dark:text-white;
+    @apply block text-base font-semibold text-theme-foreground;
   }
 
   .trace-matrix-header__count {
-    @apply ml-2 text-xs text-slate-500 dark:text-slate-400;
+    @apply ml-2 text-xs text-theme-secondary/70;
   }
 
   .trace-matrix-toolbar {
-    @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-col gap-3 rounded-xl border border-theme-border bg-theme-card px-4 py-3 text-sm;
   }
 
   .trace-matrix-toolbar__stats {
-    @apply flex flex-wrap gap-4 text-slate-600 dark:text-slate-300;
+    @apply flex flex-wrap gap-4 text-theme-secondary;
   }
 
   .trace-matrix-toolbar__actions {
@@ -1635,7 +1635,7 @@
   }
 
   .trace-matrix-toolbar__settings {
-    @apply flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300;
+    @apply flex flex-wrap gap-4 text-xs text-theme-secondary;
   }
 
   .trace-matrix-toolbar__settings label {
@@ -1643,7 +1643,7 @@
   }
 
   .trace-matrix-toolbar__settings select {
-    @apply rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100;
+    @apply rounded border border-theme-border bg-theme-background px-2 py-1 text-sm text-theme-foreground;
   }
 
   .trace-matrix-toolbar__checkbox {
@@ -1651,7 +1651,7 @@
   }
 
   .trace-matrix-grid {
-    @apply flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-theme-border bg-theme-card text-sm;
   }
 
   .app-shell[data-compact='true'] .trace-matrix-grid {
@@ -1659,11 +1659,11 @@
   }
 
   .trace-matrix-grid__column-header-row {
-    @apply flex border-b border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800;
+    @apply flex border-b border-theme-border bg-theme-background;
   }
 
   .trace-matrix-grid__corner {
-    @apply flex items-center justify-center border-r border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-300;
+    @apply flex items-center justify-center border-r border-theme-border text-xs font-semibold uppercase tracking-wide text-theme-secondary;
   }
 
   .trace-matrix-grid__column-headers {
@@ -1675,7 +1675,7 @@
   }
 
   .trace-matrix-grid__row-headers {
-    @apply flex flex-col overflow-hidden border-r border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800;
+    @apply flex flex-col overflow-hidden border-r border-theme-border bg-theme-background;
   }
 
   .trace-matrix-grid__cells {
@@ -1684,23 +1684,23 @@
 
   .trace-matrix-grid__column-header,
   .trace-matrix-grid__row-header {
-    @apply flex flex-col gap-1 border-b border-slate-200 px-2 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-200;
+    @apply flex flex-col gap-1 border-b border-theme-border px-2 py-2 text-xs text-theme-secondary;
   }
 
   .trace-matrix-grid__column-header {
-    @apply border-l border-slate-200 dark:border-slate-700;
+    @apply border-l border-theme-border;
   }
 
   .trace-matrix-grid__row-header {
-    @apply border-r border-slate-200 dark:border-slate-700;
+    @apply border-r border-theme-border;
   }
 
   .trace-matrix-grid__card-id {
-    @apply font-mono text-[0.65rem] uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply font-mono text-[0.65rem] uppercase tracking-wide text-theme-secondary/70;
   }
 
   .trace-matrix-grid__title {
-    @apply text-xs font-medium text-slate-800 dark:text-slate-100;
+    @apply text-xs font-medium text-theme-foreground;
   }
 
   .trace-matrix-grid__cell-wrapper {
@@ -1708,7 +1708,7 @@
   }
 
   .trace-matrix-cell {
-    @apply flex h-full w-full items-center justify-center border border-slate-200 text-sm transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-blue-500 dark:border-slate-700 dark:hover:bg-slate-700;
+    @apply flex h-full w-full items-center justify-center border border-theme-border text-sm transition-colors hover:bg-theme-primary/10 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-theme-primary;
   }
 
   .trace-matrix-cell--active {
@@ -1752,15 +1752,15 @@
   }
 
   .trace-matrix-filter {
-    @apply w-72 shrink-0 rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-700 dark:bg-slate-800;
+    @apply w-72 shrink-0 rounded-xl border border-theme-border bg-theme-card p-4 text-sm;
   }
 
   .trace-matrix-filter__section + .trace-matrix-filter__section {
-    @apply mt-4 pt-4 border-t border-slate-100 dark:border-slate-700;
+    @apply mt-4 pt-4 border-t border-theme-border;
   }
 
   .trace-matrix-filter__section h3 {
-    @apply mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply mb-2 text-xs font-semibold uppercase tracking-wide text-theme-secondary/70;
   }
 
   .trace-matrix-filter__section label {
@@ -1769,7 +1769,7 @@
 
   .trace-matrix-filter__section input,
   .trace-matrix-filter__section select {
-    @apply rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100;
+    @apply rounded-md border border-theme-border bg-theme-background px-2 py-1 text-sm text-theme-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme-primary;
   }
 
   .trace-matrix-filter__status-grid {

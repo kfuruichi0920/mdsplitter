@@ -54,16 +54,16 @@ describe('themeUtils', () => {
 
       applyThemeColors(darkColors);
 
-      //! 各CSS変数が正しく設定されていることを確認
-      expect(root.style.getPropertyValue('--theme-background')).toBe('#111827');
-      expect(root.style.getPropertyValue('--theme-foreground')).toBe('#f9fafb');
-      expect(root.style.getPropertyValue('--theme-border')).toBe('#374151');
-      expect(root.style.getPropertyValue('--theme-primary')).toBe('#60a5fa');
-      expect(root.style.getPropertyValue('--theme-secondary')).toBe('#9ca3af');
-      expect(root.style.getPropertyValue('--theme-card-background')).toBe('#1f2937');
-      expect(root.style.getPropertyValue('--theme-card-border')).toBe('#4b5563');
-      expect(root.style.getPropertyValue('--theme-connector-active')).toBe('#3b82f6');
-      expect(root.style.getPropertyValue('--theme-connector-inactive')).toBe('#6b7280');
+      //! 各CSS変数が正しく設定されていることを確認 (RGBチャネルに変換される)
+      expect(root.style.getPropertyValue('--theme-background')).toBe('17 24 39');
+      expect(root.style.getPropertyValue('--theme-foreground')).toBe('249 250 251');
+      expect(root.style.getPropertyValue('--theme-border')).toBe('55 65 81');
+      expect(root.style.getPropertyValue('--theme-primary')).toBe('96 165 250');
+      expect(root.style.getPropertyValue('--theme-secondary')).toBe('156 163 175');
+      expect(root.style.getPropertyValue('--theme-card-background')).toBe('31 41 55');
+      expect(root.style.getPropertyValue('--theme-card-border')).toBe('75 85 99');
+      expect(root.style.getPropertyValue('--theme-connector-active')).toBe('59 130 246');
+      expect(root.style.getPropertyValue('--theme-connector-inactive')).toBe('107 114 128');
     });
 
     it('should update theme colors when called multiple times', () => {
@@ -95,10 +95,10 @@ describe('themeUtils', () => {
       };
       applyThemeColors(lightColors);
 
-      //! ライトモード色で上書きされていることを確認
-      expect(root.style.getPropertyValue('--theme-background')).toBe('#ffffff');
-      expect(root.style.getPropertyValue('--theme-foreground')).toBe('#1f2937');
-      expect(root.style.getPropertyValue('--theme-primary')).toBe('#3b82f6');
+      //! ライトモード色で上書きされていることを確認 (RGBチャネルに変換される)
+      expect(root.style.getPropertyValue('--theme-background')).toBe('255 255 255');
+      expect(root.style.getPropertyValue('--theme-foreground')).toBe('31 41 55');
+      expect(root.style.getPropertyValue('--theme-primary')).toBe('59 130 246');
     });
   });
 
