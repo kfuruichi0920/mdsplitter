@@ -1,6 +1,6 @@
 # mdsplitter 詳細設計
 
-最終更新日: 2025-11-16
+最終更新日: 2025-11-22
 対象リポジトリ: `mdsplitter`
 
 ## 1. システム概要
@@ -56,15 +56,18 @@
 | `src/renderer/store/notificationStore.ts` | 共通通知(トースト)の状態管理。 | レベル別のメッセージ表示と自動消去を担当。 | ✅ |
 | `src/renderer/store/matrixStore.ts` | トレースマトリクス専用ストア。 | 左右カードファイル、relation データ、フィルタ状態、統計情報、UI設定を保持。マトリクスウィンドウとメインウィンドウ間のデータ同期を管理。 | ✅ |
 | `src/renderer/store/historyStore.ts` | カード履歴管理ストア。 | カード履歴のロード・キャッシュ・追記を管理。`window.app.history` API を通じてメインプロセスと連携。 | ✅ |
-| `src/renderer/store/traceStore.ts` | トレーサビリティデータストア。 | トレースファイルの読み込み・保存、relation の追加/削除、カード件数集計を管理。 | ✅ |
+| `src/renderer/store/traceStore.ts` | トレーサビリティデータストア。 | トレースファイルの読み込み・保存、relation の追加/削除、カード件数集計に加え、深さ指定の関連カード取得 (`getRelatedCardsWithDepth`) を提供。 | ✅ |
 | `src/renderer/store/splitStore.ts` | 分割パネル構造ストア。 | 再帰的グリッド構造（VSCode 風の分割）を管理。分割操作、リサイズ、アクティブパネル追跡を実装。 | ✅ |
 | `src/renderer/store/panelEngagementStore.ts` | パネル選択状態ストア。 | アクティブ/準アクティブ/非アクティブの3段階パネル状態を管理。Ctrl+クリック時の複数パネル選択に対応。 | ✅ |
 | `src/renderer/store/tracePreferenceStore.ts` | トレースコネクタ表示設定ストア。 | 可視トグル、種別フィルタ、還流許可、個別カードミュートを管理。 | ✅ |
 | `src/renderer/store/connectorLayoutStore.ts` | コネクタレイアウト情報ストア。 | カード要素の位置情報と可視状態を保持。ResizeObserver/MutationObserver を通じて DOM 位置をトラッキング。 | ✅ |
+| `src/renderer/store/searchStore.ts` | 検索ダイアログ状態ストア。 | 開閉状態、検索履歴タブ、キーワードドラフトを保持し、SearchDialog とキーボードショートカットから共用。 | ✅ |
 | `src/renderer/App.tsx` | レイアウト骨格 (メニュー/ツールバー/サイドバー/カード/ログ/ステータス) と IPC ステータスログ、リサイズ制御を実装。 | コンパクトモードでの余白調整とテーマ切替を保持。 | ⚠️ |
 | `src/renderer/components/ConversionModal.tsx` | 📂 ボタンから起動するカード変換モーダル。入力ファイル情報、サイズ警告同意チェック、固定ルール/LLM ストラテジ選択、変換実行ボタンを提供。 | Zustand 経由で `ConversionModalDisplayState` を受け取りレンダリング。 | ✅ |
 | `src/renderer/components/SettingsModal.tsx` | 設定ダイアログコンポーネント。 | テーマ/入出力/ログ/ワークスペースの各セクションを左右2ペインで表示。`Ctrl+,` で呼び出し。 | ✅ |
 | `src/renderer/components/NotificationCenter.tsx` | トースト通知コンポーネント。 | 成功/警告/エラーなど共通フィードバックを画面右上に表示。 | ✅ |
+| `src/renderer/components/SearchDialog.tsx` | Ctrl+F で開くモーダレス検索ダイアログ。 | キーワード/正規表現/ID/トレース（深さ指定）/高度検索モードと結果履歴タブを提供し、カードへジャンプする。 | ✅ |
+| `src/renderer/components/AdvancedSearchBuilder.tsx` | 高度検索の条件ビルダー。 | フィールド・演算子・値をAND/ORで構成し、トレース深さを入力できるフォーム部品。 | ✅ |
 | `src/renderer/components/SplitContainer.tsx` | 分割パネルコンテナコンポーネント。 | 再帰的グリッド構造を描画し、タブバーとカードパネルを配置。 | ✅ |
 | `src/renderer/components/CardPanel.tsx` | カードパネルコンポーネント。 | タブバー、ツールバー、カード一覧、フィルタ機能を提供。 | ✅ |
 | `src/renderer/components/TraceConnectorLayer.tsx` | トレースコネクタ描画レイヤ。 | 隣接する左右パネル間のコネクタを SVG で描画。種別フィルタ/選択フォーカス/可視トグルに対応。 | ✅ |
@@ -81,6 +84,7 @@
 | `src/renderer/components/TraceMatrixCell.tsx` | マトリクスセルコンポーネント。 | 個別のマトリクスセルを描画。relation の有無、種別、方向性を視覚的に表示し、クリックで編集可能。 | ✅ |
 | `src/renderer/components/MatrixLaunchDialog.tsx` | マトリクス起動ダイアログ。 | メインウィンドウからマトリクスウィンドウを開くための左右ファイル選択ダイアログ。 | ✅ |
 | `src/renderer/styles.css` | Tailwind 基礎スタイルと `@apply` によるコンポーネントスタイル。ライト/ダークテーマに対応。 | 文字サイズ・余白を小さくしたコンパクトデザインを適用。 | ⚠️ |
+| `src/renderer/utils/search.ts` | 検索マッチャ/検索エンジン | `runSearch` が text/regex/id/trace/advanced を横断評価し、トレース深さ指定付きの関連カード抽出に対応。 | ✅ |
 | `src/renderer/types/conversion.ts` | 変換モーダル用の状態/入力ファイルサマリ型定義。 | `ConversionModalDisplayState`/`ConversionSourceSummary` を集中管理。 | ✅ |
 | `src/vite-env.d.ts` | Vite クライアント型補完の参照ディレクティブ。 | 実装コードは含まず型補助のみ提供。 | ✅ |
 | `src/components/Hello.tsx` | 挨拶コンポーネント。プロパティ `name` を受け取り、`role="status"` の段落で表示。 | テスト: `src/components/Hello.test.tsx`。日本語挨拶の確認のみ。 | ✅ (サンプル) |
@@ -117,7 +121,7 @@
 | UC-04 | カード変換（LLM） | LLM アダプタで分割し監査情報と共に保存。 | ユーザ、LLM アダプタ | JSON 保存、監査ログ出力。 | ⚠️ (LLM スタブ/アダプタ抽象のみ実装) |
 | UC-05 | カード編集 | カード CRUD、ステータス操作、Undo/Redo。 | ユーザ、カード編集 UI | ストアとファイル整合、未保存状態表示。 | ⛔ |
 | UC-06 | トレーサビリティ管理 | カード間リンク追加/削除と可視化。 | ユーザ、トレーサ管理モジュール | `trace_*.json` 更新、ビュー反映。 | ⛔ |
-| UC-07 | 検索・フィルタ | 種別/ステータス/テキストで絞り込み。 | ユーザ、検索モジュール | 条件一致カード表示と親展開。 | ✅ |
+| UC-07 | 検索・フィルタ | キーワード/正規表現/ID/トレース深さ/高度AND-OR 条件でカードを絞り込み、結果履歴タブからカードへジャンプする。 | ユーザ、検索モジュール | 条件一致カード表示と親展開。 | ✅ |
 | UC-08 | 設定変更と即時反映 | `settings.json` や UI からの設定変更を即時反映。 | ユーザ、設定モジュール | バリデーション通過と変更反映ログ。 | ✅ |
 | UC-09 | ログ監査 | 操作ログ収集とローテーション。 | ユーザ、ログモジュール | ログが閾値管理され監査要件満足。 | ✅ |
 | UC-10 | トレースマトリクス表示・編集 | 2つのカードファイル間のトレース関係をマトリクス形式で表示・編集。 | ユーザ、マトリクスモジュール | 別ウィンドウでマトリクス表示、セル編集、フィルタリング、統計表示、CSV/Excel エクスポート。 | ✅ |

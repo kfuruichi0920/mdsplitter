@@ -1,0 +1,21 @@
+# 作業記録 2025-11-22
+
+## 作業概要
+- 将来計画 2B-1 に基づき検索機能を別ダイアログ化し、トレース深さ指定や高度検索を備えた検索エンジンとUIを実装。
+
+## 主要変更
+- 設計ドキュメント: `doc/implementation_query_api.md` 行1-114に再設計方針とクエリAPIスキーマを整理。
+- 検索ダイアログ: `src/renderer/components/SearchDialog.tsx` 行44-220でモード切替・履歴タブ・スコープ別データセット構築を実装し、`src/renderer/App.tsx` 行2134-2148,2688-2699でCtrl+Fショートカットとダイアログ配置を接続。
+- 高度検索UI: `src/renderer/components/AdvancedSearchBuilder.tsx` 行1-104で条件追加/削除とトレース深さ入力を提供。
+- 検索エンジン: `src/renderer/utils/search.ts` 行280-402で`runSearch`を拡張し、text/regex/id/advanced/trace(深さ指定)の評価とseed重複排除を実装。
+- トレース探索: `src/renderer/store/traceStore.ts` 行268-305で深さ指定の関連カード取得`getRelatedCardsWithDepth`を追加。
+- スタイル: `src/renderer/styles.css` 行200-330付近に検索ダイアログ/高度検索用のスタイルを追加。
+- 詳細設計: `doc/software_detail_design.md` 行1,60-90,120-130付近に検索ダイアログ・検索ストア・検索ユーティリティを追記し更新日を2025-11-22に更新。
+
+## テスト
+- `npm test -- --runTestsByPath src/renderer/utils/__tests__/search.test.ts src/renderer/components/__tests__/SearchDialog.test.tsx`
+  - 7件のテストがPASS。検索エンジンの条件評価とSearchDialog UI動作を確認。
+
+## 決定事項 / メモ
+- Ctrl+FはSearchDialogを開くのみとし、入力フォーカスと履歴管理はダイアログ側で処理。
+- 旧サイドバー検索UIは廃止し、SearchDialogへ一本化（`.sidebar__search*`は今後整理予定）。

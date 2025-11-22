@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, FormEvent as ReactFormEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { nanoid } from 'nanoid';
 import { shallow } from 'zustand/shallow';
 
@@ -41,16 +41,18 @@ import type { TraceDirection, TraceRelationKind, TraceabilityRelation } from '@/
 
 import './styles.css';
 import { NotificationCenter } from './components/NotificationCenter';
+import { SearchDialog } from './components/SearchDialog';
 import { SplitContainer } from './components/SplitContainer';
 import { CardPanel } from './components/CardPanel';
 import { SettingsModal, type SettingsSection } from './components/SettingsModal';
 import { ConversionModal } from './components/ConversionModal';
 import { applyThemeColors, applySplitterWidth, applyTypography } from './utils/themeUtils';
 import { findVerticalPairForLeaf } from './utils/traceLayout';
-import { createSearchMatcher, buildSnippet } from './utils/search';
+import type { SearchResult } from './utils/search';
 import { convertDocument } from '@/shared/conversion/pipeline';
 import type { NormalizedDocument } from '@/shared/conversion/types';
 import type { CardIdAssignmentRule, ConversionModalDisplayState, ConversionSourceSummary } from './types/conversion';
+import { useSearchStore } from './store/searchStore';
 
 /** サイドバー幅のデフォルト (px)。 */
 const SIDEBAR_DEFAULT = 240;
@@ -106,26 +108,6 @@ type LogEntry = {
   level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'; ///< ログレベル。
   message: string; ///< メッセージ本文。
   timestamp: Date; ///< 記録時刻。
-};
-
-type SearchScope = 'current' | 'open' | 'input';
-
-interface SearchResultItem {
-  id: string;
-  source: 'open' | 'input';
-  fileName: string | null;
-  tabId?: string;
-  leafId?: string;
-  cardId: string;
-  cardTitle: string;
-  snippet: string;
-  matchCount: number;
-}
-
-const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
-  current: 'アクティブタブ',
-  open: '開いているタブ',
-  input: '_input ディレクトリ',
 };
 
 type ShortcutEntry = {
@@ -422,7 +404,6 @@ const buildConversionState = (strategy: ConverterStrategy): ConversionModalDispl
 export const App = () => {
   const workspaceRef = useRef<HTMLDivElement | null>(null); ///< ワークスペース全体。
   const contentRef = useRef<HTMLDivElement | null>(null); ///< サイドバー+カード領域。
-  const searchInputRef = useRef<HTMLInputElement | null>(null); ///< 検索入力フィールド。
   const traceFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const traceFilterPopoverRef = useRef<HTMLDivElement | null>(null);
   const conversionAbortControllerRef = useRef<AbortController | null>(null);
@@ -539,6 +520,9 @@ export const App = () => {
   const markdownPreviewGlobalEnabled = useUiStore((state) => state.markdownPreviewGlobalEnabled);
   const toggleMarkdownPreviewGlobal = useUiStore((state) => state.toggleMarkdownPreviewGlobal);
   const notify = useNotificationStore((state) => state.add);
+  const searchIsOpen = useSearchStore((state) => state.isOpen);
+  const openSearchDialog = useSearchStore((state) => state.open);
+  const closeSearchDialog = useSearchStore((state) => state.close);
   const splitRoot = useSplitStore((state) => state.root);
   const splitLeaf = useSplitStore((state) => state.splitLeaf);
   const activeLeafId = useSplitStore((state) => state.activeLeafId);
@@ -546,10 +530,8 @@ export const App = () => {
   const markPanelEngagement = usePanelEngagementStore((state) => state.handleSelectionTransition);
   const removePanelEngagement = usePanelEngagementStore((state) => state.removePanel);
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
-  const [isSearchOpen, setSearchOpen] = useState<boolean>(true); ///< 検索パネル折畳状態。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
   const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!appSettings) {
@@ -574,15 +556,9 @@ export const App = () => {
       return { ...prev, selectedStrategy: appSettings.converter.strategy } satisfies ConversionModalDisplayState;
     });
   }, [appSettings]);
-  const [searchScope, setSearchScope] = useState<SearchScope>('current');
-  const [searchUseRegex, setSearchUseRegex] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   const [traceBusy, setTraceBusy] = useState<boolean>(false); ///< トレース操作中フラグ。
   const [isTraceFilterOpen, setTraceFilterOpen] = useState<boolean>(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
-  const searchScopeEntries = useMemo(() => Object.entries(SEARCH_SCOPE_LABELS) as [SearchScope, string][], []);
 
   const allowedStatuses = useMemo(() => new Set<CardStatus>(CARD_STATUS_SEQUENCE), []);
   const allowedKinds = useMemo(() => new Set<CardKind>(CARD_KIND_VALUES as CardKind[]), []);
@@ -2156,29 +2132,20 @@ export const App = () => {
    * @brief 検索パネルを開いて検索欄へフォーカスする。
    */
   const openSearchPanel = useCallback(() => {
-    const focusInput = () => {
-      window.setTimeout(() => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }, 0);
-    };
-
-    if (!isSearchOpen) {
-      setSearchOpen(true);
+    if (!searchIsOpen) {
+      openSearchDialog();
       const now = new Date();
-      notify('info', '検索パネルを表示しました。');
+      notify('info', '検索ダイアログを表示しました。');
       pushLog({
         id: `search-open-${now.valueOf()}`,
         level: 'INFO',
-        message: '検索パネルを表示しました。',
+        message: '検索ダイアログを表示しました。',
         timestamp: now,
       });
-      focusInput();
       return;
     }
-
-    focusInput();
-  }, [isSearchOpen, notify, pushLog]);
+    openSearchDialog();
+  }, [notify, openSearchDialog, pushLog, searchIsOpen]);
 
   /** サイドバーとカード領域の列レイアウトスタイル。 */
   const contentStyle = useMemo<CSSProperties>(() => {
@@ -2324,22 +2291,6 @@ export const App = () => {
     setExplorerOpen((prev) => !prev);
   }, []);
 
-  const handleSearchToggle = useCallback(() => {
-    if (isSearchOpen) {
-      setSearchOpen(false);
-      const now = new Date();
-      notify('info', '検索パネルを非表示にしました。');
-      pushLog({
-        id: `search-close-${now.valueOf()}`,
-        level: 'INFO',
-        message: '検索パネルを非表示にしました。',
-        timestamp: now,
-      });
-      return;
-    }
-    openSearchPanel();
-  }, [isSearchOpen, notify, openSearchPanel, pushLog]);
-
   /**
    * @brief サイドバー表示/非表示トグル。
    */
@@ -2401,115 +2352,8 @@ export const App = () => {
     [activeTabId, addCard, effectiveLeafId, notify, pushLog],
   );
 
-  const executeSearch = useCallback(async () => {
-    const trimmed = searchQuery.trim();
-    if (!trimmed) {
-      setSearchError('検索キーワードを入力してください。');
-      setSearchResults([]);
-      return;
-    }
-
-    const matcher = createSearchMatcher(trimmed, searchUseRegex);
-    if (!matcher.valid) {
-      setSearchError(matcher.error ?? '検索条件が無効です。');
-      setSearchResults([]);
-      return;
-    }
-
-    setSearching(true);
-    try {
-      type Dataset = { source: 'open' | 'input'; tabId?: string; leafId?: string; fileName: string | null; cards: Card[] };
-      const datasets: Dataset[] = [];
-      const workspaceState = useWorkspaceStore.getState();
-
-      if (searchScope === 'current') {
-        const targetLeafId = effectiveLeafId;
-        if (!targetLeafId) {
-          setSearchError('検索対象のカードパネルが選択されていません。');
-          setSearchResults([]);
-          return;
-        }
-        const leafState = workspaceState.leafs[targetLeafId];
-        const tabId = leafState?.activeTabId;
-        if (!tabId) {
-          setSearchError('アクティブなカードファイルがありません。');
-          setSearchResults([]);
-          return;
-        }
-        const tab = workspaceState.tabs[tabId];
-        if (!tab) {
-          setSearchError('アクティブタブが見つかりません。');
-          setSearchResults([]);
-          return;
-        }
-        datasets.push({ source: 'open', tabId, leafId: targetLeafId, fileName: tab.fileName, cards: tab.cards });
-      } else if (searchScope === 'open') {
-        Object.values(workspaceState.tabs).forEach((tab) => {
-          datasets.push({ source: 'open', tabId: tab.id, leafId: tab.leafId, fileName: tab.fileName, cards: tab.cards });
-        });
-        if (datasets.length === 0) {
-          setSearchError('開いているカードファイルがありません。');
-          setSearchResults([]);
-          return;
-        }
-      } else {
-        if (!window.app?.workspace?.loadCardFile) {
-          setSearchError('カードファイル読み込み機能が利用できません。');
-          setSearchResults([]);
-          return;
-        }
-        const listApi = window.app.workspace.listCardFiles?.bind(window.app.workspace);
-        const fileList = cardFiles.length > 0 ? cardFiles : listApi ? await listApi() : [];
-        for (const fileName of fileList) {
-          try {
-            const snapshot = await window.app.workspace.loadCardFile(fileName);
-            if (snapshot?.cards) {
-              datasets.push({ source: 'input', fileName, cards: snapshot.cards });
-            }
-          } catch (error) {
-            console.error('[App] search load failed', fileName, error);
-          }
-        }
-        if (datasets.length === 0) {
-          setSearchError('検索対象となるカードファイルがありません。');
-          setSearchResults([]);
-          return;
-        }
-      }
-
-      const nextResults: SearchResultItem[] = [];
-      datasets.forEach((dataset) => {
-        dataset.cards.forEach((card) => {
-          const haystack = `${card.title ?? ''}\n${card.body ?? ''}`;
-          const match = matcher.match(haystack);
-          if (match.count > 0) {
-            nextResults.push({
-              id: `${dataset.fileName ?? dataset.tabId ?? 'untitled'}-${card.id}-${nextResults.length}`,
-              source: dataset.source,
-              fileName: dataset.fileName,
-              tabId: dataset.tabId,
-              leafId: dataset.leafId,
-              cardId: card.id,
-              cardTitle: card.title,
-              snippet: buildSnippet(haystack, match),
-              matchCount: match.count,
-            });
-          }
-        });
-      });
-
-      setSearchResults(nextResults);
-      setSearchError(nextResults.length === 0 ? '該当するカードがありません。' : null);
-    } catch (error) {
-      console.error('[App] search failed', error);
-      setSearchError('検索処理中にエラーが発生しました。');
-    } finally {
-      setSearching(false);
-    }
-  }, [cardFiles, effectiveLeafId, searchQuery, searchScope, searchUseRegex]);
-
   const handleSearchResultNavigate = useCallback(
-    async (result: SearchResultItem) => {
+    async (result: SearchResult) => {
       const focusCard = (tabId: string, leafId: string, cardId: string) => {
         const store = useWorkspaceStore.getState();
         store.setActiveTab(leafId, tabId);
@@ -2549,38 +2393,6 @@ export const App = () => {
     },
     [handleLoadCardFile],
   );
-
-  const handleSearchSubmit = useCallback(
-    (event: ReactFormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      void executeSearch();
-    },
-    [executeSearch],
-  );
-
-  const handleSearchClear = useCallback(() => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setSearchError(null);
-  }, []);
-
-  const searchStatusText = useMemo(() => {
-    if (searching) {
-      return '検索中...';
-    }
-    if (searchError) {
-      return searchError;
-    }
-    if (searchResults.length === 0) {
-      return 'まだ検索結果はありません';
-    }
-    return `${searchResults.length}件ヒット`;
-  }, [searchError, searchResults.length, searching]);
-
-  const searchStatusClass = useMemo(() => {
-    return `sidebar__search-status${searchError ? ' sidebar__search-status--error' : ''}`;
-  }, [searchError]);
-  const canClearSearch = searchQuery.trim().length > 0 || searchResults.length > 0 || Boolean(searchError);
 
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -2873,6 +2685,18 @@ export const App = () => {
   return (
     <div className="app-shell" data-dragging={dragTarget ? 'true' : 'false'}>
       <NotificationCenter />
+      <SearchDialog
+        onNavigate={handleSearchResultNavigate}
+        onClose={() => {
+          const now = new Date();
+          pushLog({
+            id: `search-close-${now.valueOf()}`,
+            level: 'INFO',
+            message: '検索ダイアログを閉じました。',
+            timestamp: now,
+          });
+        }}
+      />
       <SettingsModal
         isOpen={settingsModalState.open}
         isLoading={settingsModalState.loading}

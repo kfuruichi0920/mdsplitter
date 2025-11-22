@@ -80,7 +80,8 @@ interface TraceState {
   }) => TraceCacheEntry;
   getCountsForFile: (fileName: string) => { left: Record<string, number>; right: Record<string, number> };
   getRelatedCards: (seeds: TraceSeed[]) => Record<string, Set<string>>;
-  getRelatedNodeKeys: (seeds: TraceSeed[]) => Set<string>;
+  getRelatedCardsWithDepth: (seeds: TraceSeed[], depth: number) => Record<string, Set<string>>;
+  getRelatedNodeKeys: (seeds: TraceSeed[], depth?: number) => Set<string>;
   getMatrixData: (leftFile: string, rightFile: string) => Promise<TraceCacheEntry>;
 }
 
@@ -192,29 +193,39 @@ const buildAdjacency = (cache: Record<string, TraceCacheEntry>): Map<string, Set
   return adjacency;
 };
 
-const collectRelatedNodeKeys = (cache: Record<string, TraceCacheEntry>, seeds: TraceSeed[]): Set<string> => {
+const collectRelatedNodeKeys = (
+  cache: Record<string, TraceCacheEntry>,
+  seeds: TraceSeed[],
+  depth = Infinity,
+): Set<string> => {
   const adjacency = buildAdjacency(cache);
   const visited = new Set<string>();
-  const queue: string[] = [];
+  const queue: Array<{ key: string; depth: number }> = [];
 
   seeds.forEach(({ fileName, cardId }) => {
     const key = toTraceNodeKey(fileName, cardId);
     if (!visited.has(key)) {
       visited.add(key);
-      queue.push(key);
+      queue.push({ key, depth: 0 });
     }
   });
 
   while (queue.length > 0) {
-    const current = queue.shift() as string;
-    const neighbors = adjacency.get(current);
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    const neighbors = adjacency.get(current.key);
     if (!neighbors) {
+      continue;
+    }
+    if (current.depth >= depth) {
       continue;
     }
     neighbors.forEach((neighbor) => {
       if (!visited.has(neighbor)) {
         visited.add(neighbor);
-        queue.push(neighbor);
+        queue.push({ key: neighbor, depth: current.depth + 1 });
       }
     });
   }
@@ -266,17 +277,17 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
     }
     return aggregateCountsForFile(get().cache, fileName);
   },
-  getRelatedNodeKeys: (seeds) => {
+  getRelatedNodeKeys: (seeds, depth) => {
     if (!seeds || seeds.length === 0) {
       return new Set<string>();
     }
-    return collectRelatedNodeKeys(get().cache, seeds);
+    return collectRelatedNodeKeys(get().cache, seeds, depth ?? Infinity);
   },
-  getRelatedCards: (seeds) => {
+  getRelatedCardsWithDepth: (seeds, depth) => {
     if (!seeds || seeds.length === 0) {
       return {};
     }
-    const nodeKeys = collectRelatedNodeKeys(get().cache, seeds);
+    const nodeKeys = collectRelatedNodeKeys(get().cache, seeds, depth);
     const result: Record<string, Set<string>> = {};
     nodeKeys.forEach((nodeKey) => {
       const { fileName, cardId } = splitTraceNodeKey(nodeKey);
@@ -289,6 +300,9 @@ export const useTraceStore = create<TraceState>()((set, get) => ({
       result[fileName]?.add(cardId);
     });
     return result;
+  },
+  getRelatedCards: (seeds) => {
+    return get().getRelatedCardsWithDepth(seeds, Infinity);
   },
   loadTraceForPair: async (leftFile, rightFile) => {
     const key = toKey(leftFile, rightFile);
