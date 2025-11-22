@@ -208,6 +208,18 @@
     @apply rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
   }
 
+  .sidebar__content {
+    @apply max-h-full overflow-y-auto overflow-x-auto pr-1;
+  }
+
+  .sidebar__tree {
+    @apply flex flex-col gap-1 pl-0 min-w-full;
+  }
+
+  .sidebar__tree-file--flat {
+    @apply pl-1;
+  }
+
   .sidebar__search-form {
     @apply flex flex-col gap-2;
   }

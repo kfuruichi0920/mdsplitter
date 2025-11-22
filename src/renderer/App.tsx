@@ -3076,44 +3076,36 @@ export const App = () => {
                 aria-hidden={!isExplorerOpen}
               >
                 <ul className="sidebar__tree" role="tree">
-                  <li role="treeitem" aria-expanded="true">
-                    📁 _out
-                    <ul role="group">
-                      {outputFiles.length === 0 ? (
-                        <li role="treeitem" className="sidebar__tree-empty">
-                          出力ファイルがありません
-                        </li>
-                      ) : (
-                        outputFiles.map((file) => {
-                          // トレース情報ファイルかどうかを判定
-                          const isTraceFile = file.endsWith('.trace.json');
-                          const fileIcon = isTraceFile ? '📈' : '📄';
-                          // 現在開いているファイルかどうかを判定
-                          const isOpen = Object.values(tabs).some((tab) => tab.fileName === file);
-                          const displayIcon = isOpen ? '📜' : fileIcon;
-
-                          return (
-                            <li
-                              key={file}
-                              role="treeitem"
-                              className="sidebar__tree-file"
-                              onDoubleClick={() => handleLoadOutputFile(file)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault();
-                                  void handleLoadOutputFile(file);
-                                }
-                              }}
-                              tabIndex={0}
-                              title={`ダブルクリックして ${file} を読み込む (_out)`}
-                            >
-                              {displayIcon} {file}
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
-                  </li>
+                  {outputFiles.filter((file) => !(file.startsWith('trace_') && file.endsWith('.json'))).length === 0 ? (
+                    <li role="treeitem" className="sidebar__tree-empty">
+                      出力ファイルがありません
+                    </li>
+                  ) : (
+                    outputFiles
+                      .filter((file) => !(file.startsWith('trace_') && file.endsWith('.json')))
+                      .map((file) => {
+                        const isOpen = Object.values(tabs).some((tab) => tab.fileName === file);
+                        const displayIcon = isOpen ? '📜' : '📄';
+                        return (
+                          <li
+                            key={file}
+                            role="treeitem"
+                            className="sidebar__tree-file sidebar__tree-file--flat"
+                            onDoubleClick={() => handleLoadOutputFile(file)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                void handleLoadOutputFile(file);
+                              }
+                            }}
+                            tabIndex={0}
+                            title={`ダブルクリックして ${file} を読み込む`}
+                          >
+                            {displayIcon} {file}
+                          </li>
+                        );
+                      })
+                  )}
                 </ul>
               </div>
             </div>
