@@ -128,6 +128,7 @@ const openSearchWindow = async () => {
 		show: false,
 		parent: mainWindow ?? undefined,
 		webPreferences: {
+			preload: resolvePreloadPath(),
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
@@ -139,8 +140,8 @@ const openSearchWindow = async () => {
 		searchWindow = null;
 	});
 
-	const url = `http://127.0.0.1:${port}/search`;
-	await searchWindow.loadURL(url);
+	const url = path.resolve(__dirname, '../renderer/search.html');
+	await searchWindow.loadFile(url);
 };
 
 
@@ -456,6 +457,16 @@ app.whenReady().then(async () => {
 
 	createWindow(); //!< 初回ウィンドウ生成
 	setMainWindowResolver(() => mainWindow);
+
+	try {
+		console.info('[main] starting search server...');
+		const port = await startSearchServer();
+		logMessage('info', `検索APIサーバを起動しました (port=${port})`);
+		console.info(`[main] search server ready on port ${port}`);
+	} catch (error) {
+		console.error('[main] 検索APIサーバ起動に失敗しました', error);
+		logMessage('error', `検索APIサーバ起動に失敗: ${String(error)}`);
+	}
 
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) {

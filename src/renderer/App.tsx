@@ -526,6 +526,7 @@ export const App = () => {
   const [isExplorerOpen, setExplorerOpen] = useState<boolean>(true); ///< エクスプローラ折畳状態。
   const [cardFiles, setCardFiles] = useState<string[]>([]); ///< カードファイル一覧（_input）。
   const [outputFiles, setOutputFiles] = useState<string[]>([]); ///< 出力ファイル一覧（_out）。
+  const [searchServerPort, setSearchServerPort] = useState<number | null>(null); ///< 検索APIサーバポート。
 
   useEffect(() => {
     if (!appSettings) {
@@ -538,6 +539,18 @@ export const App = () => {
       return { ...prev, selectedStrategy: appSettings.converter.strategy } satisfies ConversionModalDisplayState;
     });
   }, [appSettings]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const info = await window.app.search.getServerInfo();
+        setSearchServerPort(info.port ?? null);
+        console.info('[renderer] search server info', info);
+      } catch (error) {
+        console.error('[App] failed to get search server info', error);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!appSettings) {
@@ -3178,6 +3191,7 @@ export const App = () => {
           <span>総カード数: {cardCount}</span>
           <span>選択カード: {selectedDisplayNumber}</span>
           <span>{saveStatusText}</span>
+          <span>検索API: {searchServerPort ?? '---'}</span>
         </div>
         {conversionState.converting && (
           <div className="status-bar__section status-bar__section--progress">

@@ -75,72 +75,6 @@ export const setMainWindowResolver = (resolver: () => BrowserWindow | null): voi
   getMainWindow = resolver;
 };
 
-const buildSearchPage = (port: number): string => `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>Search</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 16px; }
-    h1 { margin-top: 0; }
-    label { display:block; margin:8px 0 4px; font-weight:600; }
-    input, select, textarea, button { width:100%; padding:8px; margin-bottom:8px; }
-    .results { border:1px solid #ddd; padding:8px; max-height:300px; overflow:auto; }
-    .result { padding:6px; border-bottom:1px solid #eee; cursor:pointer; }
-    .meta { color:#666; font-size:12px; }
-  </style>
-</head>
-<body>
-  <h1>検索</h1>
-  <form id="search-form">
-    <label>キーワード</label>
-    <input id="keyword" type="text" placeholder="検索キーワード" />
-    <label>モード</label>
-    <select id="mode">
-      <option value="text">キーワード</option>
-      <option value="regex">正規表現</option>
-      <option value="id">ID</option>
-      <option value="trace">トレース</option>
-      <option value="advanced">高度(AND)</option>
-    </select>
-    <label>範囲</label>
-    <select id="scope">
-      <option value="current">アクティブタブ</option>
-      <option value="open">開いているタブ</option>
-      <option value="input">_input</option>
-    </select>
-    <button type="submit">検索</button>
-  </form>
-  <div class="results" id="results"></div>
-  <script>
-    const render = (items) => {
-      const container = document.getElementById('results');
-      container.innerHTML = '';
-      items.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'result';
-        div.innerHTML = '<div class="meta">' + item.fileName + ' (' + item.matchCount + ')</div><div>' + item.cardTitle + '</div><div class="meta">' + item.snippet + '</div>';
-        div.onclick = async () => {
-          await fetch('http://127.0.0.1:${port}/api/focus', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: item.fileName, cardId: item.cardId, tabId: item.tabId }) });
-        };
-        container.appendChild(div);
-      });
-    };
-    document.getElementById('search-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const body = {
-        scope: document.getElementById('scope').value,
-        mode: document.getElementById('mode').value,
-        text: document.getElementById('keyword').value,
-      };
-      const res = await fetch('http://127.0.0.1:${port}/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json();
-      render(data.results ?? []);
-    });
-  </script>
-</body>
-</html>`;
-
 const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${state.port ?? 0}`);
   if (req.method === 'OPTIONS') {
@@ -155,12 +89,6 @@ const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
 
   if (req.method === 'GET' && url.pathname === '/api/search/history') {
     sendJson(res, 200, state.history);
-    return;
-  }
-
-  if (req.method === 'GET' && url.pathname === '/search') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(buildSearchPage(state.port ?? 0));
     return;
   }
 
@@ -251,31 +179,49 @@ const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
     });
   }
 
-  if (req.method === 'GET' && url.pathname === '/') {
-    res.writeHead(302, { Location: '/search' });
-    res.end();
-    return;
-  }
-
   notFound(res);
 };
 
 export const startSearchServer = async (): Promise<number> => {
   if (state.server && state.port) {
+    console.info(`[searchServer] already running on port ${state.port}`);
     return state.port;
   }
-  const server = http.createServer(handler);
-  await new Promise<void>((resolve) => {
-    server.listen(0, '127.0.0.1', () => resolve());
-  });
-  const address = server.address();
-  if (typeof address === 'object' && address && typeof address.port === 'number') {
-    state.port = address.port;
-  } else {
-    throw new Error('Failed to start search server');
-  }
-  state.server = server;
-  return state.port;
+  const attemptStart = async (attempt: number): Promise<number> => {
+    return await new Promise<number>((resolve, reject) => {
+      const server = http.createServer(handler);
+      server.on('error', (err: NodeJS.ErrnoException) => {
+        console.error(`[searchServer] error on start (attempt ${attempt}):`, err);
+        if (err.code === 'EADDRINUSE') {
+          server.close(() => {
+            if (attempt < 5) {
+              setTimeout(() => {
+                attemptStart(attempt + 1).then(resolve).catch(reject);
+              }, 50 * attempt);
+            } else {
+              reject(new Error('検索サーバのポートを確保できません (EADDRINUSE)'));
+            }
+          });
+        } else {
+          reject(err);
+        }
+      });
+
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (typeof address === 'object' && address && typeof address.port === 'number') {
+          state.port = address.port;
+          state.server = server;
+          console.info(`[searchServer] started on port ${state.port}`);
+          resolve(address.port);
+        } else {
+          reject(new Error('Failed to resolve search server address'));
+        }
+      });
+    });
+  };
+
+  return attemptStart(1);
 };
 
 export const getSearchServerPort = (): number | null => state.port;
