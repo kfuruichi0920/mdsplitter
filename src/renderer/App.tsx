@@ -2381,11 +2381,31 @@ export const App = () => {
 
   const handleSearchResultNavigate = useCallback(
     async (result: { fileName: string | null; cardId: string; tabId?: string | null; leafId?: string | null }) => {
+      const scrollCardIntoView = (cardId: string, attempt = 0) => {
+        const esc = (value: string) => {
+          if (globalThis.CSS?.escape) {
+            return globalThis.CSS.escape(value);
+          }
+          return value.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+        };
+        const selector = `[data-card-id="${esc(cardId)}"]`;
+        const element = document.querySelector<HTMLElement>(selector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus?.({ preventScroll: true });
+          return;
+        }
+        if (attempt < 5) {
+          window.setTimeout(() => scrollCardIntoView(cardId, attempt + 1), 80);
+        }
+      };
+
       const focusCard = (tabId: string, leafId: string, cardId: string) => {
         const store = useWorkspaceStore.getState();
         store.setActiveTab(leafId, tabId);
         store.selectCard(leafId, tabId, cardId);
         useSplitStore.getState().setActiveLeaf(leafId);
+        scrollCardIntoView(cardId);
       };
 
       const workspaceState = useWorkspaceStore.getState();
