@@ -172,27 +172,7 @@ export const SearchApp = () => {
 
       <form className="search-window__form" onSubmit={handleSubmit}>
         <div className="search-window__row">
-          <label className="search-window__field">
-            <span>キーワード</span>
-            <input
-              type="search"
-              placeholder="キーワードを入力"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              disabled={mode === 'advanced'}
-            />
-          </label>
-          <label className="search-window__field">
-            <span>モード</span>
-            <select value={mode} onChange={(e) => setMode(e.target.value as SearchMode)}>
-              {(Object.keys(MODE_LABELS) as SearchMode[]).map((m) => (
-                <option key={m} value={m}>
-                  {MODE_LABELS[m]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="search-window__field">
+          <label className="search-window__field search-window__field--narrow">
             <span>範囲</span>
             <select value={scope} onChange={(e) => setScope(e.target.value as SearchScope)}>
               {(Object.keys(SCOPE_LABELS) as SearchScope[]).map((s) => (
@@ -202,16 +182,41 @@ export const SearchApp = () => {
               ))}
             </select>
           </label>
-          <label className="search-window__field search-window__checkbox">
-            <input
-              type="checkbox"
-              checked={useRegex}
-              onChange={(e) => setUseRegex(e.target.checked)}
-              disabled={mode !== 'regex' && mode !== 'text'}
-            />
-            <span>正規表現</span>
+
+          <label className="search-window__field search-window__field--wide">
+            <span>キーワード</span>
+            <div className="search-window__keyword">
+              <input
+                type="search"
+                placeholder="キーワードを入力"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                disabled={mode === 'advanced'}
+              />
+              <label className="search-window__checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={useRegex}
+                  onChange={(e) => setUseRegex(e.target.checked)}
+                  disabled={mode !== 'regex' && mode !== 'text'}
+                />
+                <span>正規表現</span>
+              </label>
+            </div>
           </label>
-          <label className="search-window__field search-window__number">
+
+          <label className="search-window__field search-window__field--narrow">
+            <span>検索モード</span>
+            <select value={mode} onChange={(e) => setMode(e.target.value as SearchMode)}>
+              {(Object.keys(MODE_LABELS) as SearchMode[]).map((m) => (
+                <option key={m} value={m}>
+                  {MODE_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="search-window__field search-window__field--narrow">
             <span>深さ</span>
             <input
               type="number"
@@ -222,6 +227,7 @@ export const SearchApp = () => {
               disabled={mode !== 'trace' && mode !== 'advanced'}
             />
           </label>
+
           <button className="search-window__submit" type="submit" disabled={status === 'loading'}>
             {status === 'loading' ? '検索中…' : '検索'}
           </button>
@@ -307,7 +313,6 @@ export const SearchApp = () => {
             <div className="search-window__result-meta">
               <span className="search-window__badge">{item.source}</span>
               <span className="search-window__file">{item.fileName ?? '未保存'}</span>
-              <span className="search-window__count">{item.matchCount}件</span>
             </div>
             <div className="search-window__result-title">{item.cardTitle || '(無題)'}</div>
             <div className="search-window__result-snippet">{item.snippet}</div>

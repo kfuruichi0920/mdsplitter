@@ -2417,8 +2417,8 @@ export const App = () => {
           element.focus?.({ preventScroll: true });
           return;
         }
-        if (attempt < 5) {
-          window.setTimeout(() => scrollCardIntoView(cardId, attempt + 1), 80);
+        if (attempt < 10) {
+          window.setTimeout(() => scrollCardIntoView(cardId, attempt + 1), 120);
         }
       };
 
