@@ -261,6 +261,37 @@ export const SearchApp = () => {
           >
             <span className="search-window__history-label">{h.label}</span>
             <span className="search-window__history-count">{h.results.length}</span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="search-window__history-close"
+              aria-label="履歴を削除"
+              onClick={(e) => {
+                e.stopPropagation();
+                setHistory((prev) => prev.filter((item) => item.id !== h.id));
+                if (activeSessionId === h.id) {
+                  const next = history.filter((item) => item.id !== h.id);
+                  setActiveSessionId(next[0]?.id ?? null);
+                  setResults(next[0]?.results ?? []);
+                  setActiveResultId(null);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setHistory((prev) => prev.filter((item) => item.id !== h.id));
+                  if (activeSessionId === h.id) {
+                    const next = history.filter((item) => item.id !== h.id);
+                    setActiveSessionId(next[0]?.id ?? null);
+                    setResults(next[0]?.results ?? []);
+                    setActiveResultId(null);
+                  }
+                }
+              }}
+            >
+              ✕
+            </span>
           </button>
         ))}
       </div>
