@@ -226,6 +226,16 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 	);
 	const leftTraceCounts = traceCounts.left ?? {};
 	const rightTraceCounts = traceCounts.right ?? {};
+	const totalTraceCounts = useMemo(() => {
+		const totals: Record<string, number> = {};
+		Object.entries(leftTraceCounts).forEach(([id, count]) => {
+			totals[id] = (totals[id] ?? 0) + count;
+		});
+		Object.entries(rightTraceCounts).forEach(([id, count]) => {
+			totals[id] = (totals[id] ?? 0) + count;
+		});
+		return totals;
+	}, [leftTraceCounts, rightTraceCounts]);
 
 	useEffect(() => {
 		if (!lastInsertPreview || !activeTabId) {
@@ -1737,6 +1747,7 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 						traceHighlightIds={combinedHighlightIds ?? undefined}
 						leftTraceCount={activeFileName ? leftTraceCounts[card.id] ?? 0 : 0}
 						rightTraceCount={activeFileName ? rightTraceCounts[card.id] ?? 0 : 0}
+						connectorCount={activeFileName ? totalTraceCounts[card.id] ?? 0 : 0}
 						leftConnectorVisible={getCardSideVisibility(card.id, 'left')}
 						rightConnectorVisible={getCardSideVisibility(card.id, 'right')}
 						markdownPreviewEnabled={card.markdownPreviewEnabled}
@@ -2010,6 +2021,7 @@ interface CardListItemProps {
 	traceHighlightIds?: Set<string> | null;
 	leftTraceCount: number;
 	rightTraceCount: number;
+	connectorCount: number;
 	leftConnectorVisible: boolean;
 	rightConnectorVisible: boolean;
 	onToggleLeftConnector?: () => void;
@@ -2054,6 +2066,7 @@ const CardListItem = React.memo(({
 	traceHighlightIds,
 	leftTraceCount,
 	rightTraceCount,
+	connectorCount,
 	leftConnectorVisible,
 	rightConnectorVisible,
 	onToggleLeftConnector,
@@ -2194,8 +2207,9 @@ const CardListItem = React.memo(({
 		);
 	};
 
-	const leftConnectorNode = renderConnector('left', card.hasLeftTrace, leftTraceCount, leftConnectorVisible, onToggleLeftConnector);
-	const rightConnectorNode = renderConnector('right', card.hasRightTrace, rightTraceCount, rightConnectorVisible, onToggleRightConnector);
+	const totalCount = connectorCount ?? 0;
+	const leftConnectorNode = renderConnector('left', card.hasLeftTrace, totalCount, leftConnectorVisible, onToggleLeftConnector);
+	const rightConnectorNode = renderConnector('right', card.hasRightTrace, totalCount, rightConnectorVisible, onToggleRightConnector);
 	const shouldRenderMarkdown = markdownPreviewEnabled && isMarkdownPreviewGlobalEnabled;
 	const markdownHtml = useMemo(() => (shouldRenderMarkdown ? renderMarkdownToHtml(card.body) : null), [card.body, shouldRenderMarkdown]);
 
