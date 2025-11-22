@@ -1,8 +1,9 @@
 import { nanoid } from 'nanoid';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import type { FormEvent } from 'react';
 import type { SearchMode, SearchRequest, SearchResult, SearchScope } from '@/shared/search';
 import { applyThemeColors, applyTypography, applySplitterWidth } from '../utils/themeUtils';
+import { addClipboardText } from '../utils/clipboard';
 import { defaultSettings } from '@/shared/settings';
 import type { ThemeSettings } from '@/shared/settings';
 import { AdvancedSearchBuilder, type ConditionRow } from '../components/AdvancedSearchBuilder';
@@ -42,11 +43,36 @@ export const SearchApp = () => {
   >([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeResultId, setActiveResultId] = useState<string | null>(null);
+  const [logVisible, setLogVisible] = useState<boolean>(false);
+  const [logHeight, setLogHeight] = useState<number>(160);
+  const [draggingLog, setDraggingLog] = useState<boolean>(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const logRef = useRef<HTMLPreElement | null>(null);
   const resolveThemeMode = (mode: 'light' | 'dark' | 'system'): 'light' | 'dark' => {
     if (mode === 'system') {
       return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     return mode === 'dark' ? 'dark' : 'light';
+  };
+
+  const handleLogCopy = async () => {
+    try {
+      const text = logs.join('\n');
+      await addClipboardText(text);
+    } catch (error) {
+      console.error('[SearchApp] failed to copy log', error);
+    }
+  };
+
+  const handleLogResizeStart = () => setDraggingLog(true);
+  const handleLogResizeEnd = () => setDraggingLog(false);
+  const handleLogResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingLog) return;
+    const host = (e.currentTarget.parentElement as HTMLElement) ?? null;
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    const newHeight = rect.bottom - e.clientY - 8;
+    setLogHeight(Math.max(120, Math.min(newHeight, 480)));
   };
 
   useEffect(() => {
@@ -74,18 +100,23 @@ export const SearchApp = () => {
         console.error('[SearchApp] failed to apply theme', err);
       }
     })();
-    const unsubscribe = window.app.theme.onChanged((theme: ThemeSettings['theme']) => {
-      const mode = resolveThemeMode(theme.mode ?? defaultSettings.theme.mode);
-      const colors = mode === 'dark' ? theme.dark : theme.light;
-      applyThemeColors(colors);
-      applyTypography(theme.fontSize, theme.fontFamily);
-      applySplitterWidth(theme.splitterWidth);
-      if (mode === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    });
+    const unsubscribe =
+      window.app?.theme?.onChanged?.((theme: ThemeSettings['theme']) => {
+        try {
+          const mode = resolveThemeMode(theme.mode ?? defaultSettings.theme.mode);
+          const colors = mode === 'dark' ? theme.dark : theme.light;
+          applyThemeColors(colors);
+          applyTypography(theme.fontSize, theme.fontFamily);
+          applySplitterWidth(theme.splitterWidth);
+          if (mode === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (error) {
+          console.error('[SearchApp] failed to apply theme (onChanged)', error);
+        }
+      }) ?? null;
     return () => {
       unsubscribe?.();
     };
@@ -121,12 +152,14 @@ export const SearchApp = () => {
     setStatus('loading');
     setError(null);
     try {
+      setLogs((prev) => [...prev, `[send] /api/search ${JSON.stringify(requestBody)}`]);
       const res = await fetch(`${API_ORIGIN(port)}/api/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
       const json = await res.json();
+      setLogs((prev) => [...prev, `[recv] /api/search status=${res.status} ${JSON.stringify(json)}`]);
       if (!res.ok) {
         setError(json?.error ?? '検索に失敗しました。');
         setStatus('error');
@@ -153,6 +186,7 @@ export const SearchApp = () => {
     }
     setActiveResultId(item.id);
     try {
+      setLogs((prev) => [...prev, `[send] /api/focus ${JSON.stringify({ fileName: item.fileName, cardId: item.cardId, tabId: item.tabId })}`]);
       await fetch(`${API_ORIGIN(port)}/api/focus`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -246,9 +280,19 @@ export const SearchApp = () => {
       </form>
 
       <div className="search-window__status">
-        {error ? <span className="search-window__error">{error}</span> : null}
-        {!error && status === 'loading' ? <span>検索中...</span> : null}
-        {!error && status === 'ready' ? <span>{results.length}件ヒット</span> : null}
+        <div className="search-window__status-left">
+          {error ? <span className="search-window__error">{error}</span> : null}
+          {!error && status === 'loading' ? <span>検索中...</span> : null}
+          {!error && status === 'ready' ? <span>{results.length}件ヒット</span> : null}
+        </div>
+        <div className="search-window__status-right">
+          <button type="button" className="search-window__log-toggle" onClick={() => setLogVisible((v) => !v)}>
+            {logVisible ? 'ログ非表示' : 'ログ表示'}
+          </button>
+          <button type="button" className="search-window__log-copy" onClick={handleLogCopy}>
+            ログコピー
+          </button>
+        </div>
       </div>
 
       <div className="search-window__history" role="tablist" aria-label="検索履歴">
@@ -302,22 +346,39 @@ export const SearchApp = () => {
         ))}
       </div>
 
-      <div className="search-window__results" aria-label="検索結果">
-        {results.map((item) => (
-          <button
-            key={item.id}
-            className={`search-window__result${activeResultId === item.id ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => handleFocus(item)}
-          >
-            <div className="search-window__result-meta">
-              <span className="search-window__badge">{item.source}</span>
-              <span className="search-window__file">{item.fileName ?? '未保存'}</span>
+      <div className="search-window__panes">
+        <div className="search-window__results" aria-label="検索結果">
+          {results.map((item) => (
+            <button
+              key={item.id}
+              className={`search-window__result${activeResultId === item.id ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => handleFocus(item)}
+            >
+              <div className="search-window__result-meta">
+                <span className="search-window__badge">{item.source}</span>
+                <span className="search-window__file">{item.fileName ?? '未保存'}</span>
+              </div>
+              <div className="search-window__result-title">{item.cardTitle || '(無題)'}</div>
+              <div className="search-window__result-snippet search-window__result-snippet--clamp">{item.snippet}</div>
+            </button>
+          ))}
+        </div>
+        {logVisible ? (
+          <>
+            <div
+              className="search-window__log-separator"
+              role="separator"
+              aria-orientation="horizontal"
+              onPointerDown={handleLogResizeStart}
+              onPointerUp={handleLogResizeEnd}
+              onPointerMove={handleLogResize}
+            />
+            <div className="search-window__log" style={{ height: `${logHeight}px` }} aria-label="検索ログ">
+              <pre ref={logRef}>{logs.length === 0 ? 'ログはまだありません。' : logs.join('\n')}</pre>
             </div>
-            <div className="search-window__result-title">{item.cardTitle || '(無題)'}</div>
-            <div className="search-window__result-snippet">{item.snippet}</div>
-          </button>
-        ))}
+          </>
+        ) : null}
       </div>
     </div>
   );
