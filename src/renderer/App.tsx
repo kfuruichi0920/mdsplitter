@@ -2147,6 +2147,28 @@ export const App = () => {
   }, []);
 
   /**
+   * @brief 開いているタブのスナップショットを検索サーバへ同期する。
+   * @details
+   * タブ・カード更新のたびに最新を送ることで検索ダイアログが常に最新状態を検索できるようにする。
+   */
+  useEffect(() => {
+    void (async () => {
+      try {
+        const tabsSnapshot = buildOpenTabDatasets();
+        const activeLeafId = useSplitStore.getState().activeLeafId;
+        const activeTabId = activeLeafId ? leafs[activeLeafId]?.activeTabId ?? null : null;
+        await window.app.search.updateOpenTabs({
+          tabs: tabsSnapshot,
+          activeTabId,
+          activeLeafId,
+        });
+      } catch (error) {
+        console.warn('[App] failed to sync tabs to search server', error);
+      }
+    })();
+  }, [buildOpenTabDatasets, leafs, tabs]);
+
+  /**
    * @brief 検索ウィンドウを開き、RESTサーバへタブ情報を同期する。
    */
   const openSearchPanel = useCallback(() => {
