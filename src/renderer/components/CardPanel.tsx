@@ -1423,27 +1423,10 @@ export const CardPanel = ({ leafId, isActive = false, onLog, onPanelClick, onPan
 				>
 					➕
 				</button>
-				<div className="tab-bar__spacer" />
-				<button
-					type="button"
-					className="tab-bar__tab"
-					onClick={(event) => {
-						event.stopPropagation();
-						const defaultLeft = activeFileName ?? availableFiles[0] ?? '';
-						const alternative = availableFiles.find((file) => file !== defaultLeft) ?? '';
-						setMatrixLeftFile(defaultLeft);
-						setMatrixRightFile(alternative);
-						setMatrixDialogOpen(true);
-					}}
-					disabled={availableFiles.length < 2}
-					aria-label="トレースマトリクスを開く"
-					title="トレースマトリクスを開く"
-				>
-					🗺️
-				</button>
-				<button
-					type="button"
-					className="tab-bar__close"
+			<div className="tab-bar__spacer" />
+			<button
+				type="button"
+				className="tab-bar__close"
 					onClick={(event) => {
 						event.stopPropagation();
 						onPanelClose?.(leafId);
